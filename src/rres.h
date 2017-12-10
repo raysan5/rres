@@ -70,19 +70,24 @@ References:
 // NOTE: Some types are required for RAYGUI_STANDALONE usage
 //----------------------------------------------------------------------------------
 #if defined(RRES_STANDALONE)
-    // rRES data returned when reading a resource, it contains all required data for user (24 byte)
-    // NOTE: Using void *data pointer, so we can load to image.data, wave.data, mesh.*, (unsigned char *)
+    // rRES resource chunk (piece of data)
     typedef struct RRESChunk {
         unsigned int type;          // Resource chunk type (4 byte)
-        int *params;                // Resouce chunk parameters pointer (4 byte)
+        int *params;                // Resource chunk parameters pointer (4 byte)
         void *data;                 // Resource chunk data pointer (4 byte)
     } RRESChunk;
     
+    // rRES resource (single resource)
+    // NOTE: One resource could be composed of multiple chunks
     typedef struct RRES {
         unsigned int type;          // Resource type (4 bytes)
-        unsigned int resCount;      // Resources chunks counter
-        RRESChunk *resources;       // Resources chunks
+        unsigned int resCount;      // Resource chunks counter
+        RRESChunk *chunks;          // Resource chunks
     } RRES;
+    
+    // rRES resources array
+    // NOTE: It could be useful at some point to load multiple resources
+    typedef struct RRES *RRESList;  // Resources list pointer
     
     // RRESData type
     typedef enum { 
