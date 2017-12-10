@@ -63,7 +63,8 @@ References:
 //----------------------------------------------------------------------------------
 // Defines and Macros
 //----------------------------------------------------------------------------------
-#define MAX_RESOURCES_SUPPORTED   256
+#define RRES_MAX_RESOURCES      256
+#define RRES_CURRENT_VERSION    100
 
 //----------------------------------------------------------------------------------
 // Types and Structures Definition
