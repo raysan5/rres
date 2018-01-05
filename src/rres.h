@@ -50,7 +50,7 @@ References:
 #endif
 
 //#define RRES_STATIC
-#ifdef RRES_STATIC
+#if defined(RRES_STATIC)
     #define RRESDEF static              // Functions just visible to module including this file
 #else
     #ifdef __cplusplus
