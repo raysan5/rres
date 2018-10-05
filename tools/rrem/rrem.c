@@ -1,16 +1,20 @@
 /**********************************************************************************************
 *
-*   rREM - raylib Resource Embedder v0.1-dev
+*   rREM v0.5 - A simple and easy to use raylib resource embedder
 *
 *   DESCRIPTION:
+*       Tool to embbed resources (images, text, sounds...) into a file; possible uses:
+*         - Embedding into a resource file (.rres)
+*         - Directly embedding in executable program (.exe)
 *
-*   Tool to embbed resources (images, text, sounds, models...) into a file; two possible uses:
-*       - Embedding into a resource file (.rres)
-*       - Directly embedding in executable program (.exe)
-
-*   COMPILATION:
-*       gcc -o $(NAME_PART).exe $(FILE_NAME) external/tinyfiledialogs.c -I..\.. \ 
-*           -lraylib -lopengl32 -lgdi32 -lcomdlg32 -lole32 -std=c99 -Wall
+*   DEPENDENCIES:
+*       raylib 2.0              - Windowing/input management and drawing.
+*       raygui 2.0              - IMGUI controls (based on raylib).
+*       miniz                   - zlib-style compression/decompression library (DEFLATE algorithm)
+*
+*   COMPILATION (Windows - MinGW):
+*       gcc -o rrem.exe rrem.c external/miniz.c -s rrem.rc.data -Iexternal / 
+*           -lraylib -lopengl32 -lgdi32 -std=c99 -Wall -mwindows
 *
 // TODO: Review rRES file structure!!!
 *
@@ -94,10 +98,9 @@
 *       rrem -o image01.png sound.wav text.txt    # Create 'data.o' and 'data.h' including those 3 files,\n"
 *                                                   uses DEFLATE compression for pixel/wave/text data.\n"
 *
-*   Used external lib:
-*       stb_image - Multiple formats image loading (JPEG, PNG, BMP, TGA, PSD, GIF, PIC)
-*       miniz - zlib-style compression/decompression library (DEFLATE algorithm)
 *
+*   DEVELOPERS:
+*       Ramon Santamaria (@raysan5):   Developer, supervisor, updater and maintainer.
 *
 *   LICENSE: zlib/libpng
 *
@@ -130,20 +133,10 @@
 #include "external/raygui.h"    // Required for: IMGUI implementation
 
 //#define RRES_IMPLEMENTATION
-//#include "rres.h"               // Required for: rRES management --> Already embedded in raylib?
+//#include "rres.h"               // Required for: rRES management --> Not yet available...
 
-#include "external/tinyfiledialogs.h"   // Required for: Open/Save file dialogs
-//#include "external/dirent.h"            // Required for: Listing files in a directory
-//#include "external/miniz.c"             // Required for: DEFLATE compression/decompression --> Provided by rres.h
-
-// NOTE: If using dirent.h lib probably not required...
-#if defined(_WIN32)
-    #include <direct.h>
-    #define GetCurrentDir _getcwd
-#else
-    #include <unistd.h>
-    #define GetCurrentDir getcwd
-#endif
+//#include "external/tinyfiledialogs.h"   // Required for: Open/Save file dialogs
+#include "external/miniz.h"             // Required for: DEFLATE compression/decompression
 
 //----------------------------------------------------------------------------------
 // Some basic Defines
@@ -217,10 +210,10 @@ const char *usageHelp =
 //static unsigned char *CompressData(const unsigned char *data, unsigned long uncompSize, unsigned long *outCompSize);
 //static unsigned char *DecompressData(const unsigned char *data, unsigned long compSize, int uncompSize);
 
-static char *RemoveExtension(const char *mystr, char dot, char sep);
-static char *GetFileName(const char *path);
+static char *RemoveExtension(const char *fileName, char dot, char sep);
+
 static int GetRRESFileType(const char *ext);
-static void ListDirectoryFiles(const char *path);       // Print all the files and directories within directory
+
 
 //------------------------------------------------------------------------------------
 // Program main entry point
@@ -231,10 +224,8 @@ int main(int argc, char *argv[])
     // It's easier, just get the folder from argv[0]
 
     char currentPath[MAX_PATH_LENGTH];
-    //if (!GetCurrentDir(currentPath, sizeof(currentPath))) return -1;
-    //currentPath[sizeof(currentPath) - 1] = '\0'; // Not really required...
-    //printf("The current working directory is %s\n\n", currentPath);
-            
+    strcpy(currentPath, GetWorkingDirectory());
+
     ResourceInfo resources[256];       // RRES_MAX_RESOURCES
     unsigned int resCount = 0;
 
@@ -256,12 +247,6 @@ int main(int argc, char *argv[])
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(800, 450, "rREM - raylib resource embedded");
-    
-    // Get current directory
-    // NOTE: Current working directory could not match current executable directory
-    GetCurrentDir(currentPath, sizeof(currentPath));
-    currentPath[strlen(currentPath)] = '\\';
-    currentPath[strlen(currentPath) + 1] = '\0';      // Not really required
     
     int resSelected = -1;
 
@@ -585,72 +570,47 @@ static unsigned char *CompressDataRLE(const unsigned char *data, unsigned int un
 }
 */
 
-// Returns filename portion of the given path
-// Returns empty string if path is directory
-static char *GetFileName(const char *path)
-{
-    char *filename = strrchr(path, '\\');
-    
-    if (filename == NULL) return path;
-    else filename++;
-    
-    return filename;
-/*    
-    char *pfile;
-    pfile = argv[0] + strlen(argv[0]);
-    for (; pfile > argv[0]; pfile--)
-    {
-        if ((*pfile == '\\') || (*pfile == '/'))
-        {
-            pfile++;
-            break;
-        }
-    }
-*/
-}
-
 static int GetRRESFileType(const char *ext)
 {
     int type = -1;
-
+/*
     if ((strcmp(ext,"png")==0) || 
         (strcmp(ext,"jpg")==0) ||
         (strcmp(ext,"bmp")==0) ||
         (strcmp(ext,"tga")==0) ||
         (strcmp(ext,"gif")==0) ||
         (strcmp(ext,"pic")==0) ||
-        (strcmp(ext,"psd")==0)) type = RRES_TYPE_IMAGE;       // Image
+        (strcmp(ext,"psd")==0)) type = RRES_TYPE_IMAGE;         // Image
     else if ((strcmp(ext,"txt")==0) ||
              (strcmp(ext,"csv")==0)  ||
              (strcmp(ext,"info")==0)  ||
-             (strcmp(ext,"md")==0)) type = RRES_TYPE_TEXT;    // Text
-    else if ((strcmp(ext,"wav")==0) /*||
-             (strcmp(ext,"ogg")==0)*/) type = RRES_TYPE_WAVE;    // Audio
-    else if (strcmp(ext,"obj")==0) type = RRES_TYPE_MESH;    // Mesh
+             (strcmp(ext,"md")==0)) type = RRES_TYPE_TEXT;      // Text
+    else if ((strcmp(ext,"wav")==0) ||
+             (strcmp(ext,"ogg")==0)) type = RRES_TYPE_WAVE;     // Audio
+    else if (strcmp(ext,"obj")==0) type = RRES_TYPE_MESH;       // Mesh
     else type = RRES_TYPE_RAW;     // Unknown
-    
+*/
     return type;
 }
 
-// remove_ext: removes the "extension" from a file spec.
-//   mystr is the string to process.
+// Removes the "extension" from a file name
+//   fileName is the string to process.
 //   dot is the extension separator.
 //   sep is the path separator (0 means to ignore).
-// Returns an allocated string identical to the original but with the extension removed. It must be freed when you're finished with it.
-// If you pass in NULL or the new string can't be allocated, it returns NULL.
-static char *RemoveExtension(const char *mystr, char dot, char sep) 
+// NOTE: Returns an allocated string identical to the original but with the extension removed. It must be freed when you're finished with it.
+static char *RemoveExtension(const char *fileName, char dot, char sep) 
 {
     // NOTE: It seems that this function produces some memory leak...
 
     char *retstr, *lastdot, *lastsep;
 
     // Error checks and allocate string
-    if (mystr == NULL) return NULL;
+    if (fileName == NULL) return NULL;
     
-    if ((retstr = malloc(strlen(mystr) + 1)) == NULL) return NULL;
+    if ((retstr = malloc(strlen(fileName) + 1)) == NULL) return NULL;
 
     // Make a copy and find the relevant characters
-    strcpy(retstr, mystr);
+    strcpy(retstr, fileName);
     lastdot = strrchr(retstr, dot);
     lastsep = (sep == 0) ? NULL : strrchr(retstr, sep);
 
@@ -673,23 +633,6 @@ static char *RemoveExtension(const char *mystr, char dot, char sep)
     }
 
     return retstr;    // Return the modified string
-}
-
-// Print all the files and directories within directory
-// NOTE: Requires indent.h lib
-static void ListDirectoryFiles(const char *path)
-{
-    /*
-    DIR *dir;
-    struct dirent *ent;
-    
-    if ((dir = opendir(path)) != NULL) 
-    {
-        while ((ent = readdir(dir)) != NULL) printf("Files: %s\n", ent->d_name);
-        closedir(dir);
-    } 
-    else printf("Can not open directory...\n");
-    */
 }
 
 // Convert int value into 4-bytes array (char buffer)
@@ -733,35 +676,34 @@ inline unsigned long swap_32bit(unsigned long ul)
 */
 }
 
-// Converts file binary data into C
-static void Bin2c(const char *cFileName, const char *data, int dataSize)
+// Converts file binary data into byte array code (.h) 
+static void SaveFileAsCode(const char *fileName, const char *data, int dataSize)
 {
-	FILE *cFile;
+	FILE *codeFile;
 
-    cFile = fopen(cFileName, "wt");
+    codeFile = fopen(fileName, "wt");
     
-    fprintf(cFile, "const int dataSize = %i;", dataSize);
-
-	fprintf(cFile, "const unsigned char %s[%i] = {\n    ", "fileName", dataSize);
+    fprintf(codeFile, "const int dataSize = %i;", dataSize);
+	fprintf(codeFile, "const unsigned char %s[%i] = {\n    ", fileName, dataSize);
 	
-	int blCounter = 0;		// break line counter
+	int blCounter = 0;		// Break line counter
 	
 	for (int i = 0; i < dataSize; i ++)
 	{
 		blCounter++;
         
-        fprintf(cFile, "0x%.2x, ", data[i]);
+        fprintf(codeFile, "0x%.2x, ", data[i]);
 		
         if (blCounter >= 24)
 		{
-			fprintf(cFile, "\n    ");
+			fprintf(codeFile, "\n    ");
 			blCounter = 0;
 		}
 	}
     
-    fprintf(cFile, " };\n");
+    fprintf(codeFile, " };\n");
 
-	fclose(cFile);
+	fclose(codeFile);
 }
 
 // Check if text string is codified as UTF-8
@@ -845,6 +787,7 @@ static bool IsUtf8(const char *string)
     return 1;
 }
 
+/*
 // Generate C header data for resource usage
 // NOTE: Defines resource name and identifier        
 static void GenRRESHeaderFile(const char *rresHeaderName, RRES *resources, int resCount)
@@ -880,12 +823,12 @@ static void GenRRESHeaderFile(const char *rresHeaderName, RRES *resources, int r
         resId++;
     }
     */
-    free(name);
-    free(typeName);
-    free(baseFileName);
+    // free(name);
+    // free(typeName);
+    // free(baseFileName);
     
-    fclose(headerFile);
-}
+    // fclose(headerFile);
+// }
 
 // Generate C object compiled file to embed in executable
 static void GenRRESObjectFile(const char *rresFileName)
@@ -894,7 +837,7 @@ static void GenRRESObjectFile(const char *rresFileName)
     // OPTION: Include tcc compiler lib in program to do not depend on external programs (that can not exist)
 
     FILE *rresFile = fopen(rresFileName, "rb");
-    FILE *cFile = fopen("data.c", "wt");
+    FILE *codeFile = fopen("data.c", "wt");
     
     // Get rresFile file size
     fseek(rresFile, 0, SEEK_END);
@@ -904,9 +847,9 @@ static void GenRRESObjectFile(const char *rresFileName)
     
     printf("rRES file size: %i\n", fileSize);
     
-    fprintf(cFile, "// This file has been automatically generated by rREM - raylib Resource Embedder\n\n");
+    fprintf(codeFile, "// This file has been automatically generated by rREM - raylib Resource Embedder\n\n");
     
-    fprintf(cFile, "const unsigned char data[%i] = {\n    ", fileSize);
+    fprintf(codeFile, "const unsigned char data[%i] = {\n    ", fileSize);
     
     unsigned char *data = (unsigned char *)malloc(fileSize);
     
@@ -919,18 +862,18 @@ static void GenRRESObjectFile(const char *rresFileName)
     {
         blCounter++;
         
-        fprintf(cFile, "0x%.2x, ", data[i]);
+        fprintf(codeFile, "0x%.2x, ", data[i]);
         
         if (blCounter >= 24)
         {
-            fprintf(cFile, "\n    ");
+            fprintf(codeFile, "\n    ");
             blCounter = 0;
         }
     }
     
-    fprintf(cFile, "0x%.2x };\n", data[fileSize-1]);
+    fprintf(codeFile, "0x%.2x };\n", data[fileSize-1]);
 
-    fclose(cFile);
+    fclose(codeFile);
     fclose(rresFile);
     
     free(data);
