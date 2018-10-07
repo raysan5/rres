@@ -10,8 +10,8 @@
 *       or source files without problems. But only ONE file should hold the implementation.
 *
 *   DEPENDENCIES:
-*       tinfl   -  DEFLATE decompression functions
-*
+*       tinfl   - DEFLATE decompression library
+*       miniz   - DEFLATE compression/decompression library (zlib-style)
 *
 *   LICENSE: zlib/libpng
 *
@@ -33,6 +33,71 @@
 *     3. This notice may not be removed or altered from any source distribution.
 *
 **********************************************************************************************/
+
+// TODO: Review rRES file structure!!!
+/*
+*
+*   rRES file Structure:
+*
+*   rRES Base Header        (8 bytes)
+*       File ID - 'rRES'    (4 byte)
+*       RRES Version        (1 byte)    // rRES Format Version (4bit MSB) + Subversion (4bit LSB)
+*       <Reserved>          (1 byte)    // Useful in a future... Flags?
+*       # Resources         (2 byte)    // Number of resources contained
+*
+*   rRES Res Info Header    (12 bytes)  // For every resource, one header
+*       Res ID              (2 byte)    // Resource unique identifier
+*       Res Type            (1 byte)    // Resource type
+*                                           // 0 - Image
+*                                           // 1 - Text
+*                                           // 2 - Sound
+*                                           // 3 - Model
+*                                           // 4 - Raw
+*                                           // 5 - Other?
+*       Res Data Comp       (1 byte)    // Data Compression
+*                                       // Compresion: 
+*                                           // 0 - No compression
+*                                           // 1 - RLE compression (custom)
+*                                           // 2 - DEFLATE (LZ77+Huffman) compression (miniz lib)
+*                                           // 3 - Others? (LZX, LZMA(7ZIP), BZ2, XZ,...)
+*       Res Data Size       (4 byte)    // Data size in .rres file (compressed or not, only DATA)
+*       Source Data Size    (4 byte)    // Source data size (uncompressed, only DATA)
+*
+*   rRES Resource Data                  // Depending on resource type, some 'parameters' preceed data
+*       Image Data Params   (6 bytes)
+*           Width           (2 byte)    // Image width
+*           Height          (2 byte)    // Image height
+*           Color format    (1 byte)    // Image data color format
+*                                           // 0 - Monocrome (1 bit per pixel)
+*                                           // 1 - Grayscale (8 bit)
+*                                           // 2 - R5G6B5 (16 bit)
+*                                           // 3 - R5G5B5A1 (16 bit)
+*                                           // 4 - R4G4B4A4 (16 bit)
+*                                           // 5 - R8G8B8 (24 bit)
+*                                           // 6 - R8G8B8A8 (32 bit) - default
+*           Mipmaps count   (1 byte)    // Mipmap images included - default 1
+*           DATA                        // Image data
+*       Sound Data Params   (6 bytes)   
+*           Sample Rate     (2 byte)    // Sample rate (frequency)
+*           BitsPerSample   (2 byte)    // Bits per sample
+*           Channels        (1 byte)    // Channels (1 - mono, 2 - stereo)
+*           <reserved>      (1 byte)    
+*           DATA                        // Sound data
+*       Model Data Params   (6 bytes?)
+*           Num vertex      (4 byte)    // Number of vertex
+*           Data Type       (1 byte)    // Vertex arrays provided --> Use like FLAGS: 01011101
+*                                           // 0001 - Positions
+*                                           // 0011 - position+textcoord
+*                                           // position-color-UVcoords-normals-otherUV
+*           Indexed Data    // Indexing data will be GREAT!...but it must be calculated!
+*                           // Once all data is unindexed, just test positions-UVcoords-normals and create new index!
+*                           // Or just store unindexed data... easier!
+*           DATA                        // Model vertex data (32 bit per vertex - 1 float)
+*       Text Data Params
+*           DATA                        // Text data (processed like raw data)
+*       Raw Data Params <no-params>
+*           DATA                        // Raw data
+*/
 
 /*  
 References:
