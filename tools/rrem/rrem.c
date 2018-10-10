@@ -299,7 +299,7 @@ static void ShowUsageInfo(void)
     printf("\n//////////////////////////////////////////////////////////////////////////////////\n");
     printf("//                                                                              //\n");
     printf("// rREM v%s - A simple and easy-to-use raylib resource embedder                //\n", TOOL_VERSION_TEXT);
-    printf("// powered by raylib v2.0 (www.raylib.com) and raygui v2.0                      //\n");
+    printf("// powered by raylib v2.1 (www.raylib.com) and raygui v2.1                      //\n");
     printf("// more info and bugs-report: github.com/raysan5/rres                           //\n");
     printf("//                                                                              //\n");
     printf("// Copyright (c) 2014-2018 Ramon Santamaria (@raysan5)                          //\n");
@@ -307,37 +307,15 @@ static void ShowUsageInfo(void)
     printf("//////////////////////////////////////////////////////////////////////////////////\n\n");
     
 #if defined(ENABLE_PRO_FEATURES)
-/*
-    "------------------------------------------------------------------------------\n"
-    "rREM Usage: rrem [options] <files>\n"
-    "rrem creates a .rres resource with embedded files and a .h header to access embedded data.\n"
-    "\n"
-    "options:\n"
-    "  -v, --version            Print version information and exit immediately\n"
-    "  -h, --help               Print this help and exit immediately\n"
-    "  -i                       Activates rayGUI custom user interface (science, bitches)\n"
-    "  -o                       Generate an embeddable object (.o file)\n"
-    "  -cx                      Specify compression algorithm for data\n"
-    "       -c0                 No compression\n"
-    "       -c1                 RLE compression (custom)\n"
-    "       -c2                 DEFLATE compression (default)\n"
-    "       -c3                 LZMA compression (NOT IMPLEMENTED YET)\n"
-    "       -c4                 BZ2 compression (NOT IMPLEMENTED YET)\n"
-    "\n"
-    "examples:\n"
-    "  # Create 'resources.rres' and 'resources.h' including 3 files:\n\n"
-    "           rrem image01.png image02.jpg mysound.wav\n\n"
-    "  # Create 'resources.o' and 'resources.h' including 3 files,\n"
-    "  # uses NO compression for pixel/wave/text data.\n"
-    "           rrem -c0 -o image01.png sound.wav text.txt\n\n"
-    "------------------------------------------------------------------------------\n";
+
+// rrem creates a .rres resource with embedded files and a .h header to access embedded data.
     
 *
 *   USAGE: rrem [-v] [-h] [-o] [-cx] [-n <output_name>] <input_file> [<another_input_file>]
 *
 *          -v                       Print version information and exit immediately
 *          -h                       Print usage help and exit immediately
-*          -i                       Activates rayGUI custom user interface (science, bitches)
+*          -i                       Activates rayGUI custom user interface
 *          -n <output_file_name>    Name for the output file (default: data.rres) (NOT IMPLEMENTED)
 *          -a <rres_file_name>      Append data to an existing .rres file (NOT IMPLEMENTED)
 *          -o                       Generate an embeddable object (.o file)
@@ -345,46 +323,39 @@ static void ShowUsageInfo(void)
 *
 *
 *   EXAMPLES:
-*       rrem image01.png image02.jpg mysound.wav  # Create 'data.rres' and 'data.h' including those 3 files,\n"
-*                                                   uses DEFLATE compression for pixel/wave data.\n"
-*       rrem -n images image01.png image02.bmp    # Create 'images.rres' and 'images.h' including those 2 files,\n"
-*                                                   uses DEFLATE compression for pixel data.\n"
-*       rrem -o image01.png sound.wav text.txt    # Create 'data.o' and 'data.h' including those 3 files,\n"
-*                                                   uses DEFLATE compression for pixel/wave/text data.\n"
+
 *
 */
     printf("USAGE:\n\n");
-    printf("    > rfxgen [--version] [--help] --input <filename.ext> [--output <filename.ext>]\n");
-    printf("             [--format <sample_rate> <sample_size> <channels>] [--play <filename.ext>]\n");
+    printf("    > rrem [--help] --input <filename.ext>,[otherfile.ext] [--output <filename.ext>]\n");
+    printf("           [--comp <value>] [--gen-object]\n");
     
     printf("\nOPTIONS:\n\n");
     printf("    -v, --version                   : Show tool version and info\n");
     printf("    -h, --help                      : Show command line usage help\n");
-    printf("    -i, --input <filename.ext>      : Define input file.\n");
+    printf("    -i, --input <filename.ext>,<otherfile.ext>     : Define input files.\n");
     printf("                                      Supported extensions: .rfx, .sfs, .wav\n");
     printf("    -o, --output <filename.ext>     : Define output file.\n");
     printf("                                      Supported extensions: .wav, .h\n");
     printf("                                      NOTE: If not specified, defaults to: output.wav\n\n");
-    printf("    -f, --format <sample_rate> <sample_size> <channels>\n");
-    printf("                                    : Format output wave.\n");
-    printf("                                      Supported values:\n");
-    printf("                                          Sample rate:      22050, 44100\n");
-    printf("                                          Sample size:      8, 16, 32\n");
-    printf("                                          Channels:         1 (mono), 2 (stereo)\n");
-    printf("                                      NOTE: If not specified, defaults to: 44100, 16, 1\n\n");
-    printf("    -p, --play <filename.ext>       : Play provided sound.\n");
-    printf("                                      Supported extensions: .wav, .ogg, .flac, .mp3\n");
+    printf("    -f, --comp <svalue>             : Define data compression method\n");
+    printf("                                    : Format output wave.\n")
+    printf("                                          0 - NONE\n");
+    printf("                                          1 - DEFLATE\n");
+    printf("                                          2 - LZMA\n");
+    printf("                                          3 - RLE (custom)\n");
+    printf("                                          4 - BZ2\n");
     
     printf("\nEXAMPLES:\n\n");
-    printf("    > rfxgen --input sound.rfx --output jump.wav\n");
-    printf("        Process <sound.rfx> to generate <sound.wav> at 44100 Hz, 32 bit, Mono\n\n");
-    printf("    > rfxgen --input sound.rfx --output jump.wav --format 22050 16 2\n");
-    printf("        Process <sound.rfx> to generate <jump.wav> at 22050 Hz, 16 bit, Stereo\n\n");
-    printf("    > rfxgen --input sound.rfx --play output.wav\n");
-    printf("        Process <sound.rfx> to generate <output.wav> and play <output.wav>\n\n");
-    printf("    > rfxgen --input sound.wav --output jump.wav --format 22050 8 1 --play jump.wav\n");
-    printf("        Process <sound.wav> to generate <jump.wav> at 22050 Hz, 8 bit, Stereo.\n");
-    printf("        Plays generated sound <jump.wav>.\n");
+    printf("    > rrem --input image01.png,image02.jpg,mysound.wav\n");
+    printf("        Create 'data.rres' and 'data.h' including those 3 files,\n");
+    printf("        uses DEFLATE compression for pixel/wave data.\n");
+    printf("    > rrem --input image01.png,image02.bmp --output images.rres\n");
+    printf("        Create 'images.rres' and 'images.h' including those 2 files,\n");
+    printf("        uses DEFLATE compression for pixel data.\n");
+    printf("    > rrem --input image01.png,sound.wav,text.txt\n");
+    printf("        Create 'data.rres' and 'data.h' including those 3 files,\n");
+    printf("        uses DEFLATE compression for pixel/wave/text data.\n");
 #endif
 }
 
@@ -412,7 +383,6 @@ static int GetRRESFileType(const char *ext)
     return type;
 }
 
-/*
 // Generate C header data for resource usage
 // NOTE: Defines resource name and identifier        
 static void GenRRESHeaderFile(const char *rresHeaderName, RRES *resources, int resCount)
@@ -422,7 +392,7 @@ static void GenRRESHeaderFile(const char *rresHeaderName, RRES *resources, int r
     fprintf(headerFile, "#define NUM_RESOURCES %i\n\n", resCount);
 
     char *name = NULL;
-    char *typeName = "";
+    char *typeName = NULL;
     char *baseFileName = NULL;
     /*
     for (int i = firstFileArgPos; i < argc; i++)
@@ -452,8 +422,8 @@ static void GenRRESHeaderFile(const char *rresHeaderName, RRES *resources, int r
     // free(typeName);
     // free(baseFileName);
     
-    // fclose(headerFile);
-// }
+    fclose(headerFile);
+}
 
 // Generate C object compiled file to embed in executable
 static void GenRRESObjectFile(const char *rresFileName)
@@ -507,169 +477,8 @@ static void GenRRESObjectFile(const char *rresFileName)
     //remove("data.c");         // Remove .c file
 }
 
-/*
-// Data compression function
-// NOTE: Allocated data MUST be freed!
-static unsigned char *CompressData(const unsigned char *data, unsigned long uncompSize, unsigned long *outCompSize)
-{
-    int compStatus;
-    unsigned long tempCompSize = compressBound(uncompSize);
-    unsigned char *pComp;
-
-    // Allocate buffer to hold compressed data
-    pComp = (mz_uint8 *)malloc((size_t)tempCompSize);
-    
-    printf("Compression space reserved: %i\n", tempCompSize);
-    
-    // Check correct memory allocation
-    if (!pComp)
-    {
-        printf("Out of memory!\n");
-        return NULL;
-    }
-
-    // Compress data
-    compStatus = compress(pComp, &tempCompSize, (const unsigned char *)data, uncompSize);
-    
-    // Check compression success
-    if (compStatus != Z_OK)
-    {
-        printf("Compression failed!\n");
-        free(pComp);
-        return NULL;
-    }
-
-    printf("Compressed from %u bytes to %u bytes\n", (mz_uint32)uncompSize, (mz_uint32)tempCompSize);
-    
-    if (tempCompSize > uncompSize) printf("WARNING: Compressed data is larger than uncompressed data!!!\n");
-    
-    *outCompSize = tempCompSize;
-    
-    return pComp;
-}
-
-// Data decompression function
-// NOTE: Allocated data MUST be freed!
-static unsigned char *DecompressData(const unsigned char *data, unsigned long compSize, int uncompSize)
-{
-    int decompStatus;
-    unsigned long tempUncompSize;
-    unsigned char *pUncomp;
-    
-    // Allocate buffer to hold decompressed data
-    pUncomp = (mz_uint8 *)malloc((size_t)uncompSize);
-    
-    // Check correct memory allocation
-    if (!pUncomp)
-    {
-        printf("Out of memory!\n");
-        return NULL;
-    }
-    
-    // Decompress data
-    decompStatus = uncompress(pUncomp, &tempUncompSize, data, compSize);
-    
-    if (decompStatus != Z_OK)
-    {
-        printf("Decompression failed!\n");
-        free(pUncomp);
-        return NULL;
-    }
-    
-    if (uncompSize != (int)tempUncompSize)
-    {
-        printf("WARNING! Expected uncompressed size do not match! Data may be corrupted!\n");
-        printf(" -- Expected uncompressed size: %i\n", uncompSize);
-        printf(" -- Returned uncompressed size: %i\n", tempUncompSize);
-    }
-
-    printf("Decompressed from %u bytes to %u bytes\n", (mz_uint32)compSize, (mz_uint32)tempUncompSize);
-    
-    return pUncomp;
-}
-
-static unsigned char *CompressDataRLE(const unsigned char *data, unsigned int uncompSize, unsigned int *outCompSize)
-{
-    unsigned char *compData = (unsigned char *)malloc(uncompSize * 2 * sizeof(unsigned char));    // NOTE: We allocate some initial space to store compresed data, 
-    // hopefully, it will be < uncompSize but in the worst possible case it could be 2 * uncompSize, so we allocate that space just in case...
-    
-    printf("Compresed data array allocated! Size: %i\n", uncompSize * 2);
-    
-    unsigned char count = 1;
-    unsigned char currentValue, nextValue;
-    
-    int j = 0;
-    
-    currentValue = data[0];
-    
-    printf("First initial value: %i\n", currentValue);
-    //getchar();
-    
-    for (int i = 1; i < uncompSize; i++)
-    {
-        nextValue = data[i];
-        
-        if (currentValue == nextValue)
-        {
-            if (count == 255)
-            {
-                compData[j] = count;
-                compData[j + 1] = currentValue;
-                
-                j += 2;
-                count = 1;
-            }
-            else count++;
-        }
-        else
-        {
-            compData[j] = count;
-            compData[j + 1] = currentValue;
-            
-            //printf("Data stored Value-Count: %i - %i\n", currentValue, count);
-            
-            j += 2;
-            count = 1;
-
-            currentValue = nextValue;
-        }
-    }
-    
-    compData[j] = count;
-    compData[j + 1] = currentValue;
-    j += 2;
-    
-    printf("Data stored Value-Count: %i - %i\n", currentValue, count);
-        
-    compData[j] = 0;    // Just to indicate the end of data
-                        // NOTE: Array lenght will be j
-    
-    printf("Data compressed!\n");
-
-    // Resize memory block with realloc
-    compData = (unsigned char *)realloc(compData, j * sizeof(unsigned char));
-        
-    if (compData == NULL)
-    {
-        printf("Error reallocating memory!");
-        
-        free(compData);    // Free the initial memory block
-    }
-  
-    // REMEMBER: compData must be freed!
-
-    //unsigned char *outData = (unsigned char *)malloc((j+1) * sizeof(unsigned char));        
-    
-    //for (int i = 0; i < (j+1); i++) outData[i] = compData[i];
-    
-    *outCompSize = (j + 1);  // New array of compressed data lenght
-
-    return compData;    // REMEMBER! This memory should be freed!
-}
-*/
-
 //--------------------------------------------------------------------
-// Some utilities...
+// Auxiliar functions (utilities)
 //---------------------------------------------------------------------
 
 // Convert int value into 4-bytes array (char buffer)

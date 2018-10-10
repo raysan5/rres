@@ -547,7 +547,7 @@ RRESDEF void AppendRRESChunk(RRESResource *resource, RRESResourceChunk chunk)
 // Module specific Functions Definition
 //----------------------------------------------------------------------------------
 
-// Data decompression function
+// Data decompression (using DEFLATE, tinfl library)
 // NOTE: Allocated data MUST be freed by user
 static void *DecompressData(const unsigned char *data, unsigned long compSize, int uncompSize)
 {
@@ -573,7 +573,7 @@ static void *DecompressData(const unsigned char *data, unsigned long compSize, i
             RRES_FREE(uncompData);
         }
 
-        if (uncompSize != (int)tempUncompSize)
+        if (uncompSize != tempUncompSize)
         {
             TraceLog(LOG_WARNING, "Expected uncompressed size do not match, data may be corrupted");
             TraceLog(LOG_WARNING, " -- Expected uncompressed size: %i", uncompSize);
@@ -585,6 +585,168 @@ static void *DecompressData(const unsigned char *data, unsigned long compSize, i
 
     return uncompData;
 }
+
+/*
+// Data compression (using DEFLATE, miniz library)
+// NOTE: Allocated data MUST be freed!
+static unsigned char *CompressData(const unsigned char *data, unsigned long uncompSize, unsigned long *outCompSize)
+{
+    int compStatus;
+    unsigned long tempCompSize = compressBound(uncompSize);
+    unsigned char *pComp;
+
+    // Allocate buffer to hold compressed data
+    pComp = (mz_uint8 *)malloc((size_t)tempCompSize);
+    
+    printf("Compression space reserved: %i\n", tempCompSize);
+    
+    // Check correct memory allocation
+    if (!pComp)
+    {
+        printf("Out of memory!\n");
+        return NULL;
+    }
+
+    // Compress data
+    compStatus = compress(pComp, &tempCompSize, (const unsigned char *)data, uncompSize);
+    
+    // Check compression success
+    if (compStatus != Z_OK)
+    {
+        printf("Compression failed!\n");
+        free(pComp);
+        return NULL;
+    }
+
+    printf("Compressed from %u bytes to %u bytes\n", (mz_uint32)uncompSize, (mz_uint32)tempCompSize);
+    
+    if (tempCompSize > uncompSize) printf("WARNING: Compressed data is larger than uncompressed data!!!\n");
+    
+    *outCompSize = tempCompSize;
+    
+    return pComp;
+}
+
+// Data decompression (using DEFLATE, miniz library)
+// NOTE: Allocated data MUST be freed!
+static unsigned char *DecompressData(const unsigned char *data, unsigned long compSize, int uncompSize)
+{
+    int decompStatus;
+    unsigned long tempUncompSize;
+    unsigned char *pUncomp;
+    
+    // Allocate buffer to hold decompressed data
+    pUncomp = (mz_uint8 *)malloc((size_t)uncompSize);
+    
+    // Check correct memory allocation
+    if (!pUncomp)
+    {
+        printf("Out of memory!\n");
+        return NULL;
+    }
+    
+    // Decompress data
+    decompStatus = uncompress(pUncomp, &tempUncompSize, data, compSize);
+    
+    if (decompStatus != Z_OK)
+    {
+        printf("Decompression failed!\n");
+        free(pUncomp);
+        return NULL;
+    }
+    
+    if (uncompSize != (int)tempUncompSize)
+    {
+        printf("WARNING! Expected uncompressed size do not match! Data may be corrupted!\n");
+        printf(" -- Expected uncompressed size: %i\n", uncompSize);
+        printf(" -- Returned uncompressed size: %i\n", tempUncompSize);
+    }
+
+    printf("Decompressed from %u bytes to %u bytes\n", (mz_uint32)compSize, (mz_uint32)tempUncompSize);
+    
+    return pUncomp;
+}
+
+// Data compression data (custom RLE algorythm)
+static unsigned char *CompressDataRLE(const unsigned char *data, unsigned int uncompSize, unsigned int *outCompSize)
+{
+    unsigned char *compData = (unsigned char *)malloc(uncompSize * 2 * sizeof(unsigned char));    // NOTE: We allocate some initial space to store compresed data, 
+    // hopefully, it will be < uncompSize but in the worst possible case it could be 2 * uncompSize, so we allocate that space just in case...
+    
+    printf("Compresed data array allocated! Size: %i\n", uncompSize * 2);
+    
+    unsigned char count = 1;
+    unsigned char currentValue, nextValue;
+    
+    int j = 0;
+    
+    currentValue = data[0];
+    
+    printf("First initial value: %i\n", currentValue);
+    //getchar();
+    
+    for (int i = 1; i < uncompSize; i++)
+    {
+        nextValue = data[i];
+        
+        if (currentValue == nextValue)
+        {
+            if (count == 255)
+            {
+                compData[j] = count;
+                compData[j + 1] = currentValue;
+                
+                j += 2;
+                count = 1;
+            }
+            else count++;
+        }
+        else
+        {
+            compData[j] = count;
+            compData[j + 1] = currentValue;
+            
+            //printf("Data stored Value-Count: %i - %i\n", currentValue, count);
+            
+            j += 2;
+            count = 1;
+
+            currentValue = nextValue;
+        }
+    }
+    
+    compData[j] = count;
+    compData[j + 1] = currentValue;
+    j += 2;
+    
+    printf("Data stored Value-Count: %i - %i\n", currentValue, count);
+        
+    compData[j] = 0;    // Just to indicate the end of data
+                        // NOTE: Array lenght will be j
+    
+    printf("Data compressed!\n");
+
+    // Resize memory block with realloc
+    compData = (unsigned char *)realloc(compData, j * sizeof(unsigned char));
+        
+    if (compData == NULL)
+    {
+        printf("Error reallocating memory!");
+        
+        free(compData);    // Free the initial memory block
+    }
+  
+    // REMEMBER: compData must be freed!
+
+    //unsigned char *outData = (unsigned char *)malloc((j+1) * sizeof(unsigned char));        
+    
+    //for (int i = 0; i < (j+1); i++) outData[i] = compData[i];
+    
+    *outCompSize = (j + 1);  // New array of compressed data lenght
+
+    return compData;    // REMEMBER! This memory should be freed!
+}
+*/
 
 // Some required functions for rres standalone module version
 #if defined(RRES_STANDALONE)
