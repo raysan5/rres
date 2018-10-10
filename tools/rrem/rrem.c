@@ -60,9 +60,9 @@
 //----------------------------------------------------------------------------------
 #define ENABLE_PRO_FEATURES             // Enable PRO version features
 
-#define TOOL_VERSION_TEXT  "0.5"        // Tool version string
+#define TOOL_VERSION_TEXT     "0.5"     // Tool version string
 
-#define MAX_PATH_LENGTH     256         // Maximum length for resources file paths
+#define MAX_PATH_LENGTH        256      // Maximum length for resources file paths
 
 //----------------------------------------------------------------------------------
 // Types and Structures Definition
@@ -96,8 +96,6 @@ static void ShowUsageInfo(void);    // Show command line usage info
 static int GetRRESFileType(const char *ext);
 //static void GenRRESHeaderFile(const char *rresHeaderName, RRES *resources, int resCount);
 static void GenRRESObjectFile(const char *rresFileName);
-
-static char *RemoveExtension(const char *fileName, char dot, char sep);
 
 // TODO: Compression/Decompression functions and Encryption/Decription functions should be provided by external lib
 //static unsigned char *CompressData(const unsigned char *data, unsigned long uncompSize, unsigned long *outCompSize);
@@ -285,8 +283,6 @@ int main(int argc, char *argv[])
 
     // De-Initialization
     //--------------------------------------------------------------------------------------
-    ClearDroppedFiles();    // Clear internal buffers
-    
     CloseWindow();          // Close window and OpenGL context
     //--------------------------------------------------------------------------------------
 
@@ -445,7 +441,7 @@ static void GenRRESHeaderFile(const char *rresHeaderName, RRES *resources, int r
             default: typeName = "UNKNOWN"; break;
         }
     
-        name = RemoveExtension(baseFileName, '.', '/');      // String should be de-allocated 
+        name = GetFilenameWithoutEx(baseFileName, '.', '/');      // String should be freed manually
         
         fprintf(headerFile, "#define RES_%s 0x%08x\t\t// Embedded as %s\n", name, resId, typeName);
         
@@ -509,48 +505,6 @@ static void GenRRESObjectFile(const char *rresFileName)
 
     //system("gcc -c data.c");  // Compile resource file into object file
     //remove("data.c");         // Remove .c file
-}
-
-// Removes the "extension" from a file name
-//   fileName is the string to process.
-//   dot is the extension separator.
-//   sep is the path separator (0 means to ignore).
-// NOTE: Returns an allocated string identical to the original but with the extension removed. It must be freed when you're finished with it.
-static char *RemoveExtension(const char *fileName, char dot, char sep) 
-{
-    // NOTE: It seems that this function produces some memory leak...
-
-    char *retstr, *lastdot, *lastsep;
-
-    // Error checks and allocate string
-    if (fileName == NULL) return NULL;
-    
-    if ((retstr = malloc(strlen(fileName) + 1)) == NULL) return NULL;
-
-    // Make a copy and find the relevant characters
-    strcpy(retstr, fileName);
-    lastdot = strrchr(retstr, dot);
-    lastsep = (sep == 0) ? NULL : strrchr(retstr, sep);
-
-    // If it has an extension separator...
-    if (lastdot != NULL) 
-    {
-        // ...and it's before the extenstion separator...
-        if (lastsep != NULL) 
-        {
-            if (lastsep < lastdot) 
-            {
-                *lastdot = '\0';    // ...then remove it
-            }
-        } 
-        else 
-        {
-            // Has extension separator with no path separator
-            *lastdot = '\0';
-        }
-    }
-
-    return retstr;    // Return the modified string
 }
 
 /*
