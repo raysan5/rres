@@ -8,9 +8,9 @@
 *         - Directly embedding in executable program (.exe)
 *
 *   DEPENDENCIES:
-*       raylib 2.0      - Windowing/input management and drawing.
-*       raygui 2.0      - IMGUI controls (based on raylib).
-*       miniz           - DEFLATE compression/decompression library (zlib-style)
+*       raylib 2.1-dev          - Windowing/input management and drawing.
+*       miniz 2.0.8             - DEFLATE compression/decompression library (zlib-style)
+*       tinyfiledialogs 3.3.7   - Open/save file dialogs, it requires linkage with comdlg32 and ole32 libs.
 *
 *   COMPILATION (Windows - MinGW):
 *       gcc -o rrem.exe rrem.c external/miniz.c -s rrem.rc.data -Iexternal / 
