@@ -1,9 +1,9 @@
 # rRES - raylib resource file-format
 A simple and easy-to-use file-format to package raylib resources.
 
-rres has been designed to package game assets data into a simple sel-contained comprehensive format, easy to read and use, prepared to load data in a fast and efficient way to be directly deployed to memory.
+rres has been designed to package game assets data into a simple self-contained comprehensive format, easy to read and use, prepared to load data in a fast and efficient way to be directly deployed to memory.
 
-rres has been inspired mainly by [XNB](http://xbox.create.msdn.com/en-US/sample/xnb_format) file-format (used by XNA) but also [RIFF](https://en.wikipedia.org/wiki/Resource_Interchange_File_Format) and [ZIP](https://en.wikipedia.org/wiki/Zip_(file_format)) file-formats.
+rres has been inspired mainly by [XNB](http://xbox.create.msdn.com/en-US/sample/xnb_format) file-format (used by XNA) but also [RIFF](https://en.wikipedia.org/wiki/Resource_Interchange_File_Format), [PNG](https://en.wikipedia.org/wiki/Portable_Network_Graphics) and [ZIP](https://en.wikipedia.org/wiki/Zip_(file_format)) file-formats.
 
 ## Format Design
 
