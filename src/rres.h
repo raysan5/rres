@@ -55,7 +55,7 @@
 *                                           // 4 - Raw
 *                                           // 5 - Other?
 *       Res Data Comp       (1 byte)    // Data Compression
-*                                       // Compresion: 
+*                                       // Compresion:
 *                                           // 0 - No compression
 *                                           // 1 - RLE compression (custom)
 *                                           // 2 - DEFLATE (LZ77+Huffman) compression (miniz lib)
@@ -77,11 +77,11 @@
 *                                           // 6 - R8G8B8A8 (32 bit) - default
 *           Mipmaps count   (1 byte)    // Mipmap images included - default 1
 *           DATA                        // Image data
-*       Sound Data Params   (6 bytes)   
+*       Sound Data Params   (6 bytes)
 *           Sample Rate     (2 byte)    // Sample rate (frequency)
 *           BitsPerSample   (2 byte)    // Bits per sample
 *           Channels        (1 byte)    // Channels (1 - mono, 2 - stereo)
-*           <reserved>      (1 byte)    
+*           <reserved>      (1 byte)
 *           DATA                        // Sound data
 *       Model Data Params   (6 bytes?)
 *           Num vertex      (4 byte)    // Number of vertex
@@ -99,7 +99,7 @@
 *           DATA                        // Raw data
 */
 
-/*  
+/*
 References:
     RIFF file-format:  http://www.johnloomis.org/cpe102/asgn/asgn1/riff.html
     ZIP file-format:   https://en.wikipedia.org/wiki/Zip_(file_format)
@@ -142,7 +142,7 @@ References:
         int *params;                // Resource chunk parameters pointer (4 byte)
         void *data;                 // Resource chunk data pointer (4 byte)
     } RRESChunk;
-    
+
     // rRES resource (single resource)
     // NOTE: One resource could be composed of multiple chunks
     typedef struct RRES {
@@ -150,13 +150,13 @@ References:
         unsigned int resCount;      // Resource chunks counter
         RRESChunk *chunks;          // Resource chunks
     } RRES;
-    
+
     // rRES resources array
     // NOTE: It could be useful at some point to load multiple resources
     typedef struct RRES *RRESList;  // Resources list pointer
-    
+
     // RRESData type
-    typedef enum { 
+    typedef enum {
         RRES_TYPE_RAW = 0,          // Basic raw type, no parameters
         RRES_TYPE_IMAGE,            // Basic image type, [4] parameters: width, height, mipmaps, format
         RRES_TYPE_WAVE,             // Basic wave type, [4] parameters: sampleCount, sampleRate, sampleSize, channels
@@ -218,7 +218,7 @@ unsigned char *text = (unsigned char *)rres->data;
 Shader shader = LoadShaderText(text, rres->param1);     Shader LoadShaderText(const char *shdrText, int length);
 
 rres->type == RRES_TYPE_FONT_IMAGE      (multiple parts)
-rres->type == RRES_TYPE_FONT_CHARDATA   
+rres->type == RRES_TYPE_FONT_CHARDATA
 SpriteFont font;
 font.texture = LoadTextureFromImage(image);     // rres[0]
 font.chars = (CharInfo *)rres[1]->data;
@@ -310,7 +310,7 @@ typedef struct {
 //----------------------------------------------------------------------------------
 
 // Compression types
-typedef enum { 
+typedef enum {
     RRES_COMP_NONE = 0,         // No data compression
     RRES_COMP_DEFLATE,          // DEFLATE compression
     RRES_COMP_LZ4,              // LZ4 compression
@@ -380,12 +380,12 @@ typedef enum {
 } RRESVertexFormat;
 
 #if defined(RRES_STANDALONE)
-typedef enum { 
-    LOG_INFO = 0, 
-    LOG_ERROR, 
-    LOG_WARNING, 
-    LOG_DEBUG, 
-    LOG_OTHER 
+typedef enum {
+    LOG_INFO = 0,
+    LOG_ERROR,
+    LOG_WARNING,
+    LOG_DEBUG,
+    LOG_OTHER
 } TraceLogType;
 #endif
 
@@ -408,14 +408,14 @@ static void *DecompressData(const unsigned char *data, unsigned long compSize, i
 RRESDEF RRES LoadRRES(const char *fileName, unsigned int rresId)
 {
     RRES rres = { 0 };
-    
+
     FILE *rresFile = fopen(fileName, "rb");
 
     if (rresFile == NULL) TraceLog(LOG_WARNING, "[%s] rRES raylib resource file could not be opened", fileName);
     else
     {
         RRESFileHeader fileHeader;
-    
+
         // Read rres file info header
         fread(&fileHeader.id[0], sizeof(char), 1, rresFile);
         fread(&fileHeader.id[1], sizeof(char), 1, rresFile);
@@ -430,14 +430,14 @@ RRESDEF RRES LoadRRES(const char *fileName, unsigned int rresId)
             TraceLog(LOG_WARNING, "[%s] This is not a valid raylib resource file", fileName);
         }
         else
-        {  
+        {
             for (int i = 0; i < fileHeader.count; i++)
             {
                 RRESInfoHeader infoHeader;
-                
+
                 // Read resource info and parameters
                 fread(&infoHeader, sizeof(RRESInfoHeader), 1, rresFile);
-                
+
                 if (infoHeader.id == rresId)
                 {
                     rres.type = infoHeader.resType;
@@ -448,20 +448,20 @@ RRESDEF RRES LoadRRES(const char *fileName, unsigned int rresId)
                     for (int k = 0; k < infoHeader.chunkCount; k++)
                     {
                         RRESChunkInfoHeader chunkInfoHeader;
-                
+
                         // Read resource chunk info and parameters
                         fread(&chunkInfoHeader, sizeof(RRESChunkInfoHeader), 1, rresFile);
-                
+
                         // Register data type and read parameters
                         rres.chunks[k].type = chunkInfoHeader.chunkType;
                         rres.chunks[k].params = (int *)RRES_MALLOC(sizeof(int)*chunkInfoHeader.paramsCount);
-                        
+
                         for (int p = 0; p < chunkInfoHeader.paramsCount; p++) fread(&rres.chunks[k].params[p], sizeof(int), 1, rresFile);
- 
+
                         // Read resource chunk data block
                         void *data = RRES_MALLOC(chunkInfoHeader.dataSize);
                         fread(data, chunkInfoHeader.dataSize, 1, rresFile);
-                        
+
                         // TODO: Check CRC32
 
                         // Decompres and decrypt data if required
@@ -470,9 +470,9 @@ RRESDEF RRES LoadRRES(const char *fileName, unsigned int rresId)
                         {
                             // NOTE: Memory is allocated inside Decompress data, should be freed manually
                             void *uncompData = DecompressData(data, chunkInfoHeader.dataSize, chunkInfoHeader.uncompSize);
-                            
+
                             rres.chunks[k].data = uncompData;
-                            
+
                             RRES_FREE(data);
                         }
                         else rres.chunks[k].data = data;
@@ -487,7 +487,7 @@ RRESDEF RRES LoadRRES(const char *fileName, unsigned int rresId)
                     fseek(rresFile, infoHeader.resTotalSize, SEEK_CUR);
                 }
             }
-            
+
             if (rres.chunks[0].data == NULL) TraceLog(LOG_WARNING, "[%s][ID %i] Requested resource could not be found", fileName, (int)rresId);
         }
 
@@ -522,11 +522,11 @@ RRESDEF void InitRRES(const char *fileName)
         fileHeader.id[3] = 'S';
         fileHeader.version = 100;
         fileHeader.count = 1;
-        
+
         // Write rres file header into file
         fwrite(&fileHeader, sizeof(RRESFileHeader), 1, rresFile);
     }
-    
+
     fclose(rresFile);
 }
 
@@ -597,9 +597,9 @@ static unsigned char *CompressData(const unsigned char *data, unsigned long unco
 
     // Allocate buffer to hold compressed data
     pComp = (mz_uint8 *)malloc((size_t)tempCompSize);
-    
+
     printf("Compression space reserved: %i\n", tempCompSize);
-    
+
     // Check correct memory allocation
     if (!pComp)
     {
@@ -609,7 +609,7 @@ static unsigned char *CompressData(const unsigned char *data, unsigned long unco
 
     // Compress data
     compStatus = compress(pComp, &tempCompSize, (const unsigned char *)data, uncompSize);
-    
+
     // Check compression success
     if (compStatus != Z_OK)
     {
@@ -619,11 +619,11 @@ static unsigned char *CompressData(const unsigned char *data, unsigned long unco
     }
 
     printf("Compressed from %u bytes to %u bytes\n", (mz_uint32)uncompSize, (mz_uint32)tempCompSize);
-    
+
     if (tempCompSize > uncompSize) printf("WARNING: Compressed data is larger than uncompressed data!!!\n");
-    
+
     *outCompSize = tempCompSize;
-    
+
     return pComp;
 }
 
@@ -634,27 +634,27 @@ static unsigned char *DecompressData(const unsigned char *data, unsigned long co
     int decompStatus;
     unsigned long tempUncompSize;
     unsigned char *pUncomp;
-    
+
     // Allocate buffer to hold decompressed data
     pUncomp = (mz_uint8 *)malloc((size_t)uncompSize);
-    
+
     // Check correct memory allocation
     if (!pUncomp)
     {
         printf("Out of memory!\n");
         return NULL;
     }
-    
+
     // Decompress data
     decompStatus = uncompress(pUncomp, &tempUncompSize, data, compSize);
-    
+
     if (decompStatus != Z_OK)
     {
         printf("Decompression failed!\n");
         free(pUncomp);
         return NULL;
     }
-    
+
     if (uncompSize != (int)tempUncompSize)
     {
         printf("WARNING! Expected uncompressed size do not match! Data may be corrupted!\n");
@@ -663,39 +663,39 @@ static unsigned char *DecompressData(const unsigned char *data, unsigned long co
     }
 
     printf("Decompressed from %u bytes to %u bytes\n", (mz_uint32)compSize, (mz_uint32)tempUncompSize);
-    
+
     return pUncomp;
 }
 
 // Data compression data (custom RLE algorythm)
 static unsigned char *CompressDataRLE(const unsigned char *data, unsigned int uncompSize, unsigned int *outCompSize)
 {
-    unsigned char *compData = (unsigned char *)malloc(uncompSize * 2 * sizeof(unsigned char));    // NOTE: We allocate some initial space to store compresed data, 
+    unsigned char *compData = (unsigned char *)malloc(uncompSize * 2 * sizeof(unsigned char));    // NOTE: We allocate some initial space to store compresed data,
     // hopefully, it will be < uncompSize but in the worst possible case it could be 2 * uncompSize, so we allocate that space just in case...
-    
+
     printf("Compresed data array allocated! Size: %i\n", uncompSize * 2);
-    
+
     unsigned char count = 1;
     unsigned char currentValue, nextValue;
-    
+
     int j = 0;
-    
+
     currentValue = data[0];
-    
+
     printf("First initial value: %i\n", currentValue);
     //getchar();
-    
+
     for (int i = 1; i < uncompSize; i++)
     {
         nextValue = data[i];
-        
+
         if (currentValue == nextValue)
         {
             if (count == 255)
             {
                 compData[j] = count;
                 compData[j + 1] = currentValue;
-                
+
                 j += 2;
                 count = 1;
             }
@@ -705,43 +705,43 @@ static unsigned char *CompressDataRLE(const unsigned char *data, unsigned int un
         {
             compData[j] = count;
             compData[j + 1] = currentValue;
-            
+
             //printf("Data stored Value-Count: %i - %i\n", currentValue, count);
-            
+
             j += 2;
             count = 1;
 
             currentValue = nextValue;
         }
     }
-    
+
     compData[j] = count;
     compData[j + 1] = currentValue;
     j += 2;
-    
+
     printf("Data stored Value-Count: %i - %i\n", currentValue, count);
-        
+
     compData[j] = 0;    // Just to indicate the end of data
                         // NOTE: Array lenght will be j
-    
+
     printf("Data compressed!\n");
 
     // Resize memory block with realloc
     compData = (unsigned char *)realloc(compData, j * sizeof(unsigned char));
-        
+
     if (compData == NULL)
     {
         printf("Error reallocating memory!");
-        
+
         free(compData);    // Free the initial memory block
     }
-  
+
     // REMEMBER: compData must be freed!
 
-    //unsigned char *outData = (unsigned char *)malloc((j+1) * sizeof(unsigned char));        
-    
+    //unsigned char *outData = (unsigned char *)malloc((j+1) * sizeof(unsigned char));
+
     //for (int i = 0; i < (j+1); i++) outData[i] = compData[i];
-    
+
     *outCompSize = (j + 1);  // New array of compressed data lenght
 
     return compData;    // REMEMBER! This memory should be freed!
