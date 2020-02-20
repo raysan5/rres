@@ -13,7 +13,7 @@
 *       tinyfiledialogs 3.3.7   - Open/save file dialogs, it requires linkage with comdlg32 and ole32 libs.
 *
 *   COMPILATION (Windows - MinGW):
-*       gcc -o rrem.exe rrem.c external/miniz.c -s rrem.rc.data -Iexternal / 
+*       gcc -o rrem.exe rrem.c external/miniz.c -s rrem.rc.data -Iexternal /
 *           -lraylib -lopengl32 -lgdi32 -std=c99 -Wall -mwindows
 *
 *   DEVELOPERS:
@@ -115,14 +115,14 @@ int main(int argc, char *argv[])
 
     ResourceInfo resources[256];       // RRES_MAX_RESOURCES
     unsigned int resCount = 0;
-    
+
     // Command-line usage mode
     //--------------------------------------------------------------------------------------
     if (argc > 1)
     {
         // TODO: Parse arguments and fill resources[] array
         int compressionType = 0;
-        
+
         // Before starting, process all arguments for options...
         for (int i = 1; i < argc; i++)
         {
@@ -145,7 +145,7 @@ int main(int argc, char *argv[])
                     // Generate an embeddable object (.o file)
                     //genObjRes = true;
                     //firstFileArgPos++;
-                    
+
                     printf("Generating an embeddable object!\n");
                 }
                 else if (argv[i][1] == 'c')
@@ -180,16 +180,16 @@ int main(int argc, char *argv[])
                         } break;
                         default: break;
                     }
-                    
+
                     //firstFileArgPos++;
                 }
             }
         }
-        
+
         // TODO: Process all resources with required configuration
-        
+
         // TODO: Generate rRES file embedding all resources (check if code object file is required!)
-        
+
         return 0;
     }
 
@@ -197,13 +197,13 @@ int main(int argc, char *argv[])
     //--------------------------------------------------------------------------------------
     const int screenWidth = 720;
     const int screenHeight = 640;
-    
+
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);
     InitWindow(screenWidth, screenHeight, FormatText("rREM v%s - A simple and easy-to-use raylib resource embedded", TOOL_VERSION_TEXT));
 
     SetTargetFPS(60);
     //--------------------------------------------------------------------------------------
-    
+
     // Main game loop
     while (!WindowShouldClose())    // Detect window close button or ESC key
     {
@@ -211,48 +211,48 @@ int main(int argc, char *argv[])
         //----------------------------------------------------------------------------------
         if (IsFileDropped())
         {
-            int dropsCount = 0;   
+            int dropsCount = 0;
             char **droppedFiles = GetDroppedFiles(&dropsCount);
-            
+
             // Add dropped files to resources list
             for (int i = 0; i < dropsCount; i++)
             {
                 // TODO: Probably we need to use struct RRES and struct RRESChunk
-                
+
                 resources[resCount + i].resId = 0;          // TODO: GenerateRRESId()
                 strcpy(resources[resCount + i].fileName, droppedFiles[i]);
                 resources[resCount + i].fileType = GetRRESFileType(GetExtension(droppedFiles[i]));
                 resources[resCount + i].compType = 0;       // Default compression: NONE
                 resources[resCount + i].crypType = 0;       // Default encryption: NONE
-                
+
                 // TODO: Read file data (depends on fileType)
-                
+
                 // TODO: Support multiple chunks resources!
-                
+
                 resources[resCount + i].paramsCount = 4;    // TODO: Depends on fileType
                 resources[resCount + i].dataSize = 0;       // TODO: We get it when reading file...
-                
+
                 resources[resCount + i].params = (int *)malloc(sizeof(int)*resources[resCount + i].paramsCount);
-                
+
                 // TODO: Fill data parameters (depends on fileType)
-                
+
                 resources[resCount + i].data = 0;           // TODO: Point to resource chunk data
             }
-            
+
             resCount += dropsCount;
             dropsCount = 0;
 
             ClearDroppedFiles();
         }
-        
+
         // TODO: Implement files scrolling with mouse wheel
-        
+
         // TODO: Implement files focus on mouse-over and file select/unselect on click
 
         // TODO: Implement file configuration (compression/encryption) --> use raygui
-        
+
         // TODO: On SaveRRESFile(), process all resources data (compress/encrypt) --> second thread with progress bar?
-        
+
         //----------------------------------------------------------------------------------
 
         // Draw
@@ -265,15 +265,15 @@ int main(int argc, char *argv[])
             else
             {
                 DrawText("Dropped files:", 100, 40, 20, DARKGRAY);
-                
+
                 for (int i = 0; i < resCount; i++)
                 {
                     if (i%2 == 0) DrawRectangle(0, 85 + 40*i, GetScreenWidth(), 40, Fade(LIGHTGRAY, 0.5f));
                     else DrawRectangle(0, 85 + 40*i, GetScreenWidth(), 40, Fade(LIGHTGRAY, 0.3f));
-                    
+
                     DrawText(resources[i].fileName, 120, 100 + 40*i, 10, GRAY);
                 }
-                
+
                 DrawText("Drop new files...", 100, 110 + 40*resCount, 20, DARKGRAY);
             }
 
@@ -305,31 +305,14 @@ static void ShowUsageInfo(void)
     printf("// Copyright (c) 2014-2018 Ramon Santamaria (@raysan5)                          //\n");
     printf("//                                                                              //\n");
     printf("//////////////////////////////////////////////////////////////////////////////////\n\n");
-    
+
 #if defined(ENABLE_PRO_FEATURES)
+    // rrem creates a .rres resource with embedded files and a .h header to access embedded data.
 
-// rrem creates a .rres resource with embedded files and a .h header to access embedded data.
-    
-*
-*   USAGE: rrem [-v] [-h] [-o] [-cx] [-n <output_name>] <input_file> [<another_input_file>]
-*
-*          -v                       Print version information and exit immediately
-*          -h                       Print usage help and exit immediately
-*          -i                       Activates rayGUI custom user interface
-*          -n <output_file_name>    Name for the output file (default: data.rres) (NOT IMPLEMENTED)
-*          -a <rres_file_name>      Append data to an existing .rres file (NOT IMPLEMENTED)
-*          -o                       Generate an embeddable object (.o file)
-*          -cx                      Specify compression algorithm for data (see usage below)
-*
-*
-*   EXAMPLES:
-
-*
-*/
     printf("USAGE:\n\n");
     printf("    > rrem [--help] --input <filename.ext>,[otherfile.ext] [--output <filename.ext>]\n");
     printf("           [--comp <value>] [--gen-object]\n");
-    
+
     printf("\nOPTIONS:\n\n");
     printf("    -v, --version                   : Show tool version and info\n");
     printf("    -h, --help                      : Show command line usage help\n");
@@ -345,7 +328,7 @@ static void ShowUsageInfo(void)
     printf("                                          2 - LZMA\n");
     printf("                                          3 - RLE (custom)\n");
     printf("                                          4 - BZ2\n");
-    
+
     printf("\nEXAMPLES:\n\n");
     printf("    > rrem --input image01.png,image02.jpg,mysound.wav\n");
     printf("        Create 'data.rres' and 'data.h' including those 3 files,\n");
@@ -359,12 +342,11 @@ static void ShowUsageInfo(void)
 #endif
 }
 
-
 static int GetRRESFileType(const char *ext)
 {
     int type = -1;
 /*
-    if ((strcmp(ext,"png")==0) || 
+    if ((strcmp(ext,"png")==0) ||
         (strcmp(ext,"jpg")==0) ||
         (strcmp(ext,"bmp")==0) ||
         (strcmp(ext,"tga")==0) ||
@@ -384,11 +366,11 @@ static int GetRRESFileType(const char *ext)
 }
 
 // Generate C header data for resource usage
-// NOTE: Defines resource name and identifier        
+// NOTE: Defines resource name and identifier
 static void GenRRESHeaderFile(const char *rresHeaderName, RRES *resources, int resCount)
 {
     FILE *headerFile = fopen(rresHeaderName, "wt");
-    
+
     fprintf(headerFile, "#define NUM_RESOURCES %i\n\n", resCount);
 
     char *name = NULL;
@@ -398,9 +380,9 @@ static void GenRRESHeaderFile(const char *rresHeaderName, RRES *resources, int r
     for (int i = firstFileArgPos; i < argc; i++)
     {
         baseFileName = GetFileName(argv[i]);
-    
+
         int type = GetRRESFileType(GetExtension(argv[i]));
-        
+
         switch (type)
         {
             case 0: typeName = "IMAGE"; break;
@@ -410,67 +392,67 @@ static void GenRRESHeaderFile(const char *rresHeaderName, RRES *resources, int r
             case 4: typeName = "RAW"; break;
             default: typeName = "UNKNOWN"; break;
         }
-    
+
         name = GetFilenameWithoutEx(baseFileName, '.', '/');      // String should be freed manually
-        
+
         fprintf(headerFile, "#define RES_%s 0x%08x\t\t// Embedded as %s\n", name, resId, typeName);
-        
+
         resId++;
     }
     */
     // free(name);
     // free(typeName);
     // free(baseFileName);
-    
+
     fclose(headerFile);
 }
 
 // Generate C object compiled file to embed in executable
 static void GenRRESObjectFile(const char *rresFileName)
 {
-    // If .o file generation is required, then we must generate a data.c file and compile it 
+    // If .o file generation is required, then we must generate a data.c file and compile it
     // OPTION: Include tcc compiler lib in program to do not depend on external programs (that can not exist)
 
     FILE *rresFile = fopen(rresFileName, "rb");
     FILE *codeFile = fopen("data.c", "wt");
-    
+
     // Get rresFile file size
     fseek(rresFile, 0, SEEK_END);
     int fileSize = ftell(rresFile);
-    
+
     if (fileSize > (32*1024*1024)) printf("WARNING: The file you pretend to embed in the exe is larger than 32Mb!!!\n");
-    
+
     printf("rRES file size: %i\n", fileSize);
-    
+
     fprintf(codeFile, "// This file has been automatically generated by rREM - raylib Resource Embedder\n\n");
-    
+
     fprintf(codeFile, "const unsigned char data[%i] = {\n    ", fileSize);
-    
+
     unsigned char *data = (unsigned char *)malloc(fileSize);
-    
+
     fseek(rresFile, 0, SEEK_SET);
     fread(data, fileSize, 1, rresFile);
-    
+
     int blCounter = 0;		// break line counter
-     
+
     for (int i = 0; i < fileSize-1; i ++)
     {
         blCounter++;
-        
+
         fprintf(codeFile, "0x%.2x, ", data[i]);
-        
+
         if (blCounter >= 24)
         {
             fprintf(codeFile, "\n    ");
             blCounter = 0;
         }
     }
-    
+
     fprintf(codeFile, "0x%.2x };\n", data[fileSize-1]);
 
     fclose(codeFile);
     fclose(rresFile);
-    
+
     free(data);
 
     //system("gcc -c data.c");  // Compile resource file into object file
@@ -490,8 +472,8 @@ static unsigned char *IntToChar(int myint)
     mychars[2] = ((myint >> 8) & 0xFF);
     mychars[1] = ((myint >> 16) & 0xFF);
     mychars[0] = ((myint >> 24) & 0xFF);
-  
-/*   
+
+/*
     unsigned int final = 0;
     final |= ( mychars[0] << 24 );
     final |= ( mychars[1] << 16 );
@@ -499,7 +481,7 @@ static unsigned char *IntToChar(int myint)
     final |= ( mychars[3]       );
 
     int num = (chars[0] << 24) + (chars[1] << 16) + (chars[2] << 8) + chars[3];
-    
+
     int num = 0;
     for (int i = 0; i != 4; ++i) {
         num += chars[i] << (24 - i * 8);    // |= could have also been used
@@ -523,13 +505,13 @@ static unsigned long Swap32bit(unsigned long ul)
                            ((ul & 0x000000FF) << 24));
 }
 
-// Converts file binary data into byte array code (.h) 
+// Converts file binary data into byte array code (.h)
 static void SaveFileAsCode(const char *fileName, const char *data, int dataSize)
 {
 	FILE *codeFile;
 
     codeFile = fopen(fileName, "wt");
-    
+
     fprintf(codeFile, "const int dataSize = %i;", dataSize);
 	fprintf(codeFile, "const unsigned char %s[%i] = {\n    ", fileName, dataSize);
 	
@@ -538,7 +520,7 @@ static void SaveFileAsCode(const char *fileName, const char *data, int dataSize)
 	for (int i = 0; i < dataSize; i ++)
 	{
 		blCounter++;
-        
+
         fprintf(codeFile, "0x%.2x, ", data[i]);
 		
         if (blCounter >= 24)
@@ -547,7 +529,7 @@ static void SaveFileAsCode(const char *fileName, const char *data, int dataSize)
 			blCounter = 0;
 		}
 	}
-    
+
     fprintf(codeFile, " };\n");
 
 	fclose(codeFile);
@@ -559,7 +541,7 @@ static bool IsUtf8(const char *string)
     if (!string) return 0;
 
     const unsigned char *bytes = (const unsigned char *)string;
-    
+
     while (*bytes)
     {
         if( (// ASCII
