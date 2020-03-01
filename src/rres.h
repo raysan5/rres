@@ -135,6 +135,44 @@ References:
 // Types and Structures Definition
 // NOTE: Some types are required for RAYGUI_STANDALONE usage
 //----------------------------------------------------------------------------------
+/*
+DESIGN IDEAS:
+
+Functions required: 
+    LoadRRESData()
+    SaveRRESData()
+    RRESData LoadResource(int id);  // Require to load multiple chunks?
+    
+    Texture2D LoadTextureFromResource(RRESData res); -> void *? -> Require casting?
+
+RESOURCES TYPES:
+    - Image
+    - Font: Image + CharInfo
+    - Text
+    - Mesh: VertexData
+    - Audio
+    - Raw
+
+struct {
+    int id;                 // Identifier
+    //int flags, extra;     // Extra RRES information?
+    int paramsCount;
+    int *params;            // Data parameters
+    int dataSize;
+    void *data;             // Data
+    int nameLength;
+    char *fileName;         // Resource filename (if required) -> Required to restore original file -> CentralDirectory
+} RRESData;
+
+RRESData on .rres file could be:
+
+ZIP: SIGN | VER | FLAGS | CompType | ModTime | ModDate | CRC32 | CompSize | UncompSize | nameLen | fileName | <--- DATA --->
+
+PNG has CRC32 after data: Length | ChunkType | <-- data --> | CRC32
+
+RIFF: Type | len | format | <-- data -->
+
+*/
 #if defined(RRES_STANDALONE)
     // rRES resource chunk (piece of data)
     typedef struct RRESChunk {
