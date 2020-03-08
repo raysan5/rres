@@ -9,6 +9,9 @@
 *       If not defined, the library is in header only mode and can be included in other headers
 *       or source files without problems. But only ONE file should hold the implementation.
 *
+*   #define SUPPORT_LIBRARY_MINIZ
+*       miniz library is included and used for DEFLATE compression/decompression
+*
 *   RRES FILE STRUCTURE:
 *
 *   RRES File Header            (12 bytes)  [RRESFileHeader]
@@ -59,59 +62,6 @@
 *
 **********************************************************************************************/
 
-/*
-*   rRES Resource Data                  // Depending on resource type, some 'properties' preceed data
-*       Image Data Params   (6 bytes)
-*           Width           (2 byte)    // Image width
-*           Height          (2 byte)    // Image height
-*           Color format    (1 byte)    // Image data color format
-*                                           // 0 - Monocrome (1 bit per pixel)
-*                                           // 1 - Grayscale (8 bit)
-*                                           // 2 - R5G6B5 (16 bit)
-*                                           // 3 - R5G5B5A1 (16 bit)
-*                                           // 4 - R4G4B4A4 (16 bit)
-*                                           // 5 - R8G8B8 (24 bit)
-*                                           // 6 - R8G8B8A8 (32 bit) - default
-*           Mipmaps count   (1 byte)    // Mipmap images included - default 1
-*           DATA                        // Image data
-*       Sound Data Params   (6 bytes)
-*           Sample Rate     (2 byte)    // Sample rate (frequency)
-*           BitsPerSample   (2 byte)    // Bits per sample
-*           Channels        (1 byte)    // Channels (1 - mono, 2 - stereo)
-*           <reserved>      (1 byte)
-*           DATA                        // Sound data
-*       Vertex Data Params  (6 bytes?)
-*           Num vertex      (4 byte)    // Number of vertex
-*           Data Type       (1 byte)    // Vertex arrays provided --> Use like FLAGS: 01011101
-*                                           // 0001 - Positions
-*                                           // 0011 - position+textcoord
-*                                           // position-color-UVcoords-normals-otherUV
-*           Indexed Data    // Indexing data will be GREAT!...but it must be calculated!
-*                           // Once all data is unindexed, just test positions-UVcoords-normals and create new index!
-*                           // Or just store unindexed data... easier!
-*           DATA                        // Model vertex data (32 bit per vertex - 1 float)
-*       Text Data Params
-*           DATA                        // Text data (processed like raw data), '\0' ended
-*       Raw Data Params <no-params>
-*           DATA                        // Raw data
-*/
-
-/*
-References:
-    FOURCC:            https://en.wikipedia.org/wiki/FourCC
-    RIFF file-format:  http://www.johnloomis.org/cpe102/asgn/asgn1/riff.html
-    ZIP file-format:   https://en.wikipedia.org/wiki/Zip_(file_format)
-                       http://www.onicos.com/staff/iz/formats/zip.html
-    XNB file-format:   http://xbox.create.msdn.com/en-US/sample/xnb_format
-    
-    RIFF:   Type | len | format | <-- DATA -->
-    ZIP:    SIGN | VER | FLAGS | CompType | ModTime | ModDate | CRC32 | CompSize | UncompSize | nameLen | fileName | <--- DATA --->
-    PNG:    Length | ChunkType | <-- DATA --> | CRC32
-    
-    GLB:    Length | ChunkType | <-- DATA -->
-
-*/
-
 #ifndef RRES_H
 #define RRES_H
 
@@ -129,7 +79,6 @@ References:
 //----------------------------------------------------------------------------------
 // Defines and Macros
 //----------------------------------------------------------------------------------
-#define RRES_MAX_RESOURCES      256
 #define RRES_CURRENT_VERSION    100
 
 //----------------------------------------------------------------------------------
@@ -191,91 +140,6 @@ RRESDEF void UnloadRRES(RRESData rres);
 RRESDEF RRESCentralDir LoadRRESCentralDirectory(const char *fileName);
 RRESDEF int GetRRESIdFromFileName(RRESCentralDir dir, const char *fileName);
 
-/*
-QUESTION: How to load each type of data from RRES -> Custom implementations (library dependant)
-
-// RRES_TYPE_RAW: char *data = (char *)rres.data;
-
-Image LoadImageFromRRES(RRESData rres)
-{
-    Image image = { 0 };
-    
-    if ((rres.count == 1) && (rres.type == RRES_TYPE_IMAGE))
-    {
-        image.width = rres.chunk[0].properties[0];
-        image.height = rres.chunk[0].properties[1];
-        image.mipmaps = rres.chunk[0].properties[2];
-        image.format =  rres.chunk[0].properties[3];
-        
-        image.data = rres.chunk[0].data;     // WARNING: Pointer assignment! -> Shallow copy?
-    }
-    
-    return image;
-}
-
-Wave LoadWaveFromRRES(RRESData rres)
-{
-    Wave wave = { 0 };
-    
-    if ((rres.count == 1) && (rres.type == RRES_TYPE_WAVE))
-    {
-        wave.sampleCount = rres.chunk[0].properties[0];
-        wave.sampleRate = rres.chunk[0].properties[1];
-        wave.sampleSize = rres.chunk[0].properties[2];
-        wave.channels = rres.chunk[0].properties[3];
-        
-        wave.data = rres.chunk[0].data;     // WARNING: Pointer assignment! -> Shallow copy?
-    }
-}
-
-Font LoadFontFromRRES(RRESData rres)
-{
-    Font font = { 0 };
-
-    if ((rres.count == 2) && (rres.type == RRES_TYPE_FONT))
-
-    // To load a Font we expect at least 2 resource data packages
-    if (rres[0].type == RRES_TYPE_FONT_IMAGE)
-    {
-        Image image = LoadImageFromRRES(rres[0]);
-        font.texture = LoadTextureFromImage(image);
-    }
-    
-    if (rres[1].type == RRES_TYPE_FONT_CHARDATA) //-> RAW DATA?
-    {
-        font.charsCount = rres[1].properties[0];
-        font.baseSize = rres[1].properties[1];
-        
-        // Font rectangle properties come as individual properties
-        font.recs = (Rectangle *)RRES_MALLOC(font.charsCount*sizeof(Rectangle));
-        
-        for (int i = 0; i < font.charsCount; i++)
-        {
-            font.recs[i].x = (float)rres[1].properties[2 + i*4];
-            font.recs[i].y = (float)rres[1].properties[2 + i*4 + 1];
-            font.recs[i].width = (float)rres[1].properties[2 + i*4 + 2];
-            font.recs[i].height = (float)rres[1].properties[2 + i*4 + 3];
-        }
-        
-        font.chars = (CharInfo *)rres[1]->data;
-    }
-
-    return font;
-}
-
-rres->type == RRES_TYPE_VERTEX (multiple parts)
-Mesh mesh;
-mesh.vertexCount = rres[0]->param1;
-mesh.vertices = (float *)rres[0]->data;
-mesh.texcoords = (float *)rres[1]->data;
-mesh.normals = (float *)rres[2]->data;
-mesh.tangents = (float *)rres[3]->data;
-mesh.tangents = (unsigned char *)rres[4]->data;
-
-rres->type == RRES_TYPE_TEXT
-unsigned char *text = (unsigned char *)rres->data;  // Text must be '\0' terminated -> Save it this way!
-Shader shader = LoadShaderText(text, rres->param1);     Shader LoadShaderText(const char *shdrText, int length);
-*/
 #endif // RRES_H
 
 
@@ -421,6 +285,8 @@ typedef enum {
 // Module specific Functions Declaration
 //----------------------------------------------------------------------------------
 static void *DecompressData(const unsigned char *data, unsigned long compSize, int uncompSize);
+
+static unsigned int ComputeCRC32(unsigned char *buffer, int len);
 
 //----------------------------------------------------------------------------------
 // Module Functions Definition
@@ -576,26 +442,34 @@ RRESData GetDataFromChunk(RRESInfoHeader info, void *dataChunk)
 {
     RRESData rres = { 0 };
     
-    rres.type = info.type;   // TODO: Assign rres.type (int) from info.type (FOURCC)
+    rres.type = info.type;          // TODO: Assign rres.type (int) from info.type (FOURCC)
 
-    // TODO: Check CRC32
-    
     // TODO: Decompress and decrypt [properties + data] chunk
     
     if (info.compType == RRES_COMP_DEFLATE)
     {
         void *result = DecompressData(dataChunk, info.compSize, info.uncompSize);
         
-        rres.propsCount = ((int *)result)[0];
+        int crc32 = ComputeCRC32(result, info.uncompSize);
         
-        if (propsCount > 0)
+        if (crc32 == info.crc32)    // Check CRC32
         {
-            rres.props = (int *)RRES_MALLOC(rres.propsCount*sizeof(int));
-            for (int i = 0; i < rres.propsCount; i++) rres.props[i] = ((int *)result)[1 + i];
+            rres.propsCount = ((int *)result)[0];
+            
+            if (propsCount > 0)
+            {
+                rres.props = (int *)RRES_MALLOC(rres.propsCount*sizeof(int));
+                for (int i = 0; i < rres.propsCount; i++) rres.props[i] = ((int *)result)[1 + i];
+            }
+        
+            rres.data = RRES_MALLOC(info.uncompSize);
+            memcpy(rres.data, result + (rres.propsCount*sizeof(int)), info.uncompSize);
         }
-    
-        rres.data = RRES_MALLOC(info.uncompSize);
-        memcpy(rres.data, result + (rres.propsCount*sizeof(int)), info.uncompSize);
+        else 
+        {
+            TRACELOG(LOG_WARNING, "CRC32 does not match, data can be corrupted");
+            RRES_FREE(result);
+        }
     }
     
     return rres;
@@ -675,7 +549,7 @@ static void *DecompressData(const unsigned char *data, unsigned long compSize, i
     return uncompData;
 }
 
-/*
+#if defined(SUPPORT_LIBRARY_MINIZ)
 // Data compression (using DEFLATE, miniz library)
 // NOTE: Allocated data MUST be freed!
 static unsigned char *CompressData(const unsigned char *data, unsigned long uncompSize, unsigned long *outCompSize)
@@ -687,12 +561,12 @@ static unsigned char *CompressData(const unsigned char *data, unsigned long unco
     // Allocate buffer to hold compressed data
     pComp = (mz_uint8 *)malloc((size_t)tempCompSize);
 
-    printf("Compression space reserved: %i\n", tempCompSize);
+    TRACELOG(LOG_INFO, "Compression space reserved: %i\n", tempCompSize);
 
     // Check correct memory allocation
     if (!pComp)
     {
-        printf("Out of memory!\n");
+        TRACELOG(LOG_INFO, "Out of memory!\n");
         return NULL;
     }
 
@@ -702,14 +576,14 @@ static unsigned char *CompressData(const unsigned char *data, unsigned long unco
     // Check compression success
     if (compStatus != Z_OK)
     {
-        printf("Compression failed!\n");
+        TRACELOG(LOG_INFO, "Compression failed!\n");
         free(pComp);
         return NULL;
     }
 
-    printf("Compressed from %u bytes to %u bytes\n", (mz_uint32)uncompSize, (mz_uint32)tempCompSize);
+    TRACELOG(LOG_INFO, "Compressed from %u bytes to %u bytes\n", (mz_uint32)uncompSize, (mz_uint32)tempCompSize);
 
-    if (tempCompSize > uncompSize) printf("WARNING: Compressed data is larger than uncompressed data!!!\n");
+    if (tempCompSize > uncompSize) TRACELOG(LOG_INFO, "WARNING: Compressed data is larger than uncompressed data!!!\n");
 
     *outCompSize = tempCompSize;
 
@@ -730,7 +604,7 @@ static unsigned char *DecompressData(const unsigned char *data, unsigned long co
     // Check correct memory allocation
     if (!pUncomp)
     {
-        printf("Out of memory!\n");
+        TRACELOG(LOG_INFO, "Out of memory!\n");
         return NULL;
     }
 
@@ -739,22 +613,23 @@ static unsigned char *DecompressData(const unsigned char *data, unsigned long co
 
     if (decompStatus != Z_OK)
     {
-        printf("Decompression failed!\n");
+        TRACELOG(LOG_INFO, "Decompression failed!\n");
         free(pUncomp);
         return NULL;
     }
 
     if (uncompSize != (int)tempUncompSize)
     {
-        printf("WARNING! Expected uncompressed size do not match! Data may be corrupted!\n");
-        printf(" -- Expected uncompressed size: %i\n", uncompSize);
-        printf(" -- Returned uncompressed size: %i\n", tempUncompSize);
+        TRACELOG(LOG_INFO, "WARNING! Expected uncompressed size do not match! Data may be corrupted!\n");
+        TRACELOG(LOG_INFO, " -- Expected uncompressed size: %i\n", uncompSize);
+        TRACELOG(LOG_INFO, " -- Returned uncompressed size: %i\n", tempUncompSize);
     }
 
-    printf("Decompressed from %u bytes to %u bytes\n", (mz_uint32)compSize, (mz_uint32)tempUncompSize);
+    TRACELOG(LOG_INFO, "Decompressed from %u bytes to %u bytes\n", (mz_uint32)compSize, (mz_uint32)tempUncompSize);
 
     return pUncomp;
 }
+#endif
 
 // Data compression data (custom RLE algorythm)
 static unsigned char *CompressDataRLE(const unsigned char *data, unsigned int uncompSize, unsigned int *outCompSize)
@@ -762,7 +637,7 @@ static unsigned char *CompressDataRLE(const unsigned char *data, unsigned int un
     unsigned char *compData = (unsigned char *)malloc(uncompSize * 2 * sizeof(unsigned char));    // NOTE: We allocate some initial space to store compresed data,
     // hopefully, it will be < uncompSize but in the worst possible case it could be 2 * uncompSize, so we allocate that space just in case...
 
-    printf("Compresed data array allocated! Size: %i\n", uncompSize * 2);
+    TRACELOG(LOG_INFO, "Compresed data array allocated! Size: %i\n", uncompSize * 2);
 
     unsigned char count = 1;
     unsigned char currentValue, nextValue;
@@ -771,7 +646,7 @@ static unsigned char *CompressDataRLE(const unsigned char *data, unsigned int un
 
     currentValue = data[0];
 
-    printf("First initial value: %i\n", currentValue);
+    TRACELOG(LOG_INFO, "First initial value: %i\n", currentValue);
     //getchar();
 
     for (int i = 1; i < uncompSize; i++)
@@ -795,7 +670,7 @@ static unsigned char *CompressDataRLE(const unsigned char *data, unsigned int un
             compData[j] = count;
             compData[j + 1] = currentValue;
 
-            //printf("Data stored Value-Count: %i - %i\n", currentValue, count);
+            //TRACELOG(LOG_INFO, "Data stored Value-Count: %i - %i\n", currentValue, count);
 
             j += 2;
             count = 1;
@@ -808,19 +683,19 @@ static unsigned char *CompressDataRLE(const unsigned char *data, unsigned int un
     compData[j + 1] = currentValue;
     j += 2;
 
-    printf("Data stored Value-Count: %i - %i\n", currentValue, count);
+    TRACELOG(LOG_INFO, "Data stored Value-Count: %i - %i\n", currentValue, count);
 
     compData[j] = 0;    // Just to indicate the end of data
                         // NOTE: Array lenght will be j
 
-    printf("Data compressed!\n");
+    TRACELOG(LOG_INFO, "Data compressed!\n");
 
     // Resize memory block with realloc
     compData = (unsigned char *)realloc(compData, j * sizeof(unsigned char));
 
     if (compData == NULL)
     {
-        printf("Error reallocating memory!");
+        TRACELOG(LOG_INFO, "Error reallocating memory!");
 
         free(compData);    // Free the initial memory block
     }
@@ -835,6 +710,50 @@ static unsigned char *CompressDataRLE(const unsigned char *data, unsigned int un
 
     return compData;    // REMEMBER! This memory should be freed!
 }
-*/
+
+// Compute CRC32
+static unsigned int ComputeCRC32(unsigned char *buffer, int len)
+{
+    static unsigned int crcTable[256] = {
+        0x00000000, 0x77073096, 0xEE0E612C, 0x990951BA, 0x076DC419, 0x706AF48F, 0xE963A535, 0x9E6495A3,
+        0x0eDB8832, 0x79DCB8A4, 0xE0D5E91E, 0x97D2D988, 0x09B64C2B, 0x7EB17CBD, 0xE7B82D07, 0x90BF1D91,
+        0x1DB71064, 0x6AB020F2, 0xF3B97148, 0x84BE41DE, 0x1ADAD47D, 0x6DDDE4EB, 0xF4D4B551, 0x83D385C7,
+        0x136C9856, 0x646BA8C0, 0xFD62F97A, 0x8A65C9EC, 0x14015C4F, 0x63066CD9, 0xFA0F3D63, 0x8D080DF5,
+        0x3B6E20C8, 0x4C69105E, 0xD56041E4, 0xA2677172, 0x3C03E4D1, 0x4B04D447, 0xD20D85FD, 0xA50AB56B,
+        0x35B5A8FA, 0x42B2986C, 0xDBBBC9D6, 0xACBCF940, 0x32D86CE3, 0x45DF5C75, 0xDCD60DCF, 0xABD13D59,
+        0x26D930AC, 0x51DE003A, 0xC8D75180, 0xBFD06116, 0x21B4F4B5, 0x56B3C423, 0xCFBA9599, 0xB8BDA50F,
+        0x2802B89E, 0x5F058808, 0xC60CD9B2, 0xB10BE924, 0x2F6F7C87, 0x58684C11, 0xC1611DAB, 0xB6662D3D,
+        0x76DC4190, 0x01DB7106, 0x98D220BC, 0xEFD5102A, 0x71B18589, 0x06B6B51F, 0x9FBFE4A5, 0xE8B8D433,
+        0x7807C9A2, 0x0F00F934, 0x9609A88E, 0xE10E9818, 0x7F6A0DBB, 0x086D3D2D, 0x91646C97, 0xE6635C01,
+        0x6B6B51F4, 0x1C6C6162, 0x856530D8, 0xF262004E, 0x6C0695ED, 0x1B01A57B, 0x8208F4C1, 0xF50FC457,
+        0x65B0D9C6, 0x12B7E950, 0x8BBEB8EA, 0xFCB9887C, 0x62DD1DDF, 0x15DA2D49, 0x8CD37CF3, 0xFBD44C65,
+        0x4DB26158, 0x3AB551CE, 0xA3BC0074, 0xD4BB30E2, 0x4ADFA541, 0x3DD895D7, 0xA4D1C46D, 0xD3D6F4FB,
+        0x4369E96A, 0x346ED9FC, 0xAD678846, 0xDA60B8D0, 0x44042D73, 0x33031DE5, 0xAA0A4C5F, 0xDD0D7CC9,
+        0x5005713C, 0x270241AA, 0xBE0B1010, 0xC90C2086, 0x5768B525, 0x206F85B3, 0xB966D409, 0xCE61E49F,
+        0x5EDEF90E, 0x29D9C998, 0xB0D09822, 0xC7D7A8B4, 0x59B33D17, 0x2EB40D81, 0xB7BD5C3B, 0xC0BA6CAD,
+        0xEDB88320, 0x9ABFB3B6, 0x03B6E20C, 0x74B1D29A, 0xEAD54739, 0x9DD277AF, 0x04DB2615, 0x73DC1683,
+        0xE3630B12, 0x94643B84, 0x0D6D6A3E, 0x7A6A5AA8, 0xE40ECF0B, 0x9309FF9D, 0x0A00AE27, 0x7D079EB1,
+        0xF00F9344, 0x8708A3D2, 0x1E01F268, 0x6906C2FE, 0xF762575D, 0x806567CB, 0x196C3671, 0x6E6B06E7,
+        0xFED41B76, 0x89D32BE0, 0x10DA7A5A, 0x67DD4ACC, 0xF9B9DF6F, 0x8EBEEFF9, 0x17B7BE43, 0x60B08ED5,
+        0xD6D6A3E8, 0xA1D1937E, 0x38D8C2C4, 0x4FDFF252, 0xD1BB67F1, 0xA6BC5767, 0x3FB506DD, 0x48B2364B,
+        0xD80D2BDA, 0xAF0A1B4C, 0x36034AF6, 0x41047A60, 0xDF60EFC3, 0xA867DF55, 0x316E8EEF, 0x4669BE79,
+        0xCB61B38C, 0xBC66831A, 0x256FD2A0, 0x5268E236, 0xCC0C7795, 0xBB0B4703, 0x220216B9, 0x5505262F,
+        0xC5BA3BBE, 0xB2BD0B28, 0x2BB45A92, 0x5CB36A04, 0xC2D7FFA7, 0xB5D0CF31, 0x2CD99E8B, 0x5BDEAE1D,
+        0x9B64C2B0, 0xEC63F226, 0x756AA39C, 0x026D930A, 0x9C0906A9, 0xEB0E363F, 0x72076785, 0x05005713,
+        0x95BF4A82, 0xE2B87A14, 0x7BB12BAE, 0x0CB61B38, 0x92D28E9B, 0xE5D5BE0D, 0x7CDCEFB7, 0x0BDBDF21,
+        0x86D3D2D4, 0xF1D4E242, 0x68DDB3F8, 0x1FDA836E, 0x81BE16CD, 0xF6B9265B, 0x6FB077E1, 0x18B74777,
+        0x88085AE6, 0xFF0F6A70, 0x66063BCA, 0x11010B5C, 0x8F659EFF, 0xF862AE69, 0x616BFFD3, 0x166CCF45,
+        0xA00AE278, 0xD70DD2EE, 0x4E048354, 0x3903B3C2, 0xA7672661, 0xD06016F7, 0x4969474D, 0x3E6E77DB,
+        0xAED16A4A, 0xD9D65ADC, 0x40DF0B66, 0x37D83BF0, 0xA9BCAE53, 0xDEBB9EC5, 0x47B2CF7F, 0x30B5FFE9,
+        0xBDBDF21C, 0xCABAC28A, 0x53B39330, 0x24B4A3A6, 0xBAD03605, 0xCDD70693, 0x54DE5729, 0x23D967BF,
+        0xB3667A2E, 0xC4614AB8, 0x5D681B02, 0x2A6F2B94, 0xB40BBE37, 0xC30C8EA1, 0x5A05DF1B, 0x2D02EF8D
+    };
+
+    unsigned int crc = ~0u;
+
+    for (int i = 0; i < len; i++) crc = (crc >> 8)^crcTable[buffer[i]^(crc&0xff)];
+
+    return ~crc;
+}
 
 #endif // RRES_IMPLEMENTATION
