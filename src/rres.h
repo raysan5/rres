@@ -1,6 +1,6 @@
 /**********************************************************************************************
 *
-*   rres v0.9 - raylib resource custom fileformat management functions
+*   rres v1.0 - raylib resource custom fileformat management functions
 *
 *   CONFIGURATION:
 *
@@ -9,13 +9,38 @@
 *       If not defined, the library is in header only mode and can be included in other headers
 *       or source files without problems. But only ONE file should hold the implementation.
 *
+*   RRES FILE STRUCTURE:
+*
+*   RRES File Header            (12 bytes)  [RRESFileHeader]
+*       File ID                 (4 bytes)   // File type id: 'rRES'
+*       Version                 (2 bytes)   // Format version
+*       Res Count               (2 bytes)   // Number of resources contained
+*       CD Offset               (4 bytes)   // Central Directory offset (if available)
+*
+*   RRES Resource [RRES]
+*   {
+*       RRES Info Header        (32 bytes)  [RRESInfoHeader]
+*           Type                (4 bytes)   // Resource type (FOURCC)
+*           Id                  (4 bytes)   // Resource unique identifier
+*           Comp Type           (1 byte)    // DATA compression type
+*           Crypt Type          (1 byte)    // DATA encryption type
+*           Flags               (2 bytes)   // Flags (if required)
+*           Data CompSize       (4 bytes)   // DATA compressed size
+*           Data UncompSize     (4 bytes)   // DATA uncompressed size
+*           Next Offset         (4 bytes)   // Offset to next resource related
+*           Reserved            (4 bytes)   // <reserved>
+*           CRC32               (4 bytes)   // Data Chunk CRC32 (full chunk)
+*   
+*       RRES Data Chunk         (n bytes)   // DATA: [props + data]
+*   }
+*
 *   DEPENDENCIES:
 *       tinfl   - DEFLATE decompression library
 *       miniz   - DEFLATE compression/decompression library (zlib-style)
 *
 *   LICENSE: zlib/libpng
 *
-*   Copyright (c) 2016-2018 Ramon Santamaria (@raysan5)
+*   Copyright (c) 2016-2020 Ramon Santamaria (@raysan5)
 *
 *   This software is provided "as-is", without any express or implied warranty. In no event
 *   will the authors be held liable for any damages arising from the use of this software.
@@ -34,36 +59,8 @@
 *
 **********************************************************************************************/
 
-// TODO: Review rRES file structure!!!
 /*
-*
-*   rRES file Structure:
-*
-*   rRES Base Header        (8 bytes)
-*       File ID - 'rRES'    (4 byte)
-*       RRES Version        (1 byte)    // rRES Format Version (4bit MSB) + Subversion (4bit LSB)
-*       <Reserved>          (1 byte)    // Useful in a future... Flags?
-*       # Resources         (2 byte)    // Number of resources contained
-*
-*   rRES Res Info Header    (12 bytes)  // For every resource, one header
-*       Res ID              (2 byte)    // Resource unique identifier
-*       Res Type            (1 byte)    // Resource type
-*                                           // 0 - Image
-*                                           // 1 - Text
-*                                           // 2 - Sound
-*                                           // 3 - Model
-*                                           // 4 - Raw
-*                                           // 5 - Other?
-*       Res Data Comp       (1 byte)    // Data Compression
-*                                       // Compresion:
-*                                           // 0 - No compression
-*                                           // 1 - RLE compression (custom)
-*                                           // 2 - DEFLATE (LZ77+Huffman) compression (miniz lib)
-*                                           // 3 - Others? (LZX, LZMA(7ZIP), BZ2, XZ,...)
-*       Res Data Size       (4 byte)    // Data size in .rres file (compressed or not, only DATA)
-*       Source Data Size    (4 byte)    // Source data size (uncompressed, only DATA)
-*
-*   rRES Resource Data                  // Depending on resource type, some 'parameters' preceed data
+*   rRES Resource Data                  // Depending on resource type, some 'properties' preceed data
 *       Image Data Params   (6 bytes)
 *           Width           (2 byte)    // Image width
 *           Height          (2 byte)    // Image height
@@ -83,7 +80,7 @@
 *           Channels        (1 byte)    // Channels (1 - mono, 2 - stereo)
 *           <reserved>      (1 byte)
 *           DATA                        // Sound data
-*       Model Data Params   (6 bytes?)
+*       Vertex Data Params  (6 bytes?)
 *           Num vertex      (4 byte)    // Number of vertex
 *           Data Type       (1 byte)    // Vertex arrays provided --> Use like FLAGS: 01011101
 *                                           // 0001 - Positions
@@ -94,25 +91,29 @@
 *                           // Or just store unindexed data... easier!
 *           DATA                        // Model vertex data (32 bit per vertex - 1 float)
 *       Text Data Params
-*           DATA                        // Text data (processed like raw data)
+*           DATA                        // Text data (processed like raw data), '\0' ended
 *       Raw Data Params <no-params>
 *           DATA                        // Raw data
 */
 
 /*
 References:
+    FOURCC:            https://en.wikipedia.org/wiki/FourCC
     RIFF file-format:  http://www.johnloomis.org/cpe102/asgn/asgn1/riff.html
     ZIP file-format:   https://en.wikipedia.org/wiki/Zip_(file_format)
                        http://www.onicos.com/staff/iz/formats/zip.html
     XNB file-format:   http://xbox.create.msdn.com/en-US/sample/xnb_format
+    
+    RIFF:   Type | len | format | <-- DATA -->
+    ZIP:    SIGN | VER | FLAGS | CompType | ModTime | ModDate | CRC32 | CompSize | UncompSize | nameLen | fileName | <--- DATA --->
+    PNG:    Length | ChunkType | <-- DATA --> | CRC32
+    
+    GLB:    Length | ChunkType | <-- DATA -->
+
 */
 
 #ifndef RRES_H
 #define RRES_H
-
-#if !defined(RRES_STANDALONE)
-    #include "raylib.h"
-#endif
 
 //#define RRES_STATIC
 #if defined(RRES_STATIC)
@@ -133,80 +134,45 @@ References:
 
 //----------------------------------------------------------------------------------
 // Types and Structures Definition
-// NOTE: Some types are required for RAYGUI_STANDALONE usage
 //----------------------------------------------------------------------------------
-/*
-DESIGN IDEAS:
 
-Functions required: 
-    LoadRRESData()
-    SaveRRESData()
-    RRESData LoadResource(int id);  // Require to load multiple chunks?
-    
-    Texture2D LoadTextureFromResource(RRESData res); -> void *? -> Require casting?
-
-RESOURCES TYPES:
-    - Image
-    - Font: Image + CharInfo
-    - Text
-    - Mesh: VertexData
-    - Audio
-    - Raw
-
-struct {
-    int id;                 // Identifier
-    //int flags, extra;     // Extra RRES information?
-    int paramsCount;
-    int *params;            // Data parameters
-    int dataSize;
-    void *data;             // Data
-    int nameLength;
-    char *fileName;         // Resource filename (if required) -> Required to restore original file -> CentralDirectory
+// rRES resource chunk (piece of data)
+// WARNING: No aligned with internal RRES structure
+typedef struct RRESData {
+    unsigned int type;          // Resource data type
+    int propsCount;             // Resource properties count
+    int *props;                 // Resource properties
+    void *data;                 // Resource data
 } RRESData;
 
-RRESData on .rres file could be:
+// RRES Central Directory Entry
+typedef struct {
+    int id;                     // Resource unique ID
+    int offset;                 // Resource offset in file
+    int fileNameLen;            // Resource fileName length
+    char *fileName;             // Resource fileName ('\0' terminated)
+} RRESDirEntry;
 
-ZIP: SIGN | VER | FLAGS | CompType | ModTime | ModDate | CRC32 | CompSize | UncompSize | nameLen | fileName | <--- DATA --->
+// RRES Central Directory
+typedef struct {
+    int count;                  // CDir entries count
+    RRESDirEntry *entries;      // CDir entries 
+} RRESCentralDir;
 
-PNG has CRC32 after data: Length | ChunkType | <-- data --> | CRC32
-
-RIFF: Type | len | format | <-- data -->
-
-*/
-#if defined(RRES_STANDALONE)
-    // rRES resource chunk (piece of data)
-    typedef struct RRESChunk {
-        unsigned int type;          // Resource chunk type (4 byte)
-        int *params;                // Resource chunk parameters pointer (4 byte)
-        void *data;                 // Resource chunk data pointer (4 byte)
-    } RRESChunk;
-
-    // rRES resource (single resource)
-    // NOTE: One resource could be composed of multiple chunks
-    typedef struct RRES {
-        unsigned int type;          // Resource type (4 bytes)
-        unsigned int resCount;      // Resource chunks counter
-        RRESChunk *chunks;          // Resource chunks
-    } RRES;
-
-    // rRES resources array
-    // NOTE: It could be useful at some point to load multiple resources
-    typedef struct RRES *RRESList;  // Resources list pointer
-
-    // RRESData type
-    typedef enum {
-        RRES_TYPE_RAW = 0,          // Basic raw type, no parameters
-        RRES_TYPE_IMAGE,            // Basic image type, [4] parameters: width, height, mipmaps, format
-        RRES_TYPE_WAVE,             // Basic wave type, [4] parameters: sampleCount, sampleRate, sampleSize, channels
-        RRES_TYPE_MESH,             // Complex mesh type, multiple RRES_TYPE_VERTEX chunks
-        RRES_TYPE_MATERIAL,         // Complex material type, multiple RRES_TYPE_IMAGE chunks, custom parameters
-        RRES_TYPE_VERTEX,           // Basic vertex type, [4] parameters: vertexCount, vertexType, vertexFormat
-        RRES_TYPE_TEXT,             // Basic text type, [2] parameters: charsCount, cultureCode
-        RRES_TYPE_SPRITEFONT,       // Complex font type, RRES_TYPE_IMAGE + RRES_TYPE_FONT_CHARDATA chunks
-        RRES_TYPE_FONT_CHARDATA,    // Basic chars-info type, [2] parameters: charsCount, baseSize
-        RRES_TYPE_DIRECTORY         // Basic directory type, [2] parameters: fileCount, directoryCount
-    } RRESDataType;
-#endif
+// RRESData type
+typedef enum {
+    RRES_TYPE_RAW = 0,          // [RAWD] Basic type: no properties
+    RRES_TYPE_TEXT,             // [TEXT] Basic type: [2] properties: charsCount, cultureCode
+    RRES_TYPE_IMAGE,            // [IMGE] Basic type: [4] properties: width, height, mipmaps, format
+    RRES_TYPE_WAVE,             // [WAVE] Basic type: [4] properties: sampleCount, sampleRate, sampleSize, channels
+    RRES_TYPE_VERTEX,           // [VRTX] Basic type: [4] properties: vertexCount, vertexType, vertexFormat
+    RRES_TYPE_MATDATA,          // [MATD] Basic type: [n] properties-values
+    RRES_TYPE_FONT,             // [FONT] Complex type: [n] properties: charsCount, baseSize, recs -> [1] RRES_TYPE_IMAGE + RRES_TYPE_CHARDATA chunks
+    RRES_TYPE_CHARDATA,         // [CHAR] Basic type: no properties
+    RRES_TYPE_MESH,             // [MESH] Complex type: [n] RRES_TYPE_VERTEX chunks
+    RRES_TYPE_MODEL,            // [MODL] Complex type: [n] RRES_TYPE_MESH + [n] RRES_TYPE_MATERIAL chunks
+    RRES_TYPE_DIRECTORY         // [CDIR] Basic type, [1] properties: fileCount
+} RRESDataType;
 
 //----------------------------------------------------------------------------------
 // Global variables
@@ -216,31 +182,86 @@ RIFF: Type | len | format | <-- data -->
 //----------------------------------------------------------------------------------
 // Module Functions Declaration
 //----------------------------------------------------------------------------------
-//RRESDEF RRESData LoadResourceData(const char *rresFileName, int rresId, int part);
-RRESDEF RRES LoadRRES(const char *fileName, unsigned int rresId);
-RRESDEF void UnloadRRES(RRES rres);
+
+// Load all data chunks under provided rresId,
+RRESDEF RRESData LoadRRES(const char *fileName, int rresId);
+RRESDEF RRESData *LoadRRESMulti(const char *fileName, int rresId, int *count);
+RRESDEF void UnloadRRES(RRESData rres);
+
+RRESDEF RRESCentralDir LoadRRESCentralDirectory(const char *fileName);
+RRESDEF int GetRRESIdFromFileName(RRESCentralDir dir, const char *fileName);
 
 /*
-QUESTION: How to load each type of data from RRES ?
+QUESTION: How to load each type of data from RRES -> Custom implementations (library dependant)
 
-rres->type == RRES_TYPE_RAW
-unsigned char data = (unsigned char *)rres[0]->data;
+// RRES_TYPE_RAW: char *data = (char *)rres.data;
 
-rres->type == RRES_TYPE_IMAGE
-Image image;
-image.data = rres[0]->data;        // Be careful, duplicate pointer
-image.width = rres[0]->param1;
-image.height = rres[0]->param2;
-image.mipmaps = rres[0]->param3;
-image.format =  rres[0]->format;
+Image LoadImageFromRRES(RRESData rres)
+{
+    Image image = { 0 };
+    
+    if ((rres.count == 1) && (rres.type == RRES_TYPE_IMAGE))
+    {
+        image.width = rres.chunk[0].properties[0];
+        image.height = rres.chunk[0].properties[1];
+        image.mipmaps = rres.chunk[0].properties[2];
+        image.format =  rres.chunk[0].properties[3];
+        
+        image.data = rres.chunk[0].data;     // WARNING: Pointer assignment! -> Shallow copy?
+    }
+    
+    return image;
+}
 
-rres->type == RRES_TYPE_WAVE
-Wave wave;
-wave.data = rres[0]->data;
-wave.sampleCount = rres[0]->param1;
-wave.sampleRate = rres[0]->param2;
-wave.sampleSize = rres[0]->param3;
-wave.channels = rres[0]->param4;
+Wave LoadWaveFromRRES(RRESData rres)
+{
+    Wave wave = { 0 };
+    
+    if ((rres.count == 1) && (rres.type == RRES_TYPE_WAVE))
+    {
+        wave.sampleCount = rres.chunk[0].properties[0];
+        wave.sampleRate = rres.chunk[0].properties[1];
+        wave.sampleSize = rres.chunk[0].properties[2];
+        wave.channels = rres.chunk[0].properties[3];
+        
+        wave.data = rres.chunk[0].data;     // WARNING: Pointer assignment! -> Shallow copy?
+    }
+}
+
+Font LoadFontFromRRES(RRESData rres)
+{
+    Font font = { 0 };
+
+    if ((rres.count == 2) && (rres.type == RRES_TYPE_FONT))
+
+    // To load a Font we expect at least 2 resource data packages
+    if (rres[0].type == RRES_TYPE_FONT_IMAGE)
+    {
+        Image image = LoadImageFromRRES(rres[0]);
+        font.texture = LoadTextureFromImage(image);
+    }
+    
+    if (rres[1].type == RRES_TYPE_FONT_CHARDATA) //-> RAW DATA?
+    {
+        font.charsCount = rres[1].properties[0];
+        font.baseSize = rres[1].properties[1];
+        
+        // Font rectangle properties come as individual properties
+        font.recs = (Rectangle *)RRES_MALLOC(font.charsCount*sizeof(Rectangle));
+        
+        for (int i = 0; i < font.charsCount; i++)
+        {
+            font.recs[i].x = (float)rres[1].properties[2 + i*4];
+            font.recs[i].y = (float)rres[1].properties[2 + i*4 + 1];
+            font.recs[i].width = (float)rres[1].properties[2 + i*4 + 2];
+            font.recs[i].height = (float)rres[1].properties[2 + i*4 + 3];
+        }
+        
+        font.chars = (CharInfo *)rres[1]->data;
+    }
+
+    return font;
+}
 
 rres->type == RRES_TYPE_VERTEX (multiple parts)
 Mesh mesh;
@@ -252,22 +273,9 @@ mesh.tangents = (float *)rres[3]->data;
 mesh.tangents = (unsigned char *)rres[4]->data;
 
 rres->type == RRES_TYPE_TEXT
-unsigned char *text = (unsigned char *)rres->data;
+unsigned char *text = (unsigned char *)rres->data;  // Text must be '\0' terminated -> Save it this way!
 Shader shader = LoadShaderText(text, rres->param1);     Shader LoadShaderText(const char *shdrText, int length);
-
-rres->type == RRES_TYPE_FONT_IMAGE      (multiple parts)
-rres->type == RRES_TYPE_FONT_CHARDATA
-SpriteFont font;
-font.texture = LoadTextureFromImage(image);     // rres[0]
-font.chars = (CharInfo *)rres[1]->data;
-font.charsCount = rres[1]->param1;
-font.baseSize = rres[1]->param2;
-
-rres->type == RRES_TYPE_DIRECTORY
-unsigned char *fileNames = (unsigned char *)rres[0]->data;  // fileNames separed by \n
-int filesCount = rres[0]->param1;
 */
-
 #endif // RRES_H
 
 
@@ -279,18 +287,18 @@ int filesCount = rres[0]->param1;
 
 #if defined(RRES_IMPLEMENTATION)
 
-#include <stdio.h>          // Required for: FILE, fopen(), fclose()
+#include <stdio.h>              // Required for: FILE, fopen(), fclose()
 
 // Check if custom malloc/free functions defined, if not, using standard ones
 #if !defined(RRES_MALLOC)
-    #include <stdlib.h>     // Required for: malloc(), free()
+    #include <stdlib.h>         // Required for: malloc(), free()
 
-    #define RRES_MALLOC(size)  malloc(size)
-    #define RRES_FREE(ptr)     free(ptr)
+    #define RRES_MALLOC(size)   malloc(size)
+    #define RRES_FREE(ptr)      free(ptr)
 #endif
 
-#include "external/tinfl.c" // Required for: tinfl_decompress_mem_to_mem()
-                            // NOTE: DEFLATE algorythm data decompression
+#include "external/tinfl.c"     // Required for: tinfl_decompress_mem_to_mem()
+                                // NOTE: DEFLATE algorythm data decompression
 
 //----------------------------------------------------------------------------------
 // Defines and Macros
@@ -301,47 +309,33 @@ int filesCount = rres[0]->param1;
 // Types and Structures Definition
 //----------------------------------------------------------------------------------
 
-// rRES file header (8 byte)
-typedef struct {
-    unsigned char id[4];            // File identifier: rRES (4 byte)
-    unsigned short version;         // File version and subversion (2 byte)
-    unsigned short count;           // Number of resources in this file (2 byte)
+// rRES file header (12 bytes)
+typedef struct RRESFileHeader {
+    unsigned char id[4];        // File identifier: rRES
+    unsigned short version;     // File version and subversion
+    unsigned short resCount;    // Number of resources in this file (total)
+    unsigned int cdOffset;      // Central Directory offset in file (0 if not available)
 } RRESFileHeader;
 
-// rRES resource info header (12 bytes)
-typedef struct {
-    unsigned int id;                // Resource unique identifier (4 byte)
-    unsigned short resType;         // Resource type (simple/multiple chunks)
-    unsigned short chunkCount;      // Resource chunks counter
-    unsigned int resTotalSize;      // Resource total size (for all chunks)
+// rRES resource info header (32 bytes)
+typedef struct RRESInfoHeader {
+    unsigned char type[4];      // Resource type (FOURCC)
+    unsigned int id;            // Resource unique identifier
+    unsigned char compType;     // Data compression type
+    unsigned char crypType;     // Data encription type
+    unsigned short flags;       // Data flags (if required)
+    unsigned int compSize;      // Data compressed size (if compressed)
+    unsigned int uncompSize;    // Data uncompressed size
+    unsigned int nextOffset;    // Next resource offset (if required)
+    unsigned int reserved;      // <reserved>
+    unsigned int crc32;         // Data chunk CRC32 (full chunk)
 } RRESInfoHeader;
 
-// rRES resource chunk info header (16 bytes + 4 bytes*paramsCount)
+// rRES resource chunk
 typedef struct {
-    unsigned char chunkType;        // Resource chunk type (1 byte)
-    unsigned char compType;         // Resource chunk compression type (1 byte)
-    unsigned char crypType;         // Resource chunk encryption type (1 byte)
-    unsigned char paramsCount;      // Resource chunk parameters count (1 byte)
-    unsigned int crc32;             // Resource chunk CRC32 for data (4 byte)
-    unsigned int dataSize;          // Resource chunk size (compressed or not, only DATA) (4 byte)
-    unsigned int uncompSize;        // Resource chunk size (uncompressed, only DATA) (4 byte)
-
-    int *params;                    // Resouce chunk parameters pointer (4 byte*paramsCount)
-} RRESChunkInfoHeader;
-
-// rRES resource chunk (info + data)
-// NOTE: Useful for resource chunk creation API
-typedef struct {
-    RRESChunkInfoHeader chunkInfo;  // Resource chunk info header
-    void *data;                     // Resource chunk data
-} RRESResourceChunk;
-
-// rRES resource (complete)
-// NOTE: Useful for resource creation API
-typedef struct {
-    RRESInfoHeader infoHeader;      // Resource info header
-    RRESResourceChunk *chunks;      // Resource chunks
-} RRESResource;
+    RRESInfoHeader info;        // Resource info header
+    void *dataChunk;            // Resource data chunk (data unprocessed)
+} RRES;
 
 //----------------------------------------------------------------------------------
 // Enums Definition
@@ -350,6 +344,7 @@ typedef struct {
 // Compression types
 typedef enum {
     RRES_COMP_NONE = 0,         // No data compression
+    RRES_COMP_RLE,              // RLE compression
     RRES_COMP_DEFLATE,          // DEFLATE compression
     RRES_COMP_LZ4,              // LZ4 compression
     RRES_COMP_LZMA2,            // LZMA2 compression
@@ -409,23 +404,13 @@ typedef enum {
 
 // Vertex data format type
 typedef enum {
-    RRES_VERT_BYTE,
-    RRES_VERT_SHORT,
-    RRES_VERT_INT,
-    RRES_VERT_HFLOAT,
-    RRES_VERT_FLOAT,
+    RRES_VERT_FORMAT_BYTE,
+    RRES_VERT_FORMAT_SHORT,
+    RRES_VERT_FORMAT_INT,
+    RRES_VERT_FORMAT_HFLOAT,
+    RRES_VERT_FORMAT_FLOAT,
     //...
 } RRESVertexFormat;
-
-#if defined(RRES_STANDALONE)
-typedef enum {
-    LOG_INFO = 0,
-    LOG_ERROR,
-    LOG_WARNING,
-    LOG_DEBUG,
-    LOG_OTHER
-} TraceLogType;
-#endif
 
 //----------------------------------------------------------------------------------
 // Global Variables Definition
@@ -442,118 +427,190 @@ static void *DecompressData(const unsigned char *data, unsigned long compSize, i
 //----------------------------------------------------------------------------------
 
 // Load resource from file by id (could contain multiple chunks)
-// NOTE: Returns uncompressed data with parameters, searches resource by id
-RRESDEF RRES LoadRRES(const char *fileName, unsigned int rresId)
+// NOTE: Returns uncompressed data with properties, searches resource by id
+RRESDEF RRESData LoadRRES(const char *fileName, int rresId)
 {
-    RRES rres = { 0 };
+    RRESData rres = { 0 };
+    int resCount = 0;
 
     FILE *rresFile = fopen(fileName, "rb");
 
-    if (rresFile == NULL) TraceLog(LOG_WARNING, "[%s] rRES raylib resource file could not be opened", fileName);
+    if (rresFile == NULL) TRACELOG(LOG_WARNING, "[%s] rRES file could not be opened", fileName);
     else
     {
-        RRESFileHeader fileHeader;
+        RRESFileHeader header = { 0 };
 
-        // Read rres file info header
-        fread(&fileHeader.id[0], sizeof(char), 1, rresFile);
-        fread(&fileHeader.id[1], sizeof(char), 1, rresFile);
-        fread(&fileHeader.id[2], sizeof(char), 1, rresFile);
-        fread(&fileHeader.id[3], sizeof(char), 1, rresFile);
-        fread(&fileHeader.version, sizeof(short), 1, rresFile);
-        fread(&fileHeader.count, sizeof(short), 1, rresFile);
+        // Read rres file header
+        fread(&header, sizeof(RRESFileHeader), 1, rresFile);
 
         // Verify "rRES" identifier
-        if ((fileHeader.id[0] != 'r') && (fileHeader.id[1] != 'R') && (fileHeader.id[2] != 'E') && (fileHeader.id[3] != 'S'))
+        if ((header.id[0] == 'r') && 
+            (header.id[1] == 'R') && 
+            (header.id[2] == 'E') && 
+            (header.id[3] == 'S'))
         {
-            TraceLog(LOG_WARNING, "[%s] This is not a valid raylib resource file", fileName);
-        }
-        else
-        {
-            for (int i = 0; i < fileHeader.count; i++)
+            for (int i = 0; i < header.count; i++)
             {
-                RRESInfoHeader infoHeader;
+                RRESInfoHeader info = { 0 };
+                
+                // Read resource info header
+                fread(&info, sizeof(RRESInfoHeader), 1, rresFile);
 
-                // Read resource info and parameters
-                fread(&infoHeader, sizeof(RRESInfoHeader), 1, rresFile);
-
-                if (infoHeader.id == rresId)
+                if (info.id == rresId)
                 {
-                    rres.type = infoHeader.resType;
-                    rres.chunkCount = infoHeader.chunkCount;
-                    rres.chunks = (RRESChunk *)RRES_MALLOC(sizeof(RRESChunk)*infoHeader.chunkCount);
-
+                    //if (info.nextOffset != 0) TRACELOG(LOG_INFO, "Multiple resources related detected");
+                    
+                    // TODO: Scan all linked resources checking rres.info.nextOffset
+                    //rres = (RRESData *)RRES_MALLOC(resCount*sizeof(RRESData));
+                    
                     // Load all required resource chunks
-                    for (int k = 0; k < infoHeader.chunkCount; k++)
+                    while (info.nextOffset != 0)
                     {
-                        RRESChunkInfoHeader chunkInfoHeader;
-
-                        // Read resource chunk info and parameters
-                        fread(&chunkInfoHeader, sizeof(RRESChunkInfoHeader), 1, rresFile);
-
-                        // Register data type and read parameters
-                        rres.chunks[k].type = chunkInfoHeader.chunkType;
-                        rres.chunks[k].params = (int *)RRES_MALLOC(sizeof(int)*chunkInfoHeader.paramsCount);
-
-                        for (int p = 0; p < chunkInfoHeader.paramsCount; p++) fread(&rres.chunks[k].params[p], sizeof(int), 1, rresFile);
-
-                        // Read resource chunk data block
-                        void *data = RRES_MALLOC(chunkInfoHeader.dataSize);
-                        fread(data, chunkInfoHeader.dataSize, 1, rresFile);
-
-                        // TODO: Check CRC32
-
+                        void *dataChunk = RRES_MALLOC(info.compSize);
+                        fread(dataChunk, info.compSize, 1, rresFile);
+                        
                         // Decompres and decrypt data if required
-                        // TODO: Support multiple decompression/decryption algorythms
-                        if (chunkInfoHeader.compType == RRES_COMP_DEFLATE)
-                        {
-                            // NOTE: Memory is allocated inside Decompress data, should be freed manually
-                            void *uncompData = DecompressData(data, chunkInfoHeader.dataSize, chunkInfoHeader.uncompSize);
+                        data[resCount] = GetDataFromChunk(rres.info, dataChunk);
+                        
+                        //if (data[resCount].props != NULL) TRACELOG(LOG_INFO, [%s][ID %i] Resource properties loaded successfully", fileName, (int)info.id);
+                        //if (data[resCount].data != NULL) TRACELOG(LOG_INFO, "[%s][ID %i] Resource data loaded successfully", fileName, (int)info.id);
+                        
+                        free(dataChunk);
+                        
+                        fseek(rresFile, info.nextOffset + sizeof(RRESFileHeader), SEEK_SET);
+                        
+                        // Read next resource info header
+                        fread(&info, sizeof(RRESInfoHeader), 1, rresFile);
+                        
+                        resCount++;
+                    }                  
 
-                            rres.chunks[k].data = uncompData;
-
-                            RRES_FREE(data);
-                        }
-                        else rres.chunks[k].data = data;
-
-                        if (rres.chunks[k].params != NULL) TraceLog(LOG_INFO, "[%s][ID %i] Resource parameters loaded successfully", fileName, (int)infoHeader.id);
-                        if (rres.chunks[k].data != NULL) TraceLog(LOG_INFO, "[%s][ID %i] Resource data loaded successfully", fileName, (int)infoHeader.id);
-                    }
+                    //if (rres.chunks[k].properties != NULL) TRACELOG(LOG_INFO, "[%s][ID %i] Resource properties loaded successfully", fileName, (int)infoHeader.id);
+                    //if (rres.chunks[k].data != NULL) TRACELOG(LOG_INFO, "[%s][ID %i] Resource data loaded successfully", fileName, (int)infoHeader.id);
+                
+                    break;
                 }
                 else
                 {
                     // Skip required data to read next resource infoHeader
-                    fseek(rresFile, infoHeader.resTotalSize, SEEK_CUR);
+                    fseek(rresFile, rres.info.compSize, SEEK_CUR);
                 }
             }
 
-            if (rres.chunks[0].data == NULL) TraceLog(LOG_WARNING, "[%s][ID %i] Requested resource could not be found", fileName, (int)rresId);
+            if (rres.dataChunk == NULL) TRACELOG(LOG_WARNING, "[%s][ID %i] Requested resource could not be found", fileName, rresId);
         }
 
         fclose(rresFile);
     }
 
-    return rres;
+    return data;
 }
 
 // Unload resource data
-RRESDEF void UnloadRRES(RRES rres)
+RRESDEF void UnloadRRES(RRESData rres)
 {
-    for (int i = 0; i < rres.chunkCount; i++)
-    {
-        if (rres.chunks[i].params != NULL) free(rres.chunks[i].params);
-        if (rres.chunks[i].data != NULL) free(rres.chunks[i].data);
-    }
+    free(rres.chunk.properties);
+    free(rres.chunk.data);
 }
 
+// Load central directory data
+RRESCentralDir LoadCentralDirectory(const char *fileName)
+{
+    RRESCentralDir dir = { 0 };
+    
+    FILE *rresFile = fopen(fileName, "rb");
+    
+    if (rresFile != NULL)
+    {
+        RRESFileHeader header = { 0 };
+        
+        fread(&header, sizeof(RRESFileHeader), 1, rresFile);
+        
+        if ((header.id[0] == 'r') && (header.id[1] == 'R') && (header.id[2] == 'E') && (header.id[3] == 'S'))
+        {
+            if (header.cdOffset != 0)
+            {
+                // Move to central directory position
+                fseek(rresFile, header.cdOffset, SEEK_SET);
+                
+                RRES rres = { 0 };
+                
+                // Read central directory info
+                fread(&rres.info, sizeof(RRESInfoHeader), 1, rresFile);
+                fread(rres.data, rres.info.compData, 1, rresFile);
+                
+                // Read chunk data for usage (uncompress, unencrypt, check CRC32...)
+                RRESData rresData = GetRRESDataFromChunk(rres.info, rres.chunk);
+                
+                if (rresData.type == RRES_TYPE_DIRECTORY)
+                {
+                    dir.count = rresData.properties[0];   // Files count
+                    dir.entries = (RRESDirEntry *)rresData.data;
+                }
+            }
+        }
+
+        fclose(fileName);
+    }
+    
+    return dir;
+}
+
+int GetIdFromFileName(RRESCentralDir dir, const char *fileName)
+{
+    int id = 0;
+    
+    for (int i = 0; i < dir.count; i++)
+    {
+        if (strcmp((const char *)dir.entries[i].fileName, fileName) == 0) 
+        { 
+            id = dir.entries[i].rresId; 
+            break; 
+        }
+    }
+
+    return id;
+}
+
+RRESData GetDataFromChunk(RRESInfoHeader info, void *dataChunk)
+{
+    RRESData rres = { 0 };
+    
+    rres.type = info.type;   // TODO: Assign rres.type (int) from info.type (FOURCC)
+
+    // TODO: Check CRC32
+    
+    // TODO: Decompress and decrypt [properties + data] chunk
+    
+    if (info.compType == RRES_COMP_DEFLATE)
+    {
+        void *result = DecompressData(dataChunk, info.compSize, info.uncompSize);
+        
+        rres.propsCount = ((int *)result)[0];
+        
+        if (propsCount > 0)
+        {
+            rres.props = (int *)RRES_MALLOC(rres.propsCount*sizeof(int));
+            for (int i = 0; i < rres.propsCount; i++) rres.props[i] = ((int *)result)[1 + i];
+        }
+    
+        rres.data = RRES_MALLOC(info.uncompSize);
+        memcpy(rres.data, result + (rres.propsCount*sizeof(int)), info.uncompSize);
+    }
+    
+    return rres;
+}
+
+/*
 // Init rRES resource file (write file header)
 RRESDEF void InitRRES(const char *fileName)
 {
     FILE *rresFile = fopen(fileName, "rb");
 
-    if (rresFile == NULL) TraceLog(LOG_WARNING, "[%s] rRES raylib resource file could not be opened", fileName);
+    if (rresFile == NULL) TRACELOG(LOG_WARNING, "[%s] rRES raylib resource file could not be opened", fileName);
     else
     {
-        RRESFileHeader fileHeader;
+        RRESFileHeader header = { 0 };
         fileHeader.id[0] = 'r';
         fileHeader.id[1] = 'R';
         fileHeader.id[2] = 'E';
@@ -571,15 +628,9 @@ RRESDEF void InitRRES(const char *fileName)
 // Add additional resource to existing rres file
 RRESDEF void AppendRRESResource(const char *fileName, RRESResource resource)
 {
-    // TODO: Append rRES resource to file
+    // TODO: Append resource to file
 }
-
-// Save additional resource chunk of data
-// NOTE: RRESResource info header is modified
-RRESDEF void AppendRRESChunk(RRESResource *resource, RRESResourceChunk chunk)
-{
-    // TODO: Append resource chunk to existing resource
-}
+*/
 
 //----------------------------------------------------------------------------------
 // Module specific Functions Definition
@@ -598,7 +649,7 @@ static void *DecompressData(const unsigned char *data, unsigned long compSize, i
     // Check correct memory allocation
     if (uncompData == NULL)
     {
-        TraceLog(LOG_WARNING, "Out of memory while decompressing data");
+        TRACELOG(LOG_WARNING, "Out of memory while decompressing data");
     }
     else
     {
@@ -607,18 +658,18 @@ static void *DecompressData(const unsigned char *data, unsigned long compSize, i
 
         if (tempUncompSize == -1)
         {
-            TraceLog(LOG_WARNING, "Data decompression failed");
+            TRACELOG(LOG_WARNING, "Data decompression failed");
             RRES_FREE(uncompData);
         }
 
         if (uncompSize != tempUncompSize)
         {
-            TraceLog(LOG_WARNING, "Expected uncompressed size do not match, data may be corrupted");
-            TraceLog(LOG_WARNING, " -- Expected uncompressed size: %i", uncompSize);
-            TraceLog(LOG_WARNING, " -- Returned uncompressed size: %i", tempUncompSize);
+            TRACELOG(LOG_WARNING, "Expected uncompressed size do not match, data may be corrupted");
+            TRACELOG(LOG_WARNING, " -- Expected uncompressed size: %i", uncompSize);
+            TRACELOG(LOG_WARNING, " -- Returned uncompressed size: %i", tempUncompSize);
         }
 
-        TraceLog(LOG_INFO, "Data decompressed successfully from %u bytes to %u bytes", (mz_uint32)compSize, (mz_uint32)tempUncompSize);
+        TRACELOG(LOG_INFO, "Data decompressed successfully from %u bytes to %u bytes", (mz_uint32)compSize, (mz_uint32)tempUncompSize);
     }
 
     return uncompData;
@@ -785,31 +836,5 @@ static unsigned char *CompressDataRLE(const unsigned char *data, unsigned int un
     return compData;    // REMEMBER! This memory should be freed!
 }
 */
-
-// Some required functions for rres standalone module version
-#if defined(RRES_STANDALONE)
-// Show trace log messages (LOG_INFO, LOG_WARNING, LOG_ERROR, LOG_DEBUG)
-void TraceLog(int logType, const char *text, ...)
-{
-    va_list args;
-    va_start(args, text);
-
-    switch (msgType)
-    {
-        case LOG_INFO: fprintf(stdout, "INFO: "); break;
-        case LOG_ERROR: fprintf(stdout, "ERROR: "); break;
-        case LOG_WARNING: fprintf(stdout, "WARNING: "); break;
-        case LOG_DEBUG: fprintf(stdout, "DEBUG: "); break;
-        default: break;
-    }
-
-    vfprintf(stdout, text, args);
-    fprintf(stdout, "\n");
-
-    va_end(args);
-
-    if (msgType == LOG_ERROR) exit(1);
-}
-#endif
 
 #endif // RRES_IMPLEMENTATION
