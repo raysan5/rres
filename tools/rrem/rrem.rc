@@ -11,12 +11,12 @@ BEGIN
     BEGIN
 	  //VALUE "CompanyName", "My Company Name"
       VALUE "FileDescription", "raylib Resource Embedder"
-      VALUE "FileVersion", "0.1"
+      VALUE "FileVersion", "1.0"
       VALUE "InternalName", "rrem"
-      VALUE "LegalCopyright", "(c) 2014 Ramon Santamaria (@raysan5)"
+      VALUE "LegalCopyright", "(c) 2020 Ramon Santamaria (@raysan5)"
       //VALUE "OriginalFilename", "raylib_app.exe"
       VALUE "ProductName", "rREM"
-      VALUE "ProductVersion", "0.1"
+      VALUE "ProductVersion", "1.0"
     END
   END
   BLOCK "VarFileInfo"
