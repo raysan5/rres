@@ -1,16 +1,19 @@
 /**********************************************************************************************
 *
-*   rREM v0.5 - A simple and easy to use raylib resource embedder
+*   rREM v1.0 - A simple and easy to use resource packager and embedder
 *
 *   DESCRIPTION:
-*       Tool to embbed resources (images, text, sounds...) into a file; possible uses:
+*       Tool for embedding resources (images, text, sounds...) into a file; possible uses:
 *         - Embedding into a resource file (.rres)
-*         - Directly embedding in executable program (.exe)
+*         - Directly embedding into executable program (.exe)
+*
+*   rrem creates a .rres resource with embedded files and a .h header to access embedded data.
 *
 *   DEPENDENCIES:
-*       raylib 2.1-dev          - Windowing/input management and drawing.
-*       miniz 2.0.8             - DEFLATE compression/decompression library (zlib-style)
-*       tinyfiledialogs 3.3.7   - Open/save file dialogs, it requires linkage with comdlg32 and ole32 libs.
+*       raylib 3.0              - Windowing/input management, fileformats loading and drawing.
+*       raygui 2.7              - Immediate-mode GUI controls.
+*       tinyfiledialogs 3.4.3   - Open/save file dialogs, it requires linkage with comdlg32 and ole32 libs.
+*       miniz 2.1               - DEFLATE compression/decompression library (zlib-style)
 *
 *   COMPILATION (Windows - MinGW):
 *       gcc -o rrem.exe rrem.c external/miniz.c -s rrem.rc.data -Iexternal /
@@ -21,7 +24,7 @@
 *
 *   LICENSE: zlib/libpng
 *
-*   Copyright (c) 2014-2017 Ramon Santamaria (@raysan5)
+*   Copyright (c) 2014-2020 Ramon Santamaria (@raysan5)
 *
 *   This software is provided "as-is", without any express or implied warranty. In no event
 *   will the authors be held liable for any damages arising from the use of this software.
@@ -40,167 +43,179 @@
 *
 ***********************************************************************************************/
 
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>             // String management functions: strlen(), strrchr(), strcmp()
+#include "raylib.h"
 
-#include "raylib.h"             // Required for data loading and management
+#if defined(PLATFORM_WEB)
+    #define CUSTOM_MODAL_DIALOGS        // Force custom modal dialogs usage
+    #include <emscripten/emscripten.h>  // Emscripten library - LLVM to JavaScript compiler
+#endif
 
 #define RAYGUI_IMPLEMENTATION
-#include "external/raygui.h"    // Required for: IMGUI implementation
+#define RAYGUI_SUPPORT_ICONS
+#include "raygui.h"                     // Required for: IMGUI controls
 
-//#define RRES_IMPLEMENTATION
-//#include "rres.h"               // Required for: rRES management --> Not yet available...
+#undef RAYGUI_IMPLEMENTATION            // Avoid including raygui implementation again
+#undef RICONS_IMPLEMENTATION            // Avoid including raygui icons data again
 
-//#include "external/tinyfiledialogs.h"   // Required for: Open/Save file dialogs
-#include "external/miniz.h"             // Required for: DEFLATE compression/decompression
+//#define GUI_WINDOW_ABOUT_IMPLEMENTATION
+//#include "gui_window_about.h"           // GUI: About Window
+
+#define GUI_FILE_DIALOGS_IMPLEMENTATION
+#include "gui_file_dialogs.h"           // GUI: File Dialogs
+
+#define MINIZ_NO_ARCHIVE_APIS
+#include "miniz.h"                      // Required for: DEFLATE compression/decompression
+
+#define RRES_IMPLEMENTATION
+#include "../../src/rres.h"             // Required for: rRES file management
+
+#include "external/dirent.h"            // Required for: DIR, opendir(), readdir()
+
+#include <stdlib.h>                     // Required for:
+#include <stdio.h>                      // Required for:
+#include <string.h>                     // Required for: strlen(), strrchr(), strcmp()
+
 
 //----------------------------------------------------------------------------------
 // Defines and Macros
 //----------------------------------------------------------------------------------
-#define ENABLE_PRO_FEATURES             // Enable PRO version features
-
-#define TOOL_VERSION_TEXT     "0.5"     // Tool version string
-
-#define MAX_PATH_LENGTH        256      // Maximum length for resources file paths
+#if (!defined(DEBUG) && (defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)))
+bool __stdcall FreeConsole(void);       // Close console from code (kernel32.lib)
+#endif
 
 //----------------------------------------------------------------------------------
 // Types and Structures Definition
 //----------------------------------------------------------------------------------
 
 // Loaded resource file required info
-// TODO: Use rres predefined structs, some info is not exposed...
 typedef struct {
-    unsigned short resId;
-    unsigned char fileName[256];
-    unsigned int fileType;
-    unsigned int compType;
-    unsigned int crypType;
-    unsigned int paramsCount;
-    unsigned int dataSize;
-    int *params;
-    void *data;
-    //RRES resource;
-} ResourceInfo;
+    int id;
+    int type;
+    int compType;
+    int crypType;
+    bool forceRaw;
+    int forcedId;
+    unsigned char fileName[512];
+} ResFileInfo;
 
 //----------------------------------------------------------------------------------
 // Global variables
 //----------------------------------------------------------------------------------
-// ...
+static const char *toolName = "rREM";
+static const char *toolVersion = "1.0";
+static const char *toolDescription = "A simple and easy-to-use resource packer and embedder";
+
+static ResFileInfo resources[512] = { 0 };
+static unsigned int resCount = 0;
+static unsigned int prevResCount = 0;
+
+static bool saveCentralDir = true;
+
+// Move all variables here as globals for web compilation
+static char inFileName[512] = { 0 };       // Input file name (required in case of drag & drop over executable)
+static char outFileName[512] = { 0 };      // Output file name (required for file save/export)
 
 //----------------------------------------------------------------------------------
 // Module specific Functions Declaration
 //----------------------------------------------------------------------------------
-static void ShowUsageInfo(void);    // Show command line usage info
+static void ShowCommandLineInfo(void);                      // Show command line usage info
+static void ProcessCommandLine(int argc, char *argv[]);     // Process command line input
 
-static int GetRRESFileType(const char *ext);
+//static int GetRRESFileType(const char *ext);
 //static void GenRRESHeaderFile(const char *rresHeaderName, RRES *resources, int resCount);
-static void GenRRESObjectFile(const char *rresFileName);
+//static void GenRRESObjectFile(const char *rresFileName);
+//static int GenerateUniqueRRESId(void);
 
-// TODO: Compression/Decompression functions and Encryption/Decription functions should be provided by external lib
-//static unsigned char *CompressData(const unsigned char *data, unsigned long uncompSize, unsigned long *outCompSize);
-//static unsigned char *DecompressData(const unsigned char *data, unsigned long compSize, int uncompSize);
+static void GenerateRRES(const char *fileName);             // Process all required files data and generate .rres
 
+// List all files in a directory tree recursively
+static int ScanDirectoryTreeFiles(const char *name)
+{
+    DIR *dir;
+    struct dirent *entry;
+    int filesCount = 0;
+
+    if (!(dir = opendir(name))) return 0;
+
+    while ((entry = readdir(dir)) != NULL)
+    {
+        if ((strcmp(entry->d_name, ".") != 0) && 
+            (strcmp(entry->d_name, "..") != 0))
+        {
+            char path[1024] = { 0 };
+            snprintf(path, sizeof(path), "%s/%s", name, entry->d_name);
+
+            // print only files, no directories
+            if (!DirectoryExists(path)) 
+            {
+                strcpy(resources[resCount].fileName, path);
+                filesCount++;
+                resCount++;
+            }
+            
+            filesCount += ScanDirectoryTreeFiles(path);
+        }
+    }
+    
+    //printf("Total files: %i\n", filesCount);
+
+    closedir(dir);
+    
+    return filesCount;
+}
 
 //------------------------------------------------------------------------------------
 // Program main entry point
 //------------------------------------------------------------------------------------
 int main(int argc, char *argv[])
 {
-    // NOTE: We DON'T need the current working directory! We can use the rrem.exe folder
-    // It's easier, just get the folder from argv[0]
-
-    char currentPath[MAX_PATH_LENGTH];
-    strcpy(currentPath, GetWorkingDirectory());
-
-    ResourceInfo resources[256];       // RRES_MAX_RESOURCES
-    unsigned int resCount = 0;
-
+    //ScanDirectoryTreeFiles(".");
+    
+#if !defined(DEBUG)
+    //SetTraceLogLevel(LOG_NONE);         // Disable raylib trace log messsages
+#endif
+#if defined(COMMAND_LINE_ONLY)
+    ProcessCommandLine(argc, argv);
+#else
     // Command-line usage mode
     //--------------------------------------------------------------------------------------
     if (argc > 1)
     {
-        // TODO: Parse arguments and fill resources[] array
-        int compressionType = 0;
-
-        // Before starting, process all arguments for options...
-        for (int i = 1; i < argc; i++)
+        // TODO: In this specific tool we can just process all files dropped over executable to
+        // generate a resulting rres automatically...
+        
+        if ((argc == 2) &&
+            (strcmp(argv[1], "-h") != 0) &&
+            (strcmp(argv[1], "--help") != 0))       // One argument (file dropped over executable?)
         {
-            if (argv[i][0] == '-')
-            {
-                if ((strcmp(argv[i], "-v")==0) || (strcmp(argv[i], "--version")==0))
-                {
-                    // Print version information and exit immediately
-                    printf("%s", TOOL_VERSION_TEXT);
-                    exit(0);
-                }
-                else if ((strcmp(argv[i], "-h")==0) || (strcmp(argv[i], "--help")==0))
-                {
-                    // Print help and exit immediately
-                    //printf("%s", usageHelp);
-                    exit(0);
-                }
-                else if (strcmp(argv[i], "-o")==0)
-                {
-                    // Generate an embeddable object (.o file)
-                    //genObjRes = true;
-                    //firstFileArgPos++;
-
-                    printf("Generating an embeddable object!\n");
-                }
-                else if (argv[i][1] == 'c')
-                {
-                    // Specified compression algorithm for data (default: DEFLATE)
-                    switch (argv[i][2])
-                    {
-                        case '0':
-                        {
-                            compressionType = 0;
-                            printf("Data compression algorithm selected: NO COMPRESSION\n");
-                        } break;
-                        case '1':
-                        {
-                            compressionType = 1;
-                            printf("Data compression algorithm selected: RLE (CUSTOM)\n");
-                        } break;
-                        case '2':
-                        {
-                            compressionType = 2;
-                            printf("Data compression algorithm selected: DEFLATE\n");
-                        } break;
-                        case '3':
-                        {
-                            compressionType = 2;
-                            printf("Data compression algorithm selected: LZMA (NOT IMPLEMENTED YET)\n");
-                        } break;
-                        case '4':
-                        {
-                            compressionType = 2;
-                            printf("Data compression algorithm selected: BZ2 (NOT IMPLEMENTED YET)\n");
-                        } break;
-                        default: break;
-                    }
-
-                    //firstFileArgPos++;
-                }
-            }
+            //strcpy(inFileName, argv[1]);        // Read input filename to open with gui interface
         }
-
-        // TODO: Process all resources with required configuration
-
-        // TODO: Generate rRES file embedding all resources (check if code object file is required!)
-
-        return 0;
+        else
+        {
+            ProcessCommandLine(argc, argv);
+            return 0;
+        }
     }
+
+#if (!defined(DEBUG) && (defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)))
+    // WARNING (Windows): If program is compiled as Window application (instead of console),
+    // no console is available to show output info... solution is compiling a console application
+    // and closing console (FreeConsole()) when changing to GUI interface
+    FreeConsole();
+#endif
+
+    char currentPath[1024] = { 0 };
+    strcpy(currentPath, GetWorkingDirectory());
 
     // GUI usage mode - Initialization
     //--------------------------------------------------------------------------------------
     const int screenWidth = 720;
     const int screenHeight = 640;
 
-    SetConfigFlags(FLAG_WINDOW_RESIZABLE);
-    InitWindow(screenWidth, screenHeight, FormatText("rREM v%s - A simple and easy-to-use raylib resource embedded", TOOL_VERSION_TEXT));
-
+    SetConfigFlags(FLAG_WINDOW_RESIZABLE);      // Window configuration flags
+    InitWindow(screenWidth, screenHeight, FormatText("%s v%s - %s", toolName, toolVersion, toolDescription));
+    SetWindowMinSize(640, 480);
+    
     SetTargetFPS(60);
     //--------------------------------------------------------------------------------------
 
@@ -217,41 +232,40 @@ int main(int argc, char *argv[])
             // Add dropped files to resources list
             for (int i = 0; i < dropsCount; i++)
             {
-                // TODO: Probably we need to use struct RRES and struct RRESChunk
-
-                resources[resCount + i].resId = 0;          // TODO: GenerateRRESId()
-                strcpy(resources[resCount + i].fileName, droppedFiles[i]);
-                resources[resCount + i].fileType = GetRRESFileType(GetExtension(droppedFiles[i]));
-                resources[resCount + i].compType = 0;       // Default compression: NONE
-                resources[resCount + i].crypType = 0;       // Default encryption: NONE
-
-                // TODO: Read file data (depends on fileType)
-
-                // TODO: Support multiple chunks resources!
-
-                resources[resCount + i].paramsCount = 4;    // TODO: Depends on fileType
-                resources[resCount + i].dataSize = 0;       // TODO: We get it when reading file...
-
-                resources[resCount + i].params = (int *)malloc(sizeof(int)*resources[resCount + i].paramsCount);
-
-                // TODO: Fill data parameters (depends on fileType)
-
-                resources[resCount + i].data = 0;           // TODO: Point to resource chunk data
+                // Check if dropped file is a directory and scan it
+                if (DirectoryExists(droppedFiles[i])) ScanDirectoryTreeFiles(droppedFiles[i]);
+                else 
+                {
+                    strcpy(resources[resCount].fileName, droppedFiles[i]);
+                    
+                    resCount++;
+                    if (resCount >= 512) break;
+                }
             }
 
-            resCount += dropsCount;
-            dropsCount = 0;
-
             ClearDroppedFiles();
+            
+            // Review new files types added to list
+            if (resCount > prevResCount)
+            {
+                for (int i = prevResCount; i < resCount; i++)
+                {
+                    if (IsFileExtension(resources[i].fileName, ".png;.bmp;.tga;.gif;.jpg;.psd;.hdr;.dds;.pkm;.ktx;.pvr;.astc")) resources[i].type = RRES_TYPE_IMAGE;
+                    else if (IsFileExtension(resources[i].fileName, ".txt;.vs;.fs;.info;.c;.h;.json;.xml")) resources[i].type = RRES_TYPE_TEXT;
+                    else if (IsFileExtension(resources[i].fileName, ".obj;.iqm;.gltf")) resources[i].type = RRES_TYPE_MESH;
+                    else if (IsFileExtension(resources[i].fileName, ".wav")) resources[i].type = RRES_TYPE_WAVE;
+                    else if (IsFileExtension(resources[i].fileName, ".fnt")) resources[i].type = RRES_TYPE_FONT;
+                    else if (IsFileExtension(resources[i].fileName, ".mtl")) resources[i].type = RRES_TYPE_MATERIAL;
+                    else resources[i].type = RRES_TYPE_RAWFILE;
+                }
+            }
+            
+            prevResCount = resCount;
         }
 
         // TODO: Implement files scrolling with mouse wheel
-
         // TODO: Implement files focus on mouse-over and file select/unselect on click
-
         // TODO: Implement file configuration (compression/encryption) --> use raygui
-
-        // TODO: On SaveRRESFile(), process all resources data (compress/encrypt) --> second thread with progress bar?
 
         //----------------------------------------------------------------------------------
 
@@ -276,6 +290,13 @@ int main(int argc, char *argv[])
 
                 DrawText("Drop new files...", 100, 110 + 40*resCount, 20, DARKGRAY);
             }
+            
+            DrawText(TextFormat("%02i", resCount), 10, 10, 20, MAROON);
+            
+            if (GuiButton((Rectangle){ 10, GetScreenHeight() - 50, 160, 40 }, "Generate RRES"))
+            {
+                GenerateRRES("test.rres");
+            }
 
         EndDrawing();
         //----------------------------------------------------------------------------------
@@ -286,6 +307,8 @@ int main(int argc, char *argv[])
     CloseWindow();          // Close window and OpenGL context
     //--------------------------------------------------------------------------------------
 
+#endif      // COMMAND_LINE_ONLY
+
     return 0;
 }
 
@@ -294,40 +317,45 @@ int main(int argc, char *argv[])
 //--------------------------------------------------------------------------------------------
 
 // Show command line usage info
-static void ShowUsageInfo(void)
+static void ShowCommandLineInfo(void)
 {
-    printf("\n//////////////////////////////////////////////////////////////////////////////////\n");
-    printf("//                                                                              //\n");
-    printf("// rREM v%s - A simple and easy-to-use raylib resource embedder                //\n", TOOL_VERSION_TEXT);
-    printf("// powered by raylib v2.1 (www.raylib.com) and raygui v2.1                      //\n");
-    printf("// more info and bugs-report: github.com/raysan5/rres                           //\n");
-    printf("//                                                                              //\n");
-    printf("// Copyright (c) 2014-2018 Ramon Santamaria (@raysan5)                          //\n");
-    printf("//                                                                              //\n");
-    printf("//////////////////////////////////////////////////////////////////////////////////\n\n");
-
-#if defined(ENABLE_PRO_FEATURES)
-    // rrem creates a .rres resource with embedded files and a .h header to access embedded data.
+    printf("\n//////////////////////////////////////////////////////////////////////////////////////////\n");
+    printf("//                                                                                      //\n");
+    printf("// %s v%s - %s //\n", toolName, toolVersion, toolDescription);
+    printf("// powered by raylib v3.0 (www.raylib.com) and raygui v2.7                              //\n");
+    printf("// more info and bugs-report: github.com/raysan5/rres                                   //\n");
+    printf("//                                                                                      //\n");
+    printf("// Copyright (c) 2014-2020 Ramon Santamaria (@raysan5)                                  //\n");
+    printf("//                                                                                      //\n");
+    printf("//////////////////////////////////////////////////////////////////////////////////////////\n\n");
 
     printf("USAGE:\n\n");
     printf("    > rrem [--help] --input <filename.ext>,[otherfile.ext] [--output <filename.ext>]\n");
-    printf("           [--comp <value>] [--gen-object]\n");
+    printf("           [--comp <value>] [--gen-object]\n\n");
 
-    printf("\nOPTIONS:\n\n");
-    printf("    -v, --version                   : Show tool version and info\n");
-    printf("    -h, --help                      : Show command line usage help\n");
-    printf("    -i, --input <filename.ext>,<otherfile.ext>     : Define input files.\n");
-    printf("                                      Supported extensions: .rfx, .sfs, .wav\n");
-    printf("    -o, --output <filename.ext>     : Define output file.\n");
-    printf("                                      Supported extensions: .wav, .h\n");
-    printf("                                      NOTE: If not specified, defaults to: output.wav\n\n");
-    printf("    -f, --comp <svalue>             : Define data compression method\n");
-    printf("                                    : Format output wave.\n")
+    printf("OPTIONS:\n\n");
+    printf("    -h, --help                      : Show tool version and command line usage help\n");
+    printf("    -i, --input <filename01.ext>,<comp>,<encryp>,<force-raw>,<id>\n");
+    printf("                                    : Define input file with desired configuration\n");
+    printf("    -o, --output <filename.rres>    : Define output file.\n");
+    printf("                                      Supported extensions: .rres, .h\n");
+    printf("    -c, --comp <svalue>             : Define data compression method, if not specified on individual files\n");
+    printf("                                    : Supported compression format.\n");
     printf("                                          0 - NONE\n");
     printf("                                          1 - DEFLATE\n");
     printf("                                          2 - LZMA\n");
     printf("                                          3 - RLE (custom)\n");
     printf("                                          4 - BZ2\n");
+    
+    // User should be allowed to choose every file compression/encryption/raw-mode -> Per file!?!?!
+    // User should be allowed to generate central-directory (or avoid it?)
+    // User allowed to set unique identifier for every resource? -> YES
+    // User allowed to choose if filename info goes to central-directory -> maybe in a future
+    // Probably the --input cli mechanism does not work in this case
+    //-cd, --no-cdir
+    //-c, --comp:
+    //-e, --encript:
+    //--force-raw
 
     printf("\nEXAMPLES:\n\n");
     printf("    > rrem --input image01.png,image02.jpg,mysound.wav\n");
@@ -339,7 +367,94 @@ static void ShowUsageInfo(void)
     printf("    > rrem --input image01.png,sound.wav,text.txt\n");
     printf("        Create 'data.rres' and 'data.h' including those 3 files,\n");
     printf("        uses DEFLATE compression for pixel/wave/text data.\n");
+}
+
+// Process command line input
+static void ProcessCommandLine(int argc, char *argv[])
+{
+    // CLI required variables
+    bool showUsageInfo = false;         // Toggle command line usage info
+    
+    int compressionType = 0;
+    
+#if defined(COMMAND_LINE_ONLY)
+    if (argc == 1) showUsageInfo = true;
 #endif
+
+    // Process command line arguments
+    for (int i = 1; i < argc; i++)
+    {
+        if ((strcmp(argv[i], "-h") == 0) || (strcmp(argv[i], "--help") == 0))
+        {
+            showUsageInfo = true;
+        }
+        else if ((strcmp(argv[i], "-i") == 0) || (strcmp(argv[i], "--input") == 0))
+        {
+            // Check for valid upcoming argument
+            if (((i + 1) < argc) && (argv[i + 1][0] != '-'))
+            {
+                // Check for valid file extension: input
+                if (IsFileExtension(argv[i + 1], ".png;.bmp;.tga;.jpg;.gif;.psd;.hdr"))
+                {
+                    if (!FileExists(argv[i + 1])) printf("WARNING: [%s] Provided image file not found, provide a complete directory path\n", argv[i + 1]);
+                    else strcpy(inFileName, argv[i + 1]);    // Read input file
+                }
+                else printf("WARNING: Input file extension not recognized\n");
+
+                i++;
+            }
+            else printf("WARNING: No input file provided\n");
+        }
+        else if ((strcmp(argv[i], "-o") == 0) || (strcmp(argv[i], "--output") == 0))
+        {
+            // Check for valid upcoming argument
+            if (((i + 1) < argc) && (argv[i + 1][0] != '-'))
+            {
+                if (IsFileExtension(argv[i + 1], ".png;.raw;.h;.ktx"))
+                {
+                    strcpy(outFileName, argv[i + 1]);   // Read output file
+                }
+                else printf("WARNING: Output file extension not recognized\n");
+
+                i++;
+            }
+            else printf("WARNING: No output file provided\n");
+        }
+        else if ((strcmp(argv[i], "-f") == 0) || (strcmp(argv[i], "--format") == 0))
+        {
+            // Check for valid upcoming argument
+            if (((i + 1) < argc) && (argv[i + 1][0] != '-'))  // Check if next argument could be readed
+            {
+                // TODO: Validate format value
+
+                i++;
+            }
+            else printf("WARNING: Format parameters provided not valid\n");
+        }
+    }
+
+    // Process all resources with required configuration
+    if (inFileName[0] != '\0')
+    {
+        // Set a default name for output in case not provided
+        if (outFileName[0] == '\0') strcpy(outFileName, TextFormat("%s/output.rres", GetDirectoryPath(inFileName)));
+
+        printf("\n");
+        printf("Input files:       %s\n", inFileName);
+        // TODO: Input files list with properties
+        printf("Output file:       %s\n", outFileName);
+        printf("\n");
+        
+        // TODO: Generate rRES file embedding all resources (check if code object file is required!)
+
+        // Export generated resource
+        // SaveRRES(rresData, outFileName);
+
+        // TODO: Unloadall loaded data
+    }
+    else if (!showUsageInfo) printf("WARNING: Not enough arguments provided.");
+
+    if (showUsageInfo) ShowCommandLineInfo();
 }
 
 static int GetRRESFileType(const char *ext)
@@ -458,6 +573,157 @@ static void GenRRESObjectFile(const char *rresFileName)
     //system("gcc -c data.c");  // Compile resource file into object file
     //remove("data.c");         // Remove .c file
 }
+
+
+// Process all required files data and generate .rres
+static void GenerateRRES(const char *fileName)
+{
+    FILE *rresFile = fopen(fileName, "wb");
+
+    if (rresFile == NULL) TRACELOG(LOG_WARNING, "[%s] rRES raylib resource file could not be opened", fileName);
+    else
+    {
+        RRESFileHeader header = { 0 };  // WARNING: File Header not exposed!
+        header.id[0] = 'r';
+        header.id[1] = 'R';
+        header.id[2] = 'E';
+        header.id[3] = 'S';
+        header.version = 100;
+        header.resCount = resCount;
+        header.cdOffset = 0;            // WARNING: This value is filled at the end (if required)
+
+        // Write rres file header into file
+        fwrite(&header, sizeof(RRESFileHeader), 1, rresFile);
+        
+        RRESCentralDir cdir = { 0 };
+        cdir.count = header.resCount;
+        cdir.entries = (RRESDirEntry *)RRES_MALLOC(cdir.count*sizeof(RRESDirEntry));
+        int resOffset = sizeof(RRESFileHeader);
+        int cdirSize = 0;
+
+        for (int i = 0; i < header.resCount; i++)
+        {
+            RRESInfoHeader info = { 0 };
+            
+            if (IsFileExtension(resources[i].fileName, ".png;.bmp;.tga;.gif;.jpg;.psd;.hdr;.dds;.pkm;.ktx;.pvr;.astc")) 
+            {
+                Image image = LoadImage(resources[i].fileName);
+                
+                RRESData *rres = (RRESData *)RRES_CALLOC(sizeof(RRESData), 1);
+                rres->propsCount = 4;
+                rres->props = (int *)RRES_MALLOC(rres->propsCount*sizeof(int));
+                rres->props[0] = image.width;
+                rres->props[1] = image.height;
+                rres->props[2] = image.format;
+                rres->props[3] = image.mipmaps;
+                rres->data = image.data;
+                
+                strncpy(info.type, "IMGE", 4);
+                info.id = resources[i].id;    // TODO: GenUniqueRRESId();
+                info.compType = resources[i].compType;
+                info.crypType = resources[i].crypType;
+                info.flags = 0;
+                info.compSize = 0;  // Filled on compression
+                info.uncompSize = GetPixelDataSize(image.width, image.height, image.format) + rres->propsCount*sizeof(int);
+                
+                // NOTE: Depending on the type of data to package,
+                // we will need related resources offset 
+                info.nextOffset = 0;
+
+                unsigned char *dataChunk = NULL;
+                
+                // NOTE: It is better to compress before encrypting but any proven block cipher will reduce the data to 
+                // a pseudo-random sequence of bytes that will typically yield little to no compression gain at all, so,
+                // in most cases it's better to just encrypt the uncompressed data and be done with it.
+                
+                if (info.compSize == RRES_COMP_NONE) dataChunk = (((unsigned char *)rres) + 4);
+                else if (info.compSize == RRES_COMP_DEFLATE)
+                {
+                    dataChunk = CompressDEFLATE(((unsigned char *)rres) + 4, info.uncompSize, &info.compSize);
+                }
+                
+                info.crc32 = ComputeCRC32(dataChunk, info.compSize);
+                
+                // Write resource info and data
+                fwrite(&info, sizeof(RRESInfoHeader), 1, rresFile);
+                fwrite(dataChunk, info.compSize, 1, rresFile);
+                
+                // Free all loaded resources
+                if (info.compSize == RRES_COMP_DEFLATE) RRES_FREE(dataChunk);
+                RRES_FREE(rres->props);
+                RRES_FREE(rres->data);      // Unloads image.data
+                RRES_FREE(rres);
+            }
+            else if (IsFileExtension(resources[i].fileName, ".txt;.vs;.fs;.info;.c;.h;.json;.xml")) 
+            {
+
+            }
+            else if (IsFileExtension(resources[i].fileName, ".wav"))
+            {
+
+            }
+            else if (IsFileExtension(resources[i].fileName, ".fnt")) resources[i].type = RRES_TYPE_FONT;
+            else if (IsFileExtension(resources[i].fileName, ".mtl")) resources[i].type = RRES_TYPE_MATERIAL;
+            else if (IsFileExtension(resources[i].fileName, ".obj;.iqm;.gltf")) resources[i].type = RRES_TYPE_MESH;
+            else
+            {
+                // Save RAW file
+            }
+            
+            cdir.entries[i].id = resources[i].id;       // Resource unique ID
+            
+            // Resource offset in file
+            resOffset += (sizeof(RRESInfoHeader) + info.compSize);
+            cdir.entries[i].offset = resOffset;
+            
+            // Resource fileName info ('\0' terminated)
+            cdir.entries[i].fileNameLen = strlen(resources[i].fileName) + 1;
+            cdir.entries[i].fileName = (char *)RRES_CALLOC(cdir.entries[i].fileNameLen + 1, 1);
+            strcpy(cdir.entries[i].fileName, resources[i].fileName);
+            cdirSize += (12 + cdir.entries[i].fileNameLen + 1);
+        }
+        
+        if (saveCentralDir)
+        {
+            // Write rres central directory info
+            RRESData *rres = (RRESData *)RRES_CALLOC(sizeof(RRESData), 1);
+            rres->propsCount = 1;
+            rres->props = (int *)RRES_MALLOC(rres->propsCount*sizeof(int));
+            rres->props[0] = cdir.count;
+            rres->data = cdir.entries;
+            
+            RRESInfoHeader info = { 0 };
+            strncpy(info.type, "CDIR", 4);
+            info.id = 0;        
+            info.compType = 0;
+            info.crypType = 0;
+            info.flags = 0;
+            info.compSize = cdirSize;
+            info.uncompSize = cdirSize;
+            info.nextOffset = 0;
+
+            unsigned char *dataChunk = NULL;
+
+            if (info.compSize == RRES_COMP_NONE) dataChunk = (((unsigned char *)rres) + 4);
+            
+            info.crc32 = ComputeCRC32(dataChunk, info.compSize);
+            
+            // Write resource info and data
+            fwrite(&info, sizeof(RRESInfoHeader), 1, rresFile);
+            fwrite(dataChunk, info.compSize, 1, rresFile);
+            
+            // Free all loaded resources
+            RRES_FREE(rres->props);
+            RRES_FREE(rres);
+            
+            for (int i = 0; i < header.resCount; i++) RRES_FREE(cdir.entries[i].fileName);
+            RRES_FREE(cdir.entries);
+        }
+    }
+    
+    fclose(rresFile);
+}
+
 
 //--------------------------------------------------------------------
 // Auxiliar functions (utilities)

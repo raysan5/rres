@@ -172,7 +172,7 @@ Mesh LoadMeshFromRRES(RRESData *rres, int count)
 
     mesh.vertexCount = rres[0].props[0];
     
-    // TODO: Make sure all rres[i] vertexCount are the same (requried by raylib)
+    // TODO: Make sure all rres[i] vertexCount are the same (required by raylib)
     
     for (int i = 0; i < count; i++)
     {

@@ -76,6 +76,8 @@
     #endif
 #endif
 
+#define TRACELOG(level, ...) (void)0
+
 //----------------------------------------------------------------------------------
 // Defines and Macros
 //----------------------------------------------------------------------------------
@@ -110,7 +112,7 @@ typedef struct {
 
 // RRESData type
 typedef enum {
-    RRES_TYPE_RAW       = 1,    // [RAWD] Basic type: no properties / Data: raw
+    RRES_TYPE_RAWFILE   = 1,    // [RAWD] Basic type: no properties / Data: raw
     RRES_TYPE_TEXT      = 2,    // [TEXT] Basic type: [2] properties: charsCount, cultureCode / Data: text
     RRES_TYPE_IMAGE     = 3,    // [IMGE] Basic type: [4] properties: width, height, mipmaps, format / Data: pixels
     RRES_TYPE_WAVE      = 4,    // [WAVE] Basic type: [4] properties: sampleCount, sampleRate, sampleSize, channels / Data: samples
@@ -130,7 +132,7 @@ typedef enum {
                                 //          {
                                 //              RRESn: RRES_TYPE_VERTEX
                                 //          }
-    RRES_TYPE_MATDATA   = 13,   // [MATD] Complex type: 
+    RRES_TYPE_MATERIAL  = 13,   // [MATD] Complex type: 
                                 //          RRES0: [n] properties: mapsCount, params / Data: -
                                 //          {
                                 //              RRESn: [2] properties: color, value_comp / Data: -
@@ -180,11 +182,11 @@ RRESDEF int GetRRESIdFromFileName(RRESCentralDir dir, const char *fileName);
     #include <stdlib.h>         // Required for: malloc(), free()
 
     #define RRES_MALLOC(size)   malloc(size)
+    #define RRES_CALLOC(n,sz)   calloc(n,sz)
     #define RRES_FREE(ptr)      free(ptr)
 #endif
 
-#include "external/tinfl.c"     // Required for: tinfl_decompress_mem_to_mem()
-                                // NOTE: DEFLATE algorythm data decompression
+#define SUPPORT_LIBRARY_MINIZ
 
 //----------------------------------------------------------------------------------
 // Defines and Macros
@@ -306,8 +308,12 @@ typedef enum {
 //----------------------------------------------------------------------------------
 // Module specific Functions Declaration
 //----------------------------------------------------------------------------------
-static void *DecompressData(const unsigned char *data, unsigned long compSize, int uncompSize);
+#if defined(SUPPORT_LIBRARY_MINIZ)
+static unsigned char *CompressDEFLATE(const unsigned char *data, unsigned long uncompSize, unsigned long *outCompSize);
+static unsigned char *DecompressDEFLATE(const unsigned char *data, unsigned long compSize, int uncompSize);
+#endif
 
+static RRESData GetDataFromChunk(RRESInfoHeader info, void *dataChunk);
 static unsigned int ComputeCRC32(unsigned char *buffer, int len);
 
 //----------------------------------------------------------------------------------
@@ -346,7 +352,7 @@ RRESData LoadRRES(const char *fileName, int rresId)
 
                 if (info.id == rresId)
                 {
-                    rres.type = info.type;  // TODO.
+                    rres.type = 0;//info.type;  // TODO.
                     
                     void *dataChunk = RRES_MALLOC(info.compSize);
                     fread(dataChunk, info.compSize, 1, rresFile);
@@ -363,7 +369,7 @@ RRESData LoadRRES(const char *fileName, int rresId)
                 else
                 {
                     // Skip required data to read next resource infoHeader
-                    fseek(rresFile, rres.info.compSize, SEEK_CUR);
+                    fseek(rresFile, info.compSize, SEEK_CUR);
                 }
             }
 
@@ -435,8 +441,10 @@ RRESData *LoadRRESMulti(const char *fileName, int rresId, int *count)
                         fread(dataChunk, info.compSize, 1, rresFile);
                         
                         // Decompres and decrypt data if required
-                        data[i] = GetDataFromChunk(info, dataChunk);
+                        rres[i] = GetDataFromChunk(info, dataChunk);
                         RRES_FREE(dataChunk);
+                        
+                        if ((rres[i].propsCount == 0) && (rres[i].data == NULL)) TRACELOG(LOG_WARNING, "[%s][ID %i] Requested resource could not be found", fileName, rresId);
                         
                         fseek(rresFile, temp.nextOffset, SEEK_SET);             // Jump to next resource
                         fread(&info, sizeof(RRESInfoHeader), 1, rresFile);      // Read next resource info header
@@ -452,8 +460,6 @@ RRESData *LoadRRESMulti(const char *fileName, int rresId, int *count)
                     fseek(rresFile, info.compSize, SEEK_CUR);
                 }
             }
-
-            if ((rres.propsCount == 0) && (rres.data == NULL)) TRACELOG(LOG_WARNING, "[%s][ID %i] Requested resource could not be found", fileName, rresId);
         }
 
         fclose(rresFile);
@@ -465,8 +471,8 @@ RRESData *LoadRRESMulti(const char *fileName, int rresId, int *count)
 // Unload resource data
 void UnloadRRES(RRESData rres)
 {
-    free(rres.chunk.properties);
-    free(rres.chunk.data);
+    free(rres.props);
+    free(rres.data);
 }
 
 // Load central directory data
@@ -493,10 +499,13 @@ RRESCentralDir LoadCentralDirectory(const char *fileName)
             fseek(rresFile, header.cdOffset, SEEK_CUR);         // Move to central directory position
             fread(&info, sizeof(RRESInfoHeader), 1, rresFile);  // Read resource info
            
-            if (info.type == RRES_TYPE_DIRECTORY)
+            if ((info.type[0] == 'C') &&
+                (info.type[1] == 'D') &&
+                (info.type[2] == 'I') &&
+                (info.type[3] == 'R'))
             {
                 void *dataChunk = RRES_MALLOC(info.compSize);
-                fread(dataChunk, info.compData, 1, rresFile);
+                fread(dataChunk, info.compSize, 1, rresFile);
                 
                 RRESData rres = GetDataFromChunk(info, dataChunk);
                 RRES_FREE(dataChunk);
@@ -506,7 +515,7 @@ RRESCentralDir LoadCentralDirectory(const char *fileName)
             }
         }
 
-        fclose(fileName);
+        fclose(rresFile);
     }
     
     return dir;
@@ -520,7 +529,7 @@ int GetIdFromFileName(RRESCentralDir dir, const char *fileName)
     {
         if (strcmp((const char *)dir.entries[i].fileName, fileName) == 0) 
         { 
-            id = dir.entries[i].rresId; 
+            id = dir.entries[i].id;
             break; 
         }
     }
@@ -549,7 +558,7 @@ RRESData GetDataFromChunk(RRESInfoHeader info, void *dataChunk)
     // Decompress and decrypt [properties + data] chunk
     // TODO: Support multiple compression/encryption types
     if (info.compType == RRES_COMP_NONE) result = dataChunk;
-    else if (info.compType == RRES_COMP_DEFLATE) result = DecompressData(dataChunk, info.compSize, info.uncompSize);
+    else if (info.compType == RRES_COMP_DEFLATE) result = DecompressDEFLATE(dataChunk, info.compSize, info.uncompSize);
 
     int crc32 = ComputeCRC32(result, info.uncompSize);
     
@@ -557,7 +566,7 @@ RRESData GetDataFromChunk(RRESInfoHeader info, void *dataChunk)
     {
         rres.propsCount = ((int *)result)[0];
         
-        if (propsCount > 0)
+        if (rres.propsCount > 0)
         {
             rres.props = (int *)RRES_MALLOC(rres.propsCount*sizeof(int));
             for (int i = 0; i < rres.propsCount; i++) rres.props[i] = ((int *)result)[1 + i];
@@ -611,9 +620,10 @@ RRESDEF void AppendRRESResource(const char *fileName, RRESResource resource)
 // Module specific Functions Definition
 //----------------------------------------------------------------------------------
 
+/*
 // Data decompression (using DEFLATE, tinfl library)
 // NOTE: Allocated data MUST be freed by user
-static void *DecompressData(const unsigned char *data, unsigned long compSize, int uncompSize)
+static unsigned char *DecompressDEFLATE(const unsigned char *data, unsigned long compSize, int uncompSize)
 {
     int tempUncompSize;
     void *uncompData;
@@ -649,11 +659,12 @@ static void *DecompressData(const unsigned char *data, unsigned long compSize, i
 
     return uncompData;
 }
+*/
 
 #if defined(SUPPORT_LIBRARY_MINIZ)
 // Data compression (using DEFLATE, miniz library)
 // NOTE: Allocated data MUST be freed!
-static unsigned char *CompressData(const unsigned char *data, unsigned long uncompSize, unsigned long *outCompSize)
+static unsigned char *CompressDEFLATE(const unsigned char *data, unsigned long uncompSize, unsigned long *outCompSize)
 {
     int compStatus;
     unsigned long tempCompSize = compressBound(uncompSize);
@@ -693,7 +704,7 @@ static unsigned char *CompressData(const unsigned char *data, unsigned long unco
 
 // Data decompression (using DEFLATE, miniz library)
 // NOTE: Allocated data MUST be freed!
-static unsigned char *DecompressData(const unsigned char *data, unsigned long compSize, int uncompSize)
+static unsigned char *DecompressDEFLATE(const unsigned char *data, unsigned long compSize, int uncompSize)
 {
     int decompStatus;
     unsigned long tempUncompSize;
