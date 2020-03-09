@@ -29,17 +29,6 @@
 #include "rres.h"
 #include "raylib.h"
 
-//#define RRES_STATIC
-#if defined(RRES_STATIC)
-    #define RRESDEF static              // Functions just visible to module including this file
-#else
-    #ifdef __cplusplus
-        #define RRESDEF extern "C"      // Functions visible from other files (no name mangling of functions in C++)
-    #else
-        #define RRESDEF extern          // Functions visible from other files
-    #endif
-#endif
-
 //----------------------------------------------------------------------------------
 // Defines and Macros
 //----------------------------------------------------------------------------------
@@ -208,12 +197,17 @@ Mesh LoadMeshFromRRES(RRESData *rres, int count)
     return mesh;
 }
 
-// NOTE: Text must be '\0' terminated -> Save it this way!
+// NOTE: Text must be '\0' terminated
 char *LoadTextFromRRES(RRESData rres)
 {
     char *text = NULL;
     
-    if (rres.type == RRES_TYPE_TEXT) text = (unsigned char *)rres.data;  
+    if (rres.type == RRES_TYPE_TEXT)
+    {
+        text = (char *)rres.data;       // WARNING: Do a copy of data?
+        
+        if (((char *)rres.data)[rres.props[0] - 1] != '\0') TRACELOG(LOG_WARNING, "Text data is not '\0' terminated!") 
+    }
 
     return text;
 }
