@@ -1,6 +1,6 @@
 /**********************************************************************************************
 *
-*   rREM v1.0 - A simple and easy to use resource packager and embedder
+*   rREM v1.0 - A simple and easy to use resource packer and embedder
 *
 *   DESCRIPTION:
 *       Tool for embedding resources (images, text, sounds...) into a file; possible uses:
@@ -169,8 +169,6 @@ static int ScanDirectoryTreeFiles(const char *name)
 //------------------------------------------------------------------------------------
 int main(int argc, char *argv[])
 {
-    //ScanDirectoryTreeFiles(".");
-    
 #if !defined(DEBUG)
     //SetTraceLogLevel(LOG_NONE);         // Disable raylib trace log messsages
 #endif
@@ -181,20 +179,11 @@ int main(int argc, char *argv[])
     //--------------------------------------------------------------------------------------
     if (argc > 1)
     {
-        // TODO: In this specific tool we can just process all files dropped over executable to
-        // generate a resulting rres automatically...
-        
-        if ((argc == 2) &&
-            (strcmp(argv[1], "-h") != 0) &&
-            (strcmp(argv[1], "--help") != 0))       // One argument (file dropped over executable?)
-        {
-            //strcpy(inFileName, argv[1]);        // Read input filename to open with gui interface
-        }
-        else
-        {
-            ProcessCommandLine(argc, argv);
-            return 0;
-        }
+        // NOTE: In this specific tool we want to just process all files dropped over 
+        // executable to generate a rres automatically, but when called from command-line
+        // we can attach to every filename some packaging configuration properties!
+        ProcessCommandLine(argc, argv);
+        return 0;
     }
 
 #if (!defined(DEBUG) && (defined(WIN32) || defined(_WIN32) || defined(__WIN32) && !defined(__CYGWIN__)))
@@ -319,6 +308,11 @@ int main(int argc, char *argv[])
 // Show command line usage info
 static void ShowCommandLineInfo(void)
 {
+    // Some design notes:
+    //  - User should be allowed to choose some resource properties: compression/encryption/force-raw-mode/custom-id
+    //  - User should be allowed to choose if including a central-directory or not (included by default)
+    //  - User should be allowed to choose if filename info goes to central-directory -> maybe in a future...
+    
     printf("\n//////////////////////////////////////////////////////////////////////////////////////////\n");
     printf("//                                                                                      //\n");
     printf("// %s v%s - %s //\n", toolName, toolVersion, toolDescription);
@@ -330,43 +324,64 @@ static void ShowCommandLineInfo(void)
     printf("//////////////////////////////////////////////////////////////////////////////////////////\n\n");
 
     printf("USAGE:\n\n");
-    printf("    > rrem [--help] --input <filename.ext>,[otherfile.ext] [--output <filename.ext>]\n");
-    printf("           [--comp <value>] [--gen-object]\n\n");
+    printf("    > rrem [--help] <filename01.ext> [path/filename02.ext] [path02/filename03.ext]\n");
+    printf("           [--output <filename.rres>] [--comp <value>] [--gen-object] [--no-cdir]\n\n");
 
     printf("OPTIONS:\n\n");
-    printf("    -h, --help                      : Show tool version and command line usage help\n");
-    printf("    -i, --input <filename01.ext>,<comp>,<encryp>,<force-raw>,<id>\n");
-    printf("                                    : Define input file with desired configuration\n");
+    printf("    -h, --help                      : Show tool version and command line usage help\n\n");
+
+    printf("    <filename01.ext>:<comp>:<crypto>:<force-raw>:<force-id>\n\n");
+    printf("                                    : Define input files, one after another, space separated\n");
+    printf("                                      with desired configuration parameters for every file, ':' separated.\n");
+    
+    printf("                                      Supported optional file parameters:\n");
+    printf("                                        <comp> : Compression type for the resource.\n");
+    printf("                                          Possible values (provided as text):\n");
+    printf("                                            COMP_NONE       - No data compression\n");
+    printf("                                            COMP_RLE        - RLE (custom) compression\n");
+    printf("                                            COMP_DEFLATE    - DEFLATE compression\n");
+    printf("                                            COMP_LZ4        - LZ4 compression\n");
+    printf("                                            COMP_LZMA2      - LZMA2 compression\n");
+    printf("                                            COMP_BZIP2      - BZIP2 compression\n\n");
+
+    printf("                                        <encrypt> : Encryption type for the resource: Possible values\n");
+    printf("                                          Possible values (provided as text):\n");
+    printf("                                            CRYPTO_NONE     - No data encryption\n");
+    printf("                                            CRYPTO_XOR      - XOR (128 bit) encryption\n");
+    printf("                                            CRYPTO_AES      - RIJNDAEL (128 bit) encryption (AES)\n");
+    printf("                                            CRYPTO_TDES     - Triple DES encryption\n");
+    printf("                                            CRYPTO_BLOWFISH - BLOWFISH encryption\n\n");
+    
+    printf("                                        <force-raw> : Force resource embedding as type RAWD\n");
+    printf("                                          Possible values (provided as text):\n");
+    printf("                                            AUTO            - Automatically scan type of resource\n");
+    printf("                                            FORCE_RAW       - Force resource to be processed as RAW\n\n");
+    
+    printf("                                        <force-id> : Force resource ID provided (32bit integer)\n\n");
+
     printf("    -o, --output <filename.rres>    : Define output file.\n");
     printf("                                      Supported extensions: .rres, .h\n");
-    printf("    -c, --comp <svalue>             : Define data compression method, if not specified on individual files\n");
-    printf("                                    : Supported compression format.\n");
-    printf("                                          0 - NONE\n");
-    printf("                                          1 - DEFLATE\n");
-    printf("                                          2 - LZMA\n");
-    printf("                                          3 - RLE (custom)\n");
-    printf("                                          4 - BZ2\n");
-    
-    // User should be allowed to choose every file compression/encryption/raw-mode -> Per file!?!?!
-    // User should be allowed to generate central-directory (or avoid it?)
-    // User allowed to set unique identifier for every resource? -> YES
-    // User allowed to choose if filename info goes to central-directory -> maybe in a future
-    // Probably the --input cli mechanism does not work in this case
-    //-cd, --no-cdir
-    //-c, --comp:
-    //-e, --encript:
-    //--force-raw
+    printf("    -c, --comp <value>              : Define general data compression method, to be used in case\n");
+    printf("                                      not specified on every file individually.\n");
+    printf("    --no-cdir                       : Avoid central directory resource generation at the end.\n");
 
     printf("\nEXAMPLES:\n\n");
-    printf("    > rrem --input image01.png,image02.jpg,mysound.wav\n");
+    printf("    > rrem image01.png image02.jpg mysound.wav\n");
     printf("        Create 'data.rres' and 'data.h' including those 3 files,\n");
-    printf("        uses DEFLATE compression for pixel/wave data.\n");
-    printf("    > rrem --input image01.png,image02.bmp --output images.rres\n");
-    printf("        Create 'images.rres' and 'images.h' including those 2 files,\n");
-    printf("        uses DEFLATE compression for pixel data.\n");
-    printf("    > rrem --input image01.png,sound.wav,text.txt\n");
+    printf("        uses DEFLATE compression for pixel/wave data.\n\n");
+
+    printf("    > rrem --comp COMP_NONE --no-cdir image01.png sound.wav info.txt\n");
     printf("        Create 'data.rres' and 'data.h' including those 3 files,\n");
-    printf("        uses DEFLATE compression for pixel/wave/text data.\n");
+    printf("        uses NO compression for pixel/wave/text data and avoids\n");
+    printf("        creating a central directory at the end of rres file.\n\n");
+    
+    printf("    > rrem --output images.rres --comp COMP_DEFLATE //\n");
+    printf("        image01.png:COMP_NONE:CRYPTO_NONE:AUTO:3456 //\n"); 
+    printf("        image02.bmp:COMP_DEFLATE:CRYPTO_NONE:FORCE_RAW:a22bc8 //\n");
+    printf("        image26.bmp\n");
+    printf("        Create 'images.rres' and 'images.h' including those 3 files,\n");
+    printf("        using custom properties for every resource packaging.\n\n");
+   
 }
 
 // Process command line input
