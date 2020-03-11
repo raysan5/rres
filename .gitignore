@@ -50,3 +50,42 @@ modules.order
 Module.symvers
 Mkfile.old
 dkms.conf
+
+# Ignore files build by Visual Studio
+# *.obj --> Can be confused with 3d model!
+*.pdb
+*.aps
+*.user
+# *.vcproj
+# *.vcxproj*
+# *.sln
+*.vspscc
+*_i.c
+*.i
+*.icf
+*_p.c
+*.ncb
+*.suo
+*.tlb
+*.tlh
+*.bak
+*.cache
+*.ilk
+*.log
+.vs
+[Bb]in
+[Dd]ebug/
+[Dd]ebug.win32/
+[Dd]ebug.DLL/
+*.sbr
+*.sdf
+obj/
+[R]elease/
+[Rr]elease.win32/
+_ReSharper*/
+[Tt]est[Rr]esult*
+ipch/
+*.opensdf
+*.db
+*.opendb
+packages/

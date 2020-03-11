@@ -67,7 +67,7 @@
 #include "miniz.h"                      // Required for: DEFLATE compression/decompression
 
 #define RRES_IMPLEMENTATION
-#include "../../src/rres.h"             // Required for: rRES file management
+#include "../../../src/rres.h"          // Required for: rRES file management
 
 #include "external/dirent.h"            // Required for: DIR, opendir(), readdir()
 

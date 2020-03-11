@@ -59,6 +59,7 @@ void rewinddir(DIR *dir);
 
 #endif      // DIRENT_H
 
+
 /****************************************************************************
 
     Implementation of POSIX directory browsing functions and types for Win32.
@@ -79,6 +80,8 @@ void rewinddir(DIR *dir);
     But that said, if there are any problems please get in touch.
 
 ****************************************************************************/
+
+#if defined(DIRENT_IMPLEMENTATION)
 
 #include <io.h>         // _findfirst and _findnext set errno iff they return -1
 #include <stdlib.h>
@@ -181,3 +184,5 @@ void rewinddir(DIR *dir)
     }
     else errno = EBADF;
 }
+
+#endif    // DIRENT_IMPLEMENTATION
