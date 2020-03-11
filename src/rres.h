@@ -4,7 +4,7 @@
 *
 *   CONFIGURATION:
 *
-*   #define RREM_IMPLEMENTATION
+*   #define RRES_IMPLEMENTATION
 *       Generates the implementation of the library into the included file.
 *       If not defined, the library is in header only mode and can be included in other headers
 *       or source files without problems. But only ONE file should hold the implementation.
@@ -77,6 +77,15 @@
 #endif
 
 #define TRACELOG(level, ...) (void)0
+
+// Check if custom malloc/free functions defined, if not, using standard ones
+#if !defined(RRES_MALLOC)
+#include <stdlib.h>         // Required for: malloc(), free()
+
+#define RRES_MALLOC(size)   malloc(size)
+#define RRES_CALLOC(n,sz)   calloc(n,sz)
+#define RRES_FREE(ptr)      free(ptr)
+#endif
 
 //----------------------------------------------------------------------------------
 // Defines and Macros
@@ -176,15 +185,6 @@ RRESDEF int GetRRESIdFromFileName(RRESCentralDir dir, const char *fileName);
 #if defined(RRES_IMPLEMENTATION)
 
 #include <stdio.h>              // Required for: FILE, fopen(), fclose()
-
-// Check if custom malloc/free functions defined, if not, using standard ones
-#if !defined(RRES_MALLOC)
-    #include <stdlib.h>         // Required for: malloc(), free()
-
-    #define RRES_MALLOC(size)   malloc(size)
-    #define RRES_CALLOC(n,sz)   calloc(n,sz)
-    #define RRES_FREE(ptr)      free(ptr)
-#endif
 
 #define SUPPORT_LIBRARY_MINIZ
 
@@ -573,7 +573,7 @@ RRESData GetDataFromChunk(RRESInfoHeader info, void *dataChunk)
         }
     
         rres.data = RRES_MALLOC(info.uncompSize);
-        memcpy(rres.data, result + (rres.propsCount*sizeof(int)), info.uncompSize);
+        memcpy(rres.data, ((unsigned char *)result) + (rres.propsCount*sizeof(int)), info.uncompSize);
     }
     else 
     {
