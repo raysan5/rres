@@ -26,4 +26,4 @@ rREM was a preliminary implementation of a tool to support rres file generation 
 
 rRES file-format is licensed under MIT license. Check [LICENSE](LICENSE) for further details.
 
-*Copyright (c) 2014-2018 Ramon Santamaria ([@raysan5](https://twitter.com/raysan5))*
+*Copyright (c) 2014-2020 Ramon Santamaria ([@raysan5](https://twitter.com/raysan5))*
