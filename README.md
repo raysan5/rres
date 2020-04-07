@@ -1,3 +1,6 @@
+### WARNING: `rres` and `rrem` are still under development, they are not ready yet... hopefully soon...
+
+
 # rRES - raylib resource file-format
 A simple and easy-to-use file-format to package raylib resources.
 
