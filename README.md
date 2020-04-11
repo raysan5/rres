@@ -19,6 +19,22 @@ Second design was way more complex and tried to address first design shortcoming
 
 rREM was a preliminary implementation of a tool to support rres file generation from multiple assets data.
 
+### Compilation
+
+rREM provides compilation using either VS2017 or CMake.
+
+#### CMake
+
+To compile rREM using CMake, run the following commands...
+
+``` bash
+cd tools/rrem/project/CMake
+mkdir build
+cd build
+cmake ..
+make
+```
+
 ## License
 
 rRES file-format is licensed under zlib/libpng license. Check [LICENSE](LICENSE) for further details.

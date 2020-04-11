@@ -89,4 +89,3 @@ ipch/
 *.db
 *.opendb
 packages/
-build
