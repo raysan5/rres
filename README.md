@@ -2,13 +2,14 @@
 
 <img align="left" src="https://github.com/raysan5/rres/blob/master/logo/rres_256x256.png" width=256>
 
-A simple and easy-to-use resources packaging file-format
+<br>
+
+**rres is a simple and easy-to-use resource packaging file-format**
 
 rres has been designed to package game assets data into a simple self-contained comprehensive format, easy to read and write, prepared to load data in a fast and efficient way.
 
-rres has been inspired by [XNB](http://xbox.create.msdn.com/en-US/sample/xnb_format) file-format (used by XNA), [RIFF](https://en.wikipedia.org/wiki/Resource_Interchange_File_Format), [PNG](https://en.wikipedia.org/wiki/Portable_Network_Graphics) and [ZIP](https://en.wikipedia.org/wiki/Zip_(file_format)) file-formats.
+rres is inspired by [XNB](http://xbox.create.msdn.com/en-US/sample/xnb_format) file-format (used by XNA/MonoGame), [RIFF](https://en.wikipedia.org/wiki/Resource_Interchange_File_Format), [PNG](https://en.wikipedia.org/wiki/Portable_Network_Graphics) and [ZIP](https://en.wikipedia.org/wiki/Zip_(file_format)) file-formats.
 
-<br>
 <br>
 
 ## rres format design
