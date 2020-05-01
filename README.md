@@ -1,14 +1,17 @@
 ### WARNING: `rres` and `rrem` are still under development, they are not ready yet... hopefully soon...
 
+<img align="left" src="https://github.com/raysan5/rres/blob/master/logo/rres_256x256.png" width=256>
 
-# rRES - raylib resource file-format
-A simple and easy-to-use file-format to package raylib resources.
+A simple and easy-to-use resources packaging file-format
 
-rres has been designed to package game assets data into a simple self-contained comprehensive format, easy to read and use, prepared to load data in a fast and efficient way to be directly deployed to memory.
+rres has been designed to package game assets data into a simple self-contained comprehensive format, easy to read and write, prepared to load data in a fast and efficient way.
 
-rres has been inspired mainly by [XNB](http://xbox.create.msdn.com/en-US/sample/xnb_format) file-format (used by XNA) but also [RIFF](https://en.wikipedia.org/wiki/Resource_Interchange_File_Format), [PNG](https://en.wikipedia.org/wiki/Portable_Network_Graphics) and [ZIP](https://en.wikipedia.org/wiki/Zip_(file_format)) file-formats.
+rres has been inspired by [XNB](http://xbox.create.msdn.com/en-US/sample/xnb_format) file-format (used by XNA), [RIFF](https://en.wikipedia.org/wiki/Resource_Interchange_File_Format), [PNG](https://en.wikipedia.org/wiki/Portable_Network_Graphics) and [ZIP](https://en.wikipedia.org/wiki/Zip_(file_format)) file-formats.
 
-## Format Design
+<br>
+<br>
+
+## rres format design
 
 First design of the format was limited to packaging one resource after another, every resource consisted of one `InfoHeader` followed by a fixed set of four possible parameters and the resource data. Along the .rres file, a .h header file was also generated to map the `resId` with a resource name (usually the original filename of the un-processed data). This model was pretty simple and intuitive but it has some important downsides, like not considering complex pieces of data that could require multiple chunks.
 
