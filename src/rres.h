@@ -1,6 +1,6 @@
 /**********************************************************************************************
 *
-*   rres v1.0 - raylib resource custom fileformat management functions
+*   rres v1.0 - A simple and easy-to-use resource packaging file-format
 *
 *   CONFIGURATION:
 *
@@ -34,7 +34,7 @@
 *           Reserved            (4 bytes)   // <reserved>
 *           CRC32               (4 bytes)   // Data Chunk CRC32 (full chunk)
 *   
-*       RRES Data Chunk         (n bytes)   // DATA: [props + data]
+*       RRES Data Chunk         (n bytes)   // DATA: [propsCount + props[n] + Data]
 *   }
 *
 *   DEPENDENCIES:
@@ -97,7 +97,9 @@
 //----------------------------------------------------------------------------------
 
 // rRES resource chunk (piece of data)
-// WARNING: No aligned with internal RRES structure
+// WARNING: This is the resource type returned to the user after
+// reading and processing data from file, it's not aligned with
+// internal resource data types: RRESInfoHeader + dataChunk
 typedef struct RRESData {
     unsigned int type;          // Resource data type
     int propsCount;             // Resource properties count
