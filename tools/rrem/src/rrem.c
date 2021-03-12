@@ -202,7 +202,7 @@ int main(int argc, char *argv[])
     const int screenHeight = 640;
 
     SetConfigFlags(FLAG_WINDOW_RESIZABLE);      // Window configuration flags
-    InitWindow(screenWidth, screenHeight, FormatText("%s v%s - %s", toolName, toolVersion, toolDescription));
+    InitWindow(screenWidth, screenHeight, TextFormat("%s v%s - %s", toolName, toolVersion, toolDescription));
     SetWindowMinSize(640, 480);
     
     SetTargetFPS(60);
@@ -511,7 +511,7 @@ static void GenRRESHeaderFile(const char *rresHeaderName, RRES *resources, int r
     {
         baseFileName = GetFileName(argv[i]);
 
-        int type = GetRRESFileType(GetExtension(argv[i]));
+        int type = GetRRESFileType(GetFileExtension(argv[i]));
 
         switch (type)
         {
