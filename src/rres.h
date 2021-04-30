@@ -10,7 +10,7 @@
 *       or source files without problems. But only ONE file should hold the implementation.
 *
 *
-*   rres FILE STRUCTURE:
+*   FILE STRUCTURE:
 *
 *   rresFileHeader             (12 bytes)
 *       File ID                 (4 bytes)   // File type id: 'rres'
@@ -98,22 +98,22 @@
 // WARNING: This is the resource type returned to the user after
 // reading and processing data from file, it's not aligned with
 // internal resource data types: rresInfoHeader + dataChunk
-typedef struct rresChunk {
-    unsigned int type;          // Resource data type
-    int propsCount;             // Resource properties count
-    int *props;                 // Resource properties
-    void *data;                 // Resource data
+typedef struct {
+    unsigned int type;          // Resource chunk data type
+    int propsCount;             // Resource chunk properties count
+    int *props;                 // Resource chunk properties
+    void *data;                 // Resource chunk data
 } rresChunk;
 
 // rres resource data
-typedef struct rresData {
-    unsigned int count;
-    rresChunk *chunks;
+typedef struct {
+    unsigned int count;         // Resource chunks count
+    rresChunk *chunks;          // Resource chunks
 } rresData;
 
 // rres central directory entry
 typedef struct {
-    int id;                     // Resource unique ID
+    int id;                     // Resource unique id
     int offset;                 // Resource offset in file
     int fileNameLen;            // Resource fileName length
     char *fileName;             // Resource fileName ('\0' terminated)
@@ -126,40 +126,41 @@ typedef struct {
 } rresCentralDir;
 
 // rres resource data type
+// NOTE: Data type determines the proporties and the data included in every chunk
 typedef enum {
-    RRES_DATA_RAW       = 1,    // [RAWD] Basic type: no properties / Data: raw
-    RRES_DATA_TEXT      = 2,    // [TEXT] Basic type: [2] properties: charsCount, cultureCode / Data: text
-    RRES_DATA_IMAGE     = 3,    // [IMGE] Basic type: [4] properties: width, height, mipmaps, format / Data: pixels
-    RRES_DATA_WAVE      = 4,    // [WAVE] Basic type: [4] properties: sampleCount, sampleRate, sampleSize, channels / Data: samples
-    RRES_DATA_VERTEX    = 5,    // [VRTX] Basic type: [4] properties: vertexCount, vertexType, vertexFormat / Data: vertex
-    RRES_DATA_FONT      = 10,   // [FONT] Complex type:
-                                //          rres[0]: [n] properties: baseSize, charsCount, charsPadding, recs / Data: -
+    RRES_DATA_RAW       = 1,    // [RAWD] Single chunk: rres[0]: props: - | data: raw bytes
+    RRES_DATA_TEXT      = 2,    // [TEXT] Single chunk: rres[0]: props[0]:codepointsCount, props[1]:cultureCode | data: text (utf8)
+    RRES_DATA_IMAGE     = 3,    // [IMGE] Single chunk: rres[0]: props[0]:width, props[1]:height, props[2]:mipmaps, props[3]:rresPixelFormat | data: pixels
+    RRES_DATA_WAVE      = 4,    // [WAVE] Single chunk: rres[0]: props[0]:sampleCount, props[1]:sampleRate, props[2]:sampleSize, props[3]:channels | data: samples
+    RRES_DATA_VERTEX    = 5,    // [VRTX] Single chunk: rres[0]: props[0]:vertexCount, props[1]:rresVertexAttribute, props[2]:rresVertexFormat | data: vertex
+    RRES_DATA_FONT      = 10,   // [FONT] Multiple chunks:
+                                //          rres[0]: props[0]:baseSize, props[1]:glyphsCount, props[2]:glyphsPadding, props[3+n]:recs | data: -
                                 //          rres[1]: RRES_DATA_IMAGE
-                                //          rres[2]: RRES_DATA_CHARS [optional]
-    RRES_DATA_CHARS     = 11,   // [CHAR] Complex type: 
-                                //          rres[0]: [1] property: charsCount / Data: -
+                                //          rres[2]: RRES_DATA_CHARS (optional)
+    RRES_DATA_CHARS     = 11,   // [CHRS] Multiple chunks:
+                                //          rres[0]: props[0]:charsCount | data: -
                                 //          {
-                                //              rres[n]: [4] properties: value, offsetX, offsetY, advanceX / Data: -
+                                //              rres[n]: props[0]:value, props[1]:offsetX, props[2]:offsetY, props[3]:advanceX | data: -
                                 //              rres[n+1]: RRES_DATA_IMAGE
                                 //          }
-    RRES_DATA_MESH      = 12,   // [MESH] Complex type: 
-                                //          rres[0]: [1] property: vertexBuffersCount / Data: -
+    RRES_DATA_MESH      = 12,   // [MESH] Multiple chunks:
+                                //          rres[0]: props[0]:vertexBuffersCount | data: -
                                 //          {
                                 //              rres[n]: RRES_DATA_VERTEX
                                 //          }
-    RRES_DATA_MATERIAL  = 13,   // [MATD] Complex type: 
-                                //          rres[0]: [n] properties: mapsCount, params / Data: -
+    RRES_DATA_MATERIAL  = 13,   // [MATD] Multiple chunks:
+                                //          rres[0]: props[0]:mapsCount, props[1]:params | data: -
                                 //          {
-                                //              rres[n]: [2] properties: color, value_comp / Data: -
+                                //              rres[n]: props[0]:color, props[1]:value | data: -
                                 //              rres[n+1]: RRES_DATA_IMAGE
                                 //          }
-    RRES_DATA_MODEL     = 20,   // [MODL] Complex type:
-                                //          rres[0]: [n] properties: meshCount, materialCount, transform, meshMaterial / Data: -
+    RRES_DATA_MODEL     = 20,   // [MODL] Multiple chunks:
+                                //          rres[0]: props[0]:meshCount, props[1]:materialCount, props[2+n]:transform, props[18+m]:meshMaterial | data: -
                                 //          {
                                 //              rres[n]: RRES_DATA_MESH
                                 //              rres[m]: RRES_DATA_MATERIAL
                                 //          }
-    RRES_DATA_DIRECTORY = 100,  // [CDIR] Basic type: [1] properties: fileCount / Data: rresDirEntry[]
+    RRES_DATA_DIRECTORY = 100,  // [CDIR] Single chunk: props[0]:entryCount | data: rresDirEntry[]
 } rresDataType;
 
 //----------------------------------------------------------------------------------
@@ -177,6 +178,7 @@ RRESDEF void rresUnloadData(rresData data);
 
 RRESDEF rresCentralDir rresLoadCentralDirectory(const char *fileName);
 RRESDEF int rresGetIdFromFileName(rresCentralDir dir, const char *fileName);
+RRESDEF int rresGetHashId(const char *fileName);
 
 #endif // RRES_H
 
@@ -261,48 +263,48 @@ typedef enum {
 
 // Image/Texture data type
 typedef enum {
-    RRES_IM_UNCOMP_GRAYSCALE = 1,     // 8 bit per pixel (no alpha)
-    RRES_IM_UNCOMP_GRAY_ALPHA,        // 16 bpp (2 channels)
-    RRES_IM_UNCOMP_R5G6B5,            // 16 bpp
-    RRES_IM_UNCOMP_R8G8B8,            // 24 bpp
-    RRES_IM_UNCOMP_R5G5B5A1,          // 16 bpp (1 bit alpha)
-    RRES_IM_UNCOMP_R4G4B4A4,          // 16 bpp (4 bit alpha)
-    RRES_IM_UNCOMP_R8G8B8A8,          // 32 bpp
-    RRES_IM_COMP_DXT1_RGB,            // 4 bpp (no alpha)
-    RRES_IM_COMP_DXT1_RGBA,           // 4 bpp (1 bit alpha)
-    RRES_IM_COMP_DXT3_RGBA,           // 8 bpp
-    RRES_IM_COMP_DXT5_RGBA,           // 8 bpp
-    RRES_IM_COMP_ETC1_RGB,            // 4 bpp
-    RRES_IM_COMP_ETC2_RGB,            // 4 bpp
-    RRES_IM_COMP_ETC2_EAC_RGBA,       // 8 bpp
-    RRES_IM_COMP_PVRT_RGB,            // 4 bpp
-    RRES_IM_COMP_PVRT_RGBA,           // 4 bpp
-    RRES_IM_COMP_ASTC_4x4_RGBA,       // 8 bpp
-    RRES_IM_COMP_ASTC_8x8_RGBA        // 2 bpp
+    RRES_PIXELFORMAT_UNCOMP_GRAYSCALE = 1,     // 8 bit per pixel (no alpha)
+    RRES_PIXELFORMAT_UNCOMP_GRAY_ALPHA,        // 16 bpp (2 channels)
+    RRES_PIXELFORMAT_UNCOMP_R5G6B5,            // 16 bpp
+    RRES_PIXELFORMAT_UNCOMP_R8G8B8,            // 24 bpp
+    RRES_PIXELFORMAT_UNCOMP_R5G5B5A1,          // 16 bpp (1 bit alpha)
+    RRES_PIXELFORMAT_UNCOMP_R4G4B4A4,          // 16 bpp (4 bit alpha)
+    RRES_PIXELFORMAT_UNCOMP_R8G8B8A8,          // 32 bpp
+    RRES_PIXELFORMAT_COMP_DXT1_RGB,            // 4 bpp (no alpha)
+    RRES_PIXELFORMAT_COMP_DXT1_RGBA,           // 4 bpp (1 bit alpha)
+    RRES_PIXELFORMAT_COMP_DXT3_RGBA,           // 8 bpp
+    RRES_PIXELFORMAT_COMP_DXT5_RGBA,           // 8 bpp
+    RRES_PIXELFORMAT_COMP_ETC1_RGB,            // 4 bpp
+    RRES_PIXELFORMAT_COMP_ETC2_RGB,            // 4 bpp
+    RRES_PIXELFORMAT_COMP_ETC2_EAC_RGBA,       // 8 bpp
+    RRES_PIXELFORMAT_COMP_PVRT_RGB,            // 4 bpp
+    RRES_PIXELFORMAT_COMP_PVRT_RGBA,           // 4 bpp
+    RRES_PIXELFORMAT_COMP_ASTC_4x4_RGBA,       // 8 bpp
+    RRES_PIXELFORMAT_COMP_ASTC_8x8_RGBA        // 2 bpp
     //...
-} rresImagePixelFormat;
+} rresPixelFormat;
 
-// Vertex data type
+// Vertex data attribute
 typedef enum {
-    RRES_VERT_POSITION,
-    RRES_VERT_TEXCOORD1,
-    RRES_VERT_TEXCOORD2,
-    RRES_VERT_TEXCOORD3,
-    RRES_VERT_TEXCOORD4,
-    RRES_VERT_NORMAL,
-    RRES_VERT_TANGENT,
-    RRES_VERT_COLOR,
-    RRES_VERT_INDEX,
+    RRES_VERTEX_ATTRIBUTE_POSITION,
+    RRES_VERTEX_ATTRIBUTE_TEXCOORD1,
+    RRES_VERTEX_ATTRIBUTE_TEXCOORD2,
+    RRES_VERTEX_ATTRIBUTE_TEXCOORD3,
+    RRES_VERTEX_ATTRIBUTE_TEXCOORD4,
+    RRES_VERTEX_ATTRIBUTE_NORMAL,
+    RRES_VERTEX_ATTRIBUTE_TANGENT,
+    RRES_VERTEX_ATTRIBUTE_COLOR,
+    RRES_VERTEX_ATTRIBUTE_INDEX,
     //...
-} rresVertexType;
+} rresVertexAttribute;
 
 // Vertex data format type
 typedef enum {
-    RRES_VERT_FORMAT_BYTE,
-    RRES_VERT_FORMAT_SHORT,
-    RRES_VERT_FORMAT_INT,
-    RRES_VERT_FORMAT_HFLOAT,
-    RRES_VERT_FORMAT_FLOAT,
+    RRES_VERTEX_FORMAT_BYTE,
+    RRES_VERTEX_FORMAT_SHORT,
+    RRES_VERTEX_FORMAT_INT,
+    RRES_VERTEX_FORMAT_HFLOAT,
+    RRES_VERTEX_FORMAT_FLOAT,
     //...
 } rresVertexFormat;
 
@@ -811,6 +813,17 @@ static unsigned int rresComputeCRC32(unsigned char *buffer, int len)
     for (int i = 0; i < len; i++) crc = (crc >> 8)^crcTable[buffer[i]^(crc&0xff)];
 
     return ~crc;
+}
+
+// Get rres hash id
+int rresGetHashId(const char *fileName)
+{
+    int hash = 0;
+    int length = strlen(fileName);
+    
+    for (int i = 0; i < length; i++) hash = hash*31 + (int)fileName[i];
+    
+    return hash;
 }
 
 #endif // RRES_IMPLEMENTATION
