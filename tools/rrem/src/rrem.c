@@ -10,10 +10,9 @@
 *   rrem creates a .rres resource with embedded files and a .h header to access embedded data.
 *
 *   DEPENDENCIES:
-*       raylib 3.0              - Windowing/input management, fileformats loading and drawing.
+*       raylib 3.7              - Windowing/input management, fileformats loading and drawing.
 *       raygui 2.7              - Immediate-mode GUI controls.
 *       tinyfiledialogs 3.4.3   - Open/save file dialogs, it requires linkage with comdlg32 and ole32 libs.
-*       miniz 2.1               - DEFLATE compression/decompression library (zlib-style)
 *
 *   COMPILATION (Windows - MinGW):
 *       gcc -o rrem.exe rrem.c external/miniz.c -s rrem.rc.data -Iexternal /
@@ -24,7 +23,7 @@
 *
 *   LICENSE: zlib/libpng
 *
-*   Copyright (c) 2014-2020 Ramon Santamaria (@raysan5)
+*   Copyright (c) 2014-2021 Ramon Santamaria (@raysan5)
 *
 *   This software is provided "as-is", without any express or implied warranty. In no event
 *   will the authors be held liable for any damages arising from the use of this software.
@@ -62,9 +61,6 @@
 
 #define GUI_FILE_DIALOGS_IMPLEMENTATION
 #include "gui_file_dialogs.h"           // GUI: File Dialogs
-
-#define MINIZ_NO_ARCHIVE_APIS
-#include "miniz.h"                      // Required for: DEFLATE compression/decompression
 
 #define RRES_IMPLEMENTATION
 #include "../../../src/rres.h"          // Required for: rRES file management
