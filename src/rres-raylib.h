@@ -84,15 +84,9 @@ RRESDEF Model rresLoadModel(rresData rres);
 //----------------------------------------------------------------------------------
 
 // Load simple data chunks that are later required by multi-chunk resources
-
 static void *rresLoadDataChunkRaw(rresDataChunk chunk);         // Load chunk: RRES_DATA_RAW
 static char *rresLoadDataChunkText(rresDataChunk chunk);        // Load chunk: RRES_DATA_TEXT
 static Image rresLoadDataChunkImage(rresDataChunk chunk);       // Load chunk: RRES_DATA_IMAGE
-static Wave rresLoadDataChunkWave(rresDataChunk chunk);         // Load chunk: RRES_DATA_WAVE
-static void *rresLoadDataChunkVertex(rresDataChunk chunk);      // Load chunk: RRES_DATA_VERTEX
-static CharInfo *rresLoadDataChunkChars(rresDataChunk chunk);   // Load chunk: RRES_DATA_CHARS (multi)
-//static Mesh *rresLoadDataChunkMesh(rresDataChunk chunk);        // Load chunk: RRES_DATA_MESH (multi)
-
 
 //----------------------------------------------------------------------------------
 // Module Functions Definition
@@ -129,7 +123,7 @@ Image rresLoadImage(rresData rres)
     
     if ((rres.count >= 1) && (rres.chunks[0].type == RRES_DATA_IMAGE))
     {
-        image = rresLoadDataChunkImage(chunk);
+        image = rresLoadDataChunkImage(rres.chunks[0]);
     }
     
     return image;
@@ -146,7 +140,7 @@ Wave rresLoadWave(rresData rres)
         wave.sampleSize = rres.chunks[0].props[2];
         wave.channels = rres.chunks[0].props[3];
         
-        unsigned int size = sampleCount*sampleSize/8;
+        unsigned int size = wave.sampleCount*wave.sampleSize/8;
         wave.data = RL_MALLOC(size);
         memcpy(wave.data, rres.chunks[0].data, size);   
     }
@@ -234,15 +228,15 @@ Mesh rresLoadMesh(rresData rres)
         {
             switch (rres.chunks[i].props[1])
             {
-                case RRES_VERT_POSITION: if (rres.chunks[i].props[2] == RRES_VERT_FORMAT_FLOAT) mesh.vertices = (float *)rres.chunks[i].data; break;
-                case RRES_VERT_TEXCOORD1: if (rres.chunks[i].props[2] == RRES_VERT_FORMAT_FLOAT) mesh.texcoords = (float *)rres.chunks[i].data; break;
-                case RRES_VERT_TEXCOORD2: if (rres.chunks[i].props[2] == RRES_VERT_FORMAT_FLOAT) mesh.texcoords2 = (float *)rres.chunks[i].data; break;
-                case RRES_VERT_TEXCOORD3: break;    // Not supported by raylib mesh format
-                case RRES_VERT_TEXCOORD4: break;    // Not supported by raylib mesh format
-                case RRES_VERT_NORMAL: if (rres.chunks[i].props[2] == RRES_VERT_FORMAT_FLOAT) mesh.normals = (float *)rres.chunks[i].data; break;
-                case RRES_VERT_TANGENT: if (rres.chunks[i].props[2] == RRES_VERT_FORMAT_FLOAT) mesh.tangents = (float *)rres.chunks[i].data; break;
-                case RRES_VERT_COLOR: if (rres.chunks[i].props[2] == RRES_VERT_FORMAT_BYTE) mesh.colors = (unsigned char *)rres.chunks[i].data; break;
-                case RRES_VERT_INDEX: if (rres.chunks[i].props[2] == RRES_VERT_FORMAT_SHORT) mesh.indices = (unsigned short *)rres.chunks[i].data; break;
+                case RRES_VERTEX_ATTRIBUTE_POSITION: if (rres.chunks[i].props[2] == RRES_VERTEX_FORMAT_FLOAT) mesh.vertices = (float *)rres.chunks[i].data; break;
+                case RRES_VERTEX_ATTRIBUTE_TEXCOORD1: if (rres.chunks[i].props[2] == RRES_VERTEX_FORMAT_FLOAT) mesh.texcoords = (float *)rres.chunks[i].data; break;
+                case RRES_VERTEX_ATTRIBUTE_TEXCOORD2: if (rres.chunks[i].props[2] == RRES_VERTEX_FORMAT_FLOAT) mesh.texcoords2 = (float *)rres.chunks[i].data; break;
+                case RRES_VERTEX_ATTRIBUTE_TEXCOORD3: break;    // Not supported by raylib mesh format
+                case RRES_VERTEX_ATTRIBUTE_TEXCOORD4: break;    // Not supported by raylib mesh format
+                case RRES_VERTEX_ATTRIBUTE_NORMAL: if (rres.chunks[i].props[2] == RRES_VERTEX_FORMAT_FLOAT) mesh.normals = (float *)rres.chunks[i].data; break;
+                case RRES_VERTEX_ATTRIBUTE_TANGENT: if (rres.chunks[i].props[2] == RRES_VERTEX_FORMAT_FLOAT) mesh.tangents = (float *)rres.chunks[i].data; break;
+                case RRES_VERTEX_ATTRIBUTE_COLOR: if (rres.chunks[i].props[2] == RRES_VERTEX_FORMAT_BYTE) mesh.colors = (unsigned char *)rres.chunks[i].data; break;
+                case RRES_VERTEX_ATTRIBUTE_INDEX: if (rres.chunks[i].props[2] == RRES_VERTEX_FORMAT_SHORT) mesh.indices = (unsigned short *)rres.chunks[i].data; break;
                 default: break;
             }
         }
@@ -262,7 +256,7 @@ static void *rresLoadDataChunkRaw(rresDataChunk chunk)
     
     if (chunk.type == RRES_DATA_RAW)
     {
-        rawData = RL_MALLOC(chunks.props[0]);
+        rawData = RL_MALLOC(chunk.props[0]);
         memcpy(rawData, chunk.data, chunk.props[0]);
     }
     
@@ -276,7 +270,7 @@ static char *rresLoadDataChunkText(rresDataChunk chunk)
     
     if (chunk.type == RRES_DATA_TEXT)
     {
-        text = (char *)RL_MALLOC(chunks.props[0]);
+        text = (char *)RL_MALLOC(chunk.props[0]);
         memcpy(text, chunk.data, chunk.props[0]);
     }
     

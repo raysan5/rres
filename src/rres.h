@@ -553,8 +553,8 @@ static rresDataChunk rresLoadDataChunk(rresInfoHeader info, void *data)
 // Unload data chunk
 static void rresUnloadDataChunk(rresDataChunk chunk)
 {
-    RRES_FREE(props);   // Resource chunk properties
-    RRES_FREE(data);    // Resource chunk data
+    RRES_FREE(chunk.props);   // Resource chunk properties
+    RRES_FREE(chunk.data);    // Resource chunk data
 }
 
 /*
