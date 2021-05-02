@@ -25,8 +25,40 @@ int main(void)
     const int screenHeight = 450;
 
     InitWindow(screenWidth, screenHeight, "raylib [rres] example - rres data loading");
+    
+    InitAudioDevice();
+    
+    rresCentralDir dir = rresLoadCentralDirectory("resources.rres");
+    
+    // Check if central directory is available
+    // NOTE: CDIR is not mandatory, resources are referenced by its id
+    if (dir.count > 0)
+    {
+        // List all files contained
+        for (int i = 0; i < dir.count; i++)
+        {
+            TraceLog(LOG_INFO, "FILE: [%i] %s (Offset: %i)", dir.entries[i].id, dir.entries[i].fileName, dir.entries[i].offset);
+        }
+    }        
 
-    // TODO: Load content from rres file
+    // Load content from rres file
+    rresData rres = { 0 };
+    
+    rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "resources/images/fudesumi.png"));
+    Image image = rresLoadImage(rres);
+    Texture2D texture = LoadTextureFromImage(image);
+    UnloadImage(image);
+    
+    rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "resources/fonts/pixantiqua.ttf"));
+    Font font = rresLoadFont(rres);
+    
+    rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "resources/audio/sound.wav"));
+    Wave wave = rresLoadWave(rres);
+    Sound sound = LoadSoundFromWave(wave);
+    UnloadWave(wave);
+    
+    rresUnloadData(rres);
+    rresUnloadCentralDir(dir);
 
     SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
     //--------------------------------------------------------------------------------------
@@ -36,7 +68,7 @@ int main(void)
     {
         // Update
         //----------------------------------------------------------------------------------
-        // ...
+        if (IsKeyPressed(KEY_SPACE)) PlaySound(sound);
         //----------------------------------------------------------------------------------
 
         // Draw
@@ -44,8 +76,11 @@ int main(void)
         BeginDrawing();
 
             ClearBackground(RAYWHITE);
+            
+            DrawText("rres file loading example", 10, 10, 20, DARKGRAY);
 
-            DrawText("rres file loading", 10, 10, 20, DARKGRAY);
+            DrawTexture(texture, 20, 20, WHITE);
+            DrawTextEx(font, "custom font!", (Vector2){ 100, 100 }, 40, 2, BLUE);
 
         EndDrawing();
         //----------------------------------------------------------------------------------
@@ -53,7 +88,13 @@ int main(void)
 
     // De-Initialization
     //--------------------------------------------------------------------------------------
-    CloseWindow();        // Close window and OpenGL context
+    UnloadTexture(texture);
+    UnloadFont(font);
+    UnloadSound(sound);
+    
+    CloseAudioDevice();     // Close audio device
+    
+    CloseWindow();          // Close window and OpenGL context
     //--------------------------------------------------------------------------------------
 
     return 0;
