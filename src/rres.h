@@ -18,11 +18,11 @@
 *       Res Count               (2 bytes)   // Number of resources contained
 *       CD Offset               (4 bytes)   // Central Directory offset (if available)
 *
-*   rres resource
+*   rres resource chunk
 *   {
 *       rresInfoHeader         (32 bytes)
 *           Type                (4 bytes)   // Resource type (FOURCC)
-*           Id                  (4 bytes)   // Resource unique identifier
+*           Id                  (4 bytes)   // Resource identifier (filename hash!)
 *           Comp Type           (1 byte)    // Data compression type
 *           Crypt Type          (1 byte)    // Data encryption type
 *           Flags               (2 bytes)   // Data flags (if required)
@@ -34,9 +34,6 @@
 *   
 *       rres Data Chunk         (n bytes)   // Data: [propsCount + props[n] + data]
 *   }
-*
-*   DEPENDENCIES:
-*
 *
 *
 *   LICENSE: zlib/libpng
@@ -103,12 +100,12 @@ typedef struct {
     int propsCount;             // Resource chunk properties count
     int *props;                 // Resource chunk properties
     void *data;                 // Resource chunk data
-} rresChunk;
+} rresDataChunk;
 
 // rres resource data
 typedef struct {
     unsigned int count;         // Resource chunks count
-    rresChunk *chunks;          // Resource chunks
+    rresDataChunk *chunks;      // Resource chunks
 } rresData;
 
 // rres central directory entry
@@ -128,8 +125,8 @@ typedef struct {
 // rres resource data type
 // NOTE: Data type determines the proporties and the data included in every chunk
 typedef enum {
-    RRES_DATA_RAW       = 1,    // [RAWD] Single chunk: rres[0]: props: - | data: raw bytes
-    RRES_DATA_TEXT      = 2,    // [TEXT] Single chunk: rres[0]: props[0]:codepointsCount, props[1]:cultureCode | data: text (utf8)
+    RRES_DATA_RAW       = 1,    // [RAWD] Single chunk: rres[0]: props[0]:size | data: raw bytes
+    RRES_DATA_TEXT      = 2,    // [TEXT] Single chunk: rres[0]: props[0]:size, props[1]:cultureCode | data: text (utf8)
     RRES_DATA_IMAGE     = 3,    // [IMGE] Single chunk: rres[0]: props[0]:width, props[1]:height, props[2]:mipmaps, props[3]:rresPixelFormat | data: pixels
     RRES_DATA_WAVE      = 4,    // [WAVE] Single chunk: rres[0]: props[0]:sampleCount, props[1]:sampleRate, props[2]:sampleSize, props[3]:channels | data: samples
     RRES_DATA_VERTEX    = 5,    // [VRTX] Single chunk: rres[0]: props[0]:vertexCount, props[1]:rresVertexAttribute, props[2]:rresVertexFormat | data: vertex
@@ -177,8 +174,8 @@ RRESDEF rresData rresLoadData(const char *fileName, int rresId);
 RRESDEF void rresUnloadData(rresData data);
 
 RRESDEF rresCentralDir rresLoadCentralDirectory(const char *fileName);
+RRESDEF void rresUnloadCentralDirectory(rresCentralDir dir);
 RRESDEF int rresGetIdFromFileName(rresCentralDir dir, const char *fileName);
-RRESDEF int rresGetHashId(const char *fileName);
 
 #endif // RRES_H
 
@@ -205,32 +202,32 @@ RRESDEF int rresGetHashId(const char *fileName);
 
 // rres file header (12 bytes)
 typedef struct rresFileHeader {
-    unsigned char id[4];        // File identifier: rres
+    unsigned char id[4];        // File identifier: rRES
     unsigned short version;     // File version and subversion
     unsigned short resCount;    // Number of resources in this file (total)
     unsigned int cdOffset;      // Central Directory offset in file (0 if not available)
 } rresFileHeader;
 
-// rres resource info header (32 bytes)
+// rres resource chunk info header (32 bytes)
 typedef struct rresInfoHeader {
-    unsigned char type[4];      // Resource type (FOURCC)
-    unsigned int id;            // Resource unique identifier
+    unsigned char type[4];      // Resource chunk type (FOURCC)
+    unsigned int id;            // Resource chunk identifier (filename hash!)
     unsigned char compType;     // Data compression type
     unsigned char crypType;     // Data encription type
     unsigned short flags;       // Data flags (if required)
     unsigned int compSize;      // Data compressed size (if compressed)
     unsigned int uncompSize;    // Data uncompressed size
-    unsigned int nextOffset;    // Next resource offset (if required)
+    unsigned int nextOffset;    // Next resource chunk offset (if required)
     unsigned int reserved;      // <reserved>
     unsigned int crc32;         // Data chunk CRC32 (full chunk)
 } rresInfoHeader;
 
 /*
-// rres resource chunk
-typedef struct rresChunkRaw {
+// rres resource raw data chunk (as stored in file)
+typedef struct rresFileDataChunk {
     rresInfoHeader info;        // Resource info header
-    void *data;                 // Resource chunk data (props + data, compressed and encripted)
-} rresChunkRaw;
+    void *data;                 // Resource data chunk (props + data, compressed and encripted)
+} rresFileDataChunk;
 */
 
 //----------------------------------------------------------------------------------
@@ -263,24 +260,27 @@ typedef enum {
 
 // Image/Texture data type
 typedef enum {
-    RRES_PIXELFORMAT_UNCOMP_GRAYSCALE = 1,     // 8 bit per pixel (no alpha)
-    RRES_PIXELFORMAT_UNCOMP_GRAY_ALPHA,        // 16 bpp (2 channels)
-    RRES_PIXELFORMAT_UNCOMP_R5G6B5,            // 16 bpp
-    RRES_PIXELFORMAT_UNCOMP_R8G8B8,            // 24 bpp
-    RRES_PIXELFORMAT_UNCOMP_R5G5B5A1,          // 16 bpp (1 bit alpha)
-    RRES_PIXELFORMAT_UNCOMP_R4G4B4A4,          // 16 bpp (4 bit alpha)
-    RRES_PIXELFORMAT_UNCOMP_R8G8B8A8,          // 32 bpp
-    RRES_PIXELFORMAT_COMP_DXT1_RGB,            // 4 bpp (no alpha)
-    RRES_PIXELFORMAT_COMP_DXT1_RGBA,           // 4 bpp (1 bit alpha)
-    RRES_PIXELFORMAT_COMP_DXT3_RGBA,           // 8 bpp
-    RRES_PIXELFORMAT_COMP_DXT5_RGBA,           // 8 bpp
-    RRES_PIXELFORMAT_COMP_ETC1_RGB,            // 4 bpp
-    RRES_PIXELFORMAT_COMP_ETC2_RGB,            // 4 bpp
-    RRES_PIXELFORMAT_COMP_ETC2_EAC_RGBA,       // 8 bpp
-    RRES_PIXELFORMAT_COMP_PVRT_RGB,            // 4 bpp
-    RRES_PIXELFORMAT_COMP_PVRT_RGBA,           // 4 bpp
-    RRES_PIXELFORMAT_COMP_ASTC_4x4_RGBA,       // 8 bpp
-    RRES_PIXELFORMAT_COMP_ASTC_8x8_RGBA        // 2 bpp
+    RRES_PIXELFORMAT_UNCOMP_GRAYSCALE = 1,      // 8 bit per pixel (no alpha)
+    RRES_PIXELFORMAT_UNCOMP_GRAY_ALPHA,         // 16 bpp (2 channels)
+    RRES_PIXELFORMAT_UNCOMP_R5G6B5,             // 16 bpp
+    RRES_PIXELFORMAT_UNCOMP_R8G8B8,             // 24 bpp
+    RRES_PIXELFORMAT_UNCOMP_R5G5B5A1,           // 16 bpp (1 bit alpha)
+    RRES_PIXELFORMAT_UNCOMP_R4G4B4A4,           // 16 bpp (4 bit alpha)
+    RRES_PIXELFORMAT_UNCOMP_R8G8B8A8,           // 32 bpp
+    RRES_PIXELFORMAT_UNCOMPRESSED_R32,          // 32 bpp (1 channel - float)
+    RRES_PIXELFORMAT_UNCOMPRESSED_R32G32B32,    // 32*3 bpp (3 channels - float)
+    RRES_PIXELFORMAT_UNCOMPRESSED_R32G32B32A32, // 32*4 bpp (4 channels - float)
+    RRES_PIXELFORMAT_COMP_DXT1_RGB,             // 4 bpp (no alpha)
+    RRES_PIXELFORMAT_COMP_DXT1_RGBA,            // 4 bpp (1 bit alpha)
+    RRES_PIXELFORMAT_COMP_DXT3_RGBA,            // 8 bpp
+    RRES_PIXELFORMAT_COMP_DXT5_RGBA,            // 8 bpp
+    RRES_PIXELFORMAT_COMP_ETC1_RGB,             // 4 bpp
+    RRES_PIXELFORMAT_COMP_ETC2_RGB,             // 4 bpp
+    RRES_PIXELFORMAT_COMP_ETC2_EAC_RGBA,        // 8 bpp
+    RRES_PIXELFORMAT_COMP_PVRT_RGB,             // 4 bpp
+    RRES_PIXELFORMAT_COMP_PVRT_RGBA,            // 4 bpp
+    RRES_PIXELFORMAT_COMP_ASTC_4x4_RGBA,        // 8 bpp
+    RRES_PIXELFORMAT_COMP_ASTC_8x8_RGBA         // 2 bpp
     //...
 } rresPixelFormat;
 
@@ -321,8 +321,11 @@ typedef enum {
 // static unsigned char *DecompressDEFLATE(const unsigned char *data, unsigned long compSize, int uncompSize);
 // #endif
 
-static rresChunk rresGetDataFromChunk(rresInfoHeader info, void *dataChunk);
+static rresDataChunk rresLoadDataChunk(rresInfoHeader info, void *data);
+static void rresUnloadDataChunk(rresDataChunk chunk);
+
 static unsigned int rresComputeCRC32(unsigned char *buffer, int len);
+static unsigned int rresComputeHashId(const char *fileName);
 
 //----------------------------------------------------------------------------------
 // Module Functions Definition
@@ -346,9 +349,9 @@ rresData rresLoadData(const char *fileName, int rresId)
 
         // Verify "rres" identifier
         if ((header.id[0] == 'r') && 
-            (header.id[1] == 'r') && 
-            (header.id[2] == 'e') && 
-            (header.id[3] == 's'))
+            (header.id[1] == 'R') && 
+            (header.id[2] == 'E') && 
+            (header.id[3] == 'S'))
         {
             for (int i = 0; i < header.resCount; i++)
             {
@@ -362,9 +365,9 @@ rresData rresLoadData(const char *fileName, int rresId)
                     rres.count = 1;
                     
                     int currentResPosition = SEEK_CUR;      // Store current file position
-                    rresInfoHeader temp = info;             // Temp info header to scan related resources
+                    rresInfoHeader temp = info;             // Temp info header to scan resource chunks
                     
-                    // Scan all related resources checking temp.nextOffset
+                    // Scan all resource chunks checking temp.nextOffset
                     while (temp.nextOffset != 0)
                     {
                         fseek(rresFile, temp.nextOffset, SEEK_SET);             // Jump to next resource
@@ -372,24 +375,24 @@ rresData rresLoadData(const char *fileName, int rresId)
                         rres.count++;
                     }
                         
-                    rres.chunks = (rresChunk *)RRES_MALLOC(rres.count*sizeof(rresChunk));   // Load as many rres slots as required
-                    fseek(rresFile, currentResPosition, SEEK_SET);              // Return to first resource position
+                    rres.chunks = (rresDataChunk *)RRES_CALLOC(rres.count, sizeof(rresDataChunk));   // Load as many rres slots as required
+                    fseek(rresFile, currentResPosition, SEEK_SET);              // Return to first resource chunk position
                     
-                    if (rres.count > 1) TRACELOG(LOG_INFO, "[%s][ID %i] Multiple related resources detected: %i resources", fileName, (int)info.id, *count);
+                    if (rres.count > 1) TRACELOG(LOG_INFO, "[%s][ID %i] Multiple resource chunks detected: %i chunks", fileName, (int)info.id, *count);
 
                     int i = 0;
                     
-                    // Load all required related resources
+                    // Load all required resource chunks
                     while (info.nextOffset != 0)
                     {
-                        void *dataChunk = RRES_MALLOC(info.compSize);
-                        fread(dataChunk, info.compSize, 1, rresFile);
+                        void *data = RRES_MALLOC(info.compSize);
+                        fread(data, info.compSize, 1, rresFile);
                         
-                        // Decompres and decrypt data if required
-                        rres.chunks[i] = rresGetDataFromChunk(info, dataChunk);
-                        RRES_FREE(dataChunk);
-                        
-                        if ((rres.chunks[i].propsCount == 0) && (rres.chunks[i].data == NULL)) TRACELOG(LOG_WARNING, "[%s][ID %i] Requested resource could not be found", fileName, rresId);
+                        // Load chunk data from raw file data
+                        // NOTE: Raw data can be compressed and encrypted,
+                        // it can also contain data properties at the beginning
+                        rres.chunks[i] = rresLoadDataChunk(info, data);
+                        RRES_FREE(data);
                         
                         fseek(rresFile, temp.nextOffset, SEEK_SET);             // Jump to next resource
                         fread(&info, sizeof(rresInfoHeader), 1, rresFile);      // Read next resource info header
@@ -397,11 +400,11 @@ rresData rresLoadData(const char *fileName, int rresId)
                         i++;
                     }                  
 
-                    break;
+                    break;      // Resource id found, stop checking the file
                 }
                 else
                 {
-                    // Skip required data to read next resource infoHeader
+                    // Skip required data size to read next resource infoHeader
                     fseek(rresFile, info.compSize, SEEK_CUR);
                 }
             }
@@ -416,11 +419,9 @@ rresData rresLoadData(const char *fileName, int rresId)
 // Unload resource data
 void rresUnloadData(rresData rres)
 {
-    for (int i = 0; i < rres.count; i++)
-    {
-        free(rres.chunks[i].props);
-        free(rres.chunks[i].data);
-    }
+    for (int i = 0; i < rres.count; i++) rresUnloadDataChunk(rres.chunks[i]);
+    
+    RRES_FREE(rres.chunks);
 }
 
 // Load central directory data
@@ -452,14 +453,14 @@ rresCentralDir rresLoadCentralDirectory(const char *fileName)
                 (info.type[2] == 'I') &&
                 (info.type[3] == 'R'))
             {
-                void *dataChunk = RRES_MALLOC(info.compSize);
-                fread(dataChunk, info.compSize, 1, rresFile);
+                void *data = RRES_MALLOC(info.compSize);
+                fread(data, info.compSize, 1, rresFile);
                 
-                rresChunk rres = rresGetDataFromChunk(info, dataChunk);
-                RRES_FREE(dataChunk);
+                rresDataChunk dataChunk = rresLoadDataChunk(info, data);
+                RRES_FREE(data);
                 
-                dir.count = rres.props[0];                      // Files count
-                dir.entries = (rresDirEntry *)rres.data;        // Files data
+                dir.count = dataChunk.props[0];                 // Files count
+                dir.entries = (rresDirEntry *)dataChunk.data;   // Files data
             }
         }
 
@@ -467,6 +468,13 @@ rresCentralDir rresLoadCentralDirectory(const char *fileName)
     }
     
     return dir;
+}
+
+void rresUnloadCentralDirectory(rresCentralDir dir)
+{
+    for (int i = 0; i < dir.count; i++) RRES_FREE(dir.entries[i].fileName);
+
+    RRES_FREE(dir.entries);
 }
 
 int rresGetIdFromFileName(rresCentralDir dir, const char *fileName)
@@ -485,43 +493,53 @@ int rresGetIdFromFileName(rresCentralDir dir, const char *fileName)
     return id;
 }
 
-rresChunk rresGetDataFromChunk(rresInfoHeader info, void *chunk)
+// Load data chunk from raw resource data as contained in file
+// NOTE: Raw data can be compressed and encrypted, it also contains the props data embedded
+static rresDataChunk rresLoadDataChunk(rresInfoHeader info, void *data)
 {
-    rresChunk rres = { 0 };
+    rresDataChunk dataChunk = { 0 };
     void *result = NULL;
 
     // Assign rres.type (int) from info.type (FOURCC)
-    if ((info.type[0] == 'R') && (info.type[0] == 'A') && (info.type[0] == 'W') && (info.type[0] == 'D')) rres.type = 1;        // RAWD
-    else if ((info.type[0] == 'T') && (info.type[0] == 'E') && (info.type[0] == 'X') && (info.type[0] == 'T')) rres.type = 2;   // TEXT
-    else if ((info.type[0] == 'I') && (info.type[0] == 'M') && (info.type[0] == 'G') && (info.type[0] == 'E')) rres.type = 3;   // IMGE
-    else if ((info.type[0] == 'W') && (info.type[0] == 'A') && (info.type[0] == 'V') && (info.type[0] == 'E')) rres.type = 4;   // WAVE
-    else if ((info.type[0] == 'V') && (info.type[0] == 'R') && (info.type[0] == 'T') && (info.type[0] == 'X')) rres.type = 5;   // VRTX
-    else if ((info.type[0] == 'F') && (info.type[0] == 'O') && (info.type[0] == 'N') && (info.type[0] == 'T')) rres.type = 10;  // FONT
-    else if ((info.type[0] == 'C') && (info.type[0] == 'H') && (info.type[0] == 'A') && (info.type[0] == 'R')) rres.type = 11;  // FCHR
-    else if ((info.type[0] == 'M') && (info.type[0] == 'E') && (info.type[0] == 'S') && (info.type[0] == 'H')) rres.type = 12;  // MESH
-    else if ((info.type[0] == 'M') && (info.type[0] == 'A') && (info.type[0] == 'T') && (info.type[0] == 'D')) rres.type = 13;  // MATD
-    else if ((info.type[0] == 'M') && (info.type[0] == 'O') && (info.type[0] == 'D') && (info.type[0] == 'L')) rres.type = 20;  // MODL
-    else if ((info.type[0] == 'C') && (info.type[0] == 'D') && (info.type[0] == 'I') && (info.type[0] == 'R')) rres.type = 100; // CDIR
+    if ((info.type[0] == 'R') && (info.type[0] == 'A') && (info.type[0] == 'W') && (info.type[0] == 'D')) dataChunk.type = 1;        // RAWD
+    else if ((info.type[0] == 'T') && (info.type[0] == 'E') && (info.type[0] == 'X') && (info.type[0] == 'T')) dataChunk.type = 2;   // TEXT
+    else if ((info.type[0] == 'I') && (info.type[0] == 'M') && (info.type[0] == 'G') && (info.type[0] == 'E')) dataChunk.type = 3;   // IMGE
+    else if ((info.type[0] == 'W') && (info.type[0] == 'A') && (info.type[0] == 'V') && (info.type[0] == 'E')) dataChunk.type = 4;   // WAVE
+    else if ((info.type[0] == 'V') && (info.type[0] == 'R') && (info.type[0] == 'T') && (info.type[0] == 'X')) dataChunk.type = 5;   // VRTX
+    else if ((info.type[0] == 'F') && (info.type[0] == 'O') && (info.type[0] == 'N') && (info.type[0] == 'T')) dataChunk.type = 10;  // FONT
+    else if ((info.type[0] == 'C') && (info.type[0] == 'H') && (info.type[0] == 'A') && (info.type[0] == 'R')) dataChunk.type = 11;  // FCHR
+    else if ((info.type[0] == 'M') && (info.type[0] == 'E') && (info.type[0] == 'S') && (info.type[0] == 'H')) dataChunk.type = 12;  // MESH
+    else if ((info.type[0] == 'M') && (info.type[0] == 'A') && (info.type[0] == 'T') && (info.type[0] == 'D')) dataChunk.type = 13;  // MATD
+    else if ((info.type[0] == 'M') && (info.type[0] == 'O') && (info.type[0] == 'D') && (info.type[0] == 'L')) dataChunk.type = 20;  // MODL
+    else if ((info.type[0] == 'C') && (info.type[0] == 'D') && (info.type[0] == 'I') && (info.type[0] == 'R')) dataChunk.type = 100; // CDIR
 
     // Decompress and decrypt [properties + data] chunk
     // TODO: Support multiple compression/encryption types
-    if (info.compType == RRES_COMP_NONE) result = chunk;
-    //else if (info.compType == RRES_COMP_DEFLATE) result = DecompressDEFLATE(chunk, info.compSize, info.uncompSize);   // TODO.
+    if (info.compType == RRES_COMP_NONE)
+    {
+        result = RRES_MALLOC(info.compSize);
+        memcpy(result, data, info.compSize);
+    }
+    else if (info.compType == RRES_COMP_DEFLATE)
+    {
+        //result = DecompressDEFLATE(data, info.compSize, info.uncompSize);   // TODO.
+    }
 
+    // CRC32 data validation
     int crc32 = rresComputeCRC32(result, info.uncompSize);
     
     if (crc32 == info.crc32)    // Check CRC32
     {
-        rres.propsCount = ((int *)result)[0];
+        dataChunk.propsCount = ((int *)result)[0];
         
-        if (rres.propsCount > 0)
+        if (dataChunk.propsCount > 0)
         {
-            rres.props = (int *)RRES_MALLOC(rres.propsCount*sizeof(int));
-            for (int i = 0; i < rres.propsCount; i++) rres.props[i] = ((int *)result)[1 + i];
+            dataChunk.props = (int *)RRES_MALLOC(dataChunk.propsCount*sizeof(int));
+            for (int i = 0; i < dataChunk.propsCount; i++) dataChunk.props[i] = ((int *)result)[1 + i];
         }
     
-        rres.data = RRES_MALLOC(info.uncompSize);
-        memcpy(rres.data, ((unsigned char *)result) + (rres.propsCount*sizeof(int)), info.uncompSize);
+        dataChunk.data = RRES_MALLOC(info.uncompSize);
+        memcpy(dataChunk.data, ((unsigned char *)result) + (dataChunk.propsCount*sizeof(int)), info.uncompSize);
     }
     else 
     {
@@ -529,7 +547,14 @@ rresChunk rresGetDataFromChunk(rresInfoHeader info, void *chunk)
         if (info.compType == RRES_COMP_DEFLATE) RRES_FREE(result);
     }
 
-    return rres;
+    return dataChunk;
+}
+
+// Unload data chunk
+static void rresUnloadDataChunk(rresDataChunk chunk)
+{
+    RRES_FREE(props);   // Resource chunk properties
+    RRES_FREE(data);    // Resource chunk data
 }
 
 /*
@@ -557,7 +582,7 @@ rresDEF void rresInit(const char *fileName)
 }
 
 // Add additional resource to existing rres file
-rresDEF void rresAppend(const char *fileName, rresChunk data)
+rresDEF void rresAppend(const char *fileName, rresDataChunk data)
 {
     // TODO: Append resource to file
 }
@@ -815,13 +840,13 @@ static unsigned int rresComputeCRC32(unsigned char *buffer, int len)
     return ~crc;
 }
 
-// Get rres hash id
-int rresGetHashId(const char *fileName)
+// Compute rres data chunk hash id from filename
+unsigned int rresComputeHashId(const char *fileName)
 {
-    int hash = 0;
-    int length = strlen(fileName);
+    unsigned int hash = 0;
+    unsigned int length = strlen(fileName);
     
-    for (int i = 0; i < length; i++) hash = hash*31 + (int)fileName[i];
+    for (unsigned int i = 0; i < length; i++) hash = hash*31 + (unsigned int)fileName[i];
     
     return hash;
 }
