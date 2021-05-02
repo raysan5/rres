@@ -135,7 +135,7 @@ typedef enum {
                                 //          rres[1]: RRES_DATA_IMAGE
                                 //          rres[2]: RRES_DATA_CHARS (optional)
     RRES_DATA_CHARS     = 11,   // [CHRS] Multiple chunks:
-                                //          rres[0]: props[0]:charsCount | data: -
+                                //          rres[0]: props[0]:glyphsCount | data: -
                                 //          {
                                 //              rres[n]: props[0]:value, props[1]:offsetX, props[2]:offsetY, props[3]:advanceX | data: -
                                 //              rres[n+1]: RRES_DATA_IMAGE
