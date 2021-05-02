@@ -125,31 +125,32 @@ typedef struct {
 // rres resource data type
 // NOTE: Data type determines the proporties and the data included in every chunk
 typedef enum {
+    // Basic chunks
     RRES_DATA_RAW       = 1,    // [RAWD] Single chunk: rres[0]: props[0]:size | data: raw bytes
-    RRES_DATA_TEXT      = 2,    // [TEXT] Single chunk: rres[0]: props[0]:size, props[1]:cultureCode | data: text (utf8)
+    RRES_DATA_TEXT      = 2,    // [TEXT] Single chunk: rres[0]: props[0]:size, props[1]:cultureCode | data: text
     RRES_DATA_IMAGE     = 3,    // [IMGE] Single chunk: rres[0]: props[0]:width, props[1]:height, props[2]:mipmaps, props[3]:rresPixelFormat | data: pixels
     RRES_DATA_WAVE      = 4,    // [WAVE] Single chunk: rres[0]: props[0]:sampleCount, props[1]:sampleRate, props[2]:sampleSize, props[3]:channels | data: samples
     RRES_DATA_VERTEX    = 5,    // [VRTX] Single chunk: rres[0]: props[0]:vertexCount, props[1]:rresVertexAttribute, props[2]:rresVertexFormat | data: vertex
+    RRES_DATA_CHARS     = 11,   // [CHRS] Single chunk: rres[0]: props[0]:glyphsCount, props[1+4*i]:charsInfo[0..glyphsCount] | data: -
+                                //                               > charsInfo[i]: { value, offsetX, offsetY, advanceX }
+    // Complex chunks
     RRES_DATA_FONT      = 10,   // [FONT] Multiple chunks:
-                                //          rres[0]: props[0]:baseSize, props[1]:glyphsCount, props[2]:glyphsPadding, props[3+n]:recs | data: -
+                                //          rres[0]: props[0]:baseSize, props[1]:glyphsCount, props[2]:glyphsPadding, props[3+4*i]:atlasRecs[0..glyphsCount] | data: -
+                                //                   > atlasRecs[i]: { x, y, width, height } 
                                 //          rres[1]: RRES_DATA_IMAGE
                                 //          rres[2]: RRES_DATA_CHARS (optional)
-    RRES_DATA_CHARS     = 11,   // [CHRS] Multiple chunks:
-                                //          rres[0]: props[0]:glyphsCount | data: -
-                                //          {
-                                //              rres[n]: props[0]:value, props[1]:offsetX, props[2]:offsetY, props[3]:advanceX | data: -
-                                //              rres[n+1]: RRES_DATA_IMAGE
-                                //          }
     RRES_DATA_MESH      = 12,   // [MESH] Multiple chunks:
                                 //          rres[0]: props[0]:vertexBuffersCount | data: -
                                 //          {
-                                //              rres[n]: RRES_DATA_VERTEX
+                                //              rres[1+i]: RRES_DATA_VERTEX
                                 //          }
-    RRES_DATA_MATERIAL  = 13,   // [MATD] Multiple chunks:
+    RRES_DATA_MATMAP    = 13,   // [MMAP] Multiple chunks:
+                                //          rres[0]: props[0]:color, props[1]:value | data: -
+                                //          rres[1]: RRES_DATA_IMAGE
+    RRES_DATA_MATERIAL  = 14,   // [MATR] Multiple chunks:
                                 //          rres[0]: props[0]:mapsCount, props[1]:params | data: -
                                 //          {
-                                //              rres[n]: props[0]:color, props[1]:value | data: -
-                                //              rres[n+1]: RRES_DATA_IMAGE
+                                //              rres[1+2*i]: RRES_DATA_MATMAP
                                 //          }
     RRES_DATA_MODEL     = 20,   // [MODL] Multiple chunks:
                                 //          rres[0]: props[0]:meshCount, props[1]:materialCount, props[2+n]:transform, props[18+m]:meshMaterial | data: -
@@ -557,244 +558,9 @@ static void rresUnloadDataChunk(rresDataChunk chunk)
     RRES_FREE(chunk.data);    // Resource chunk data
 }
 
-/*
-// Init rres resource file (write file header)
-rresDEF void rresInit(const char *fileName)
-{
-    FILE *rresFile = fopen(fileName, "rb");
-
-    if (rresFile == NULL) TRACELOG(LOG_WARNING, "[%s] rres file could not be opened", fileName);
-    else
-    {
-        rresFileHeader header = { 0 };
-        fileHeader.id[0] = 'r';
-        fileHeader.id[1] = 'R';
-        fileHeader.id[2] = 'E';
-        fileHeader.id[3] = 'S';
-        fileHeader.version = 100;
-        fileHeader.count = 1;
-
-        // Write rres file header into file
-        fwrite(&fileHeader, sizeof(rresFileHeader), 1, rresFile);
-    }
-
-    fclose(rresFile);
-}
-
-// Add additional resource to existing rres file
-rresDEF void rresAppend(const char *fileName, rresDataChunk data)
-{
-    // TODO: Append resource to file
-}
-*/
-
 //----------------------------------------------------------------------------------
 // Module specific Functions Definition
 //----------------------------------------------------------------------------------
-
-/*
-// Data decompression (using DEFLATE, tinfl library)
-// NOTE: Allocated data MUST be freed by user
-static unsigned char *DecompressDEFLATE(const unsigned char *data, unsigned long compSize, int uncompSize)
-{
-    int tempUncompSize;
-    void *uncompData;
-
-    // Allocate buffer to hold decompressed data
-    uncompData = (mz_uint8 *)RRES_MALLOC((size_t)uncompSize);
-
-    // Check correct memory allocation
-    if (uncompData == NULL)
-    {
-        TRACELOG(LOG_WARNING, "Out of memory while decompressing data");
-    }
-    else
-    {
-        // Decompress data
-        tempUncompSize = tinfl_decompress_mem_to_mem(uncompData, (size_t)uncompSize, data, compSize, 1);
-
-        if (tempUncompSize == -1)
-        {
-            TRACELOG(LOG_WARNING, "Data decompression failed");
-            RRES_FREE(uncompData);
-        }
-
-        if (uncompSize != tempUncompSize)
-        {
-            TRACELOG(LOG_WARNING, "Expected uncompressed size do not match, data may be corrupted");
-            TRACELOG(LOG_WARNING, " -- Expected uncompressed size: %i", uncompSize);
-            TRACELOG(LOG_WARNING, " -- Returned uncompressed size: %i", tempUncompSize);
-        }
-
-        TRACELOG(LOG_INFO, "Data decompressed successfully from %u bytes to %u bytes", (mz_uint32)compSize, (mz_uint32)tempUncompSize);
-    }
-
-    return uncompData;
-}
-*/
-/*
-#if defined(SUPPORT_LIBRARY_MINIZ)
-// Data compression (using DEFLATE, miniz library)
-// NOTE: Allocated data MUST be freed!
-static unsigned char *CompressDEFLATE(const unsigned char *data, unsigned long uncompSize, unsigned long *outCompSize)
-{
-    int compStatus;
-    unsigned long tempCompSize = compressBound(uncompSize);
-    unsigned char *pComp;
-
-    // Allocate buffer to hold compressed data
-    pComp = (mz_uint8 *)malloc((size_t)tempCompSize);
-
-    TRACELOG(LOG_INFO, "Compression space reserved: %i\n", tempCompSize);
-
-    // Check correct memory allocation
-    if (!pComp)
-    {
-        TRACELOG(LOG_INFO, "Out of memory!\n");
-        return NULL;
-    }
-
-    // Compress data
-    compStatus = compress(pComp, &tempCompSize, (const unsigned char *)data, uncompSize);
-
-    // Check compression success
-    if (compStatus != Z_OK)
-    {
-        TRACELOG(LOG_INFO, "Compression failed!\n");
-        free(pComp);
-        return NULL;
-    }
-
-    TRACELOG(LOG_INFO, "Compressed from %u bytes to %u bytes\n", (mz_uint32)uncompSize, (mz_uint32)tempCompSize);
-
-    if (tempCompSize > uncompSize) TRACELOG(LOG_INFO, "WARNING: Compressed data is larger than uncompressed data!!!\n");
-
-    *outCompSize = tempCompSize;
-
-    return pComp;
-}
-
-// Data decompression (using DEFLATE, miniz library)
-// NOTE: Allocated data MUST be freed!
-static unsigned char *DecompressDEFLATE(const unsigned char *data, unsigned long compSize, int uncompSize)
-{
-    int decompStatus;
-    unsigned long tempUncompSize;
-    unsigned char *pUncomp;
-
-    // Allocate buffer to hold decompressed data
-    pUncomp = (mz_uint8 *)malloc((size_t)uncompSize);
-
-    // Check correct memory allocation
-    if (!pUncomp)
-    {
-        TRACELOG(LOG_INFO, "Out of memory!\n");
-        return NULL;
-    }
-
-    // Decompress data
-    decompStatus = uncompress(pUncomp, &tempUncompSize, data, compSize);
-
-    if (decompStatus != Z_OK)
-    {
-        TRACELOG(LOG_INFO, "Decompression failed!\n");
-        free(pUncomp);
-        return NULL;
-    }
-
-    if (uncompSize != (int)tempUncompSize)
-    {
-        TRACELOG(LOG_INFO, "WARNING! Expected uncompressed size do not match! Data may be corrupted!\n");
-        TRACELOG(LOG_INFO, " -- Expected uncompressed size: %i\n", uncompSize);
-        TRACELOG(LOG_INFO, " -- Returned uncompressed size: %i\n", tempUncompSize);
-    }
-
-    TRACELOG(LOG_INFO, "Decompressed from %u bytes to %u bytes\n", (mz_uint32)compSize, (mz_uint32)tempUncompSize);
-
-    return pUncomp;
-}
-#endif
-
-// Data compression data (custom RLE algorythm)
-static unsigned char *CompressDataRLE(const unsigned char *data, unsigned int uncompSize, unsigned int *outCompSize)
-{
-    unsigned char *compData = (unsigned char *)malloc(uncompSize * 2 * sizeof(unsigned char));    // NOTE: We allocate some initial space to store compresed data,
-    // hopefully, it will be < uncompSize but in the worst possible case it could be 2 * uncompSize, so we allocate that space just in case...
-
-    TRACELOG(LOG_INFO, "Compresed data array allocated! Size: %i\n", uncompSize * 2);
-
-    unsigned char count = 1;
-    unsigned char currentValue, nextValue;
-
-    int j = 0;
-
-    currentValue = data[0];
-
-    TRACELOG(LOG_INFO, "First initial value: %i\n", currentValue);
-    //getchar();
-
-    for (int i = 1; i < uncompSize; i++)
-    {
-        nextValue = data[i];
-
-        if (currentValue == nextValue)
-        {
-            if (count == 255)
-            {
-                compData[j] = count;
-                compData[j + 1] = currentValue;
-
-                j += 2;
-                count = 1;
-            }
-            else count++;
-        }
-        else
-        {
-            compData[j] = count;
-            compData[j + 1] = currentValue;
-
-            //TRACELOG(LOG_INFO, "Data stored Value-Count: %i - %i\n", currentValue, count);
-
-            j += 2;
-            count = 1;
-
-            currentValue = nextValue;
-        }
-    }
-
-    compData[j] = count;
-    compData[j + 1] = currentValue;
-    j += 2;
-
-    TRACELOG(LOG_INFO, "Data stored Value-Count: %i - %i\n", currentValue, count);
-
-    compData[j] = 0;    // Just to indicate the end of data
-                        // NOTE: Array lenght will be j
-
-    TRACELOG(LOG_INFO, "Data compressed!\n");
-
-    // Resize memory block with realloc
-    compData = (unsigned char *)realloc(compData, j * sizeof(unsigned char));
-
-    if (compData == NULL)
-    {
-        TRACELOG(LOG_INFO, "Error reallocating memory!");
-
-        free(compData);    // Free the initial memory block
-    }
-
-    // REMEMBER: compData must be freed!
-
-    //unsigned char *outData = (unsigned char *)malloc((j+1) * sizeof(unsigned char));
-
-    //for (int i = 0; i < (j+1); i++) outData[i] = compData[i];
-
-    *outCompSize = (j + 1);  // New array of compressed data lenght
-
-    return compData;    // REMEMBER! This memory should be freed!
-}
-*/
 // Compute CRC32
 static unsigned int rresComputeCRC32(unsigned char *buffer, int len)
 {
