@@ -45,7 +45,7 @@
 // Module Functions Declaration
 //----------------------------------------------------------------------------------
 
-RRESDEF char *rresLoadRaw(rresData rres, int *size);
+RRESDEF void *rresLoadRaw(rresData rres, int *size);
 RRESDEF char *rresLoadText(rresData rres);
 RRESDEF Image rresLoadImage(rresData rres);
 RRESDEF Wave rresLoadWave(rresData rres);
@@ -53,8 +53,6 @@ RRESDEF Font rresLoadFont(rresData rres);
 RRESDEF Mesh rresLoadMesh(rresData rres);
 RRESDEF Material rresLoadMaterial(rresData rres);
 RRESDEF Model rresLoadModel(rresData rres);
-//RRESDEF ModelAnimation LoadModelAnimationFromRRES(rresChunk *rres, int count);
-
 
 #endif // RRES_RAYLIB_H
 
@@ -82,19 +80,31 @@ RRESDEF Model rresLoadModel(rresData rres);
 //...
 
 //----------------------------------------------------------------------------------
+// Module specific Functions Declaration
+//----------------------------------------------------------------------------------
+
+// Load simple data chunks that are later required by multi-chunk resources
+
+static void *rresLoadDataChunkRaw(rresDataChunk chunk);         // Load chunk: RRES_DATA_RAW
+static char *rresLoadDataChunkText(rresDataChunk chunk);        // Load chunk: RRES_DATA_TEXT
+static Image rresLoadDataChunkImage(rresDataChunk chunk);       // Load chunk: RRES_DATA_IMAGE
+static Wave rresLoadDataChunkWave(rresDataChunk chunk);         // Load chunk: RRES_DATA_WAVE
+static void *rresLoadDataChunkVertex(rresDataChunk chunk);      // Load chunk: RRES_DATA_VERTEX
+static CharInfo *rresLoadDataChunkChars(rresDataChunk chunk);   // Load chunk: RRES_DATA_CHARS (multi)
+//static Mesh *rresLoadDataChunkMesh(rresDataChunk chunk);        // Load chunk: RRES_DATA_MESH (multi)
+
+
+//----------------------------------------------------------------------------------
 // Module Functions Definition
 //----------------------------------------------------------------------------------
 
-// QUESTION: How to load each type of data from RRES -> Custom implementations (library dependant)
-
-char *rresLoadRaw(rresData rres, int *size)
+void *rresLoadRaw(rresData rres, int *size)
 {
-    char *data = NULL;
+    void *data = NULL;
     
     if ((rres.count >= 1) && (rres.chunks[0].type == RRES_DATA_RAW))
     {
-        data = (char *)RRES_MALLOC(rres.chunks[0].props[0]);
-        memcpy(data, rres.chunks[0].data, rres.chunks[0].props[0]);
+        data = rresLoadDataChunkRaw(rres.chunks[0]);
     }
 
     return data;
@@ -107,7 +117,7 @@ char *rresLoadText(rresData rres)
     
     if ((rres.count >= 1) && (rres.chunks[0].type == RRES_DATA_TEXT))
     {
-        text = (char *)RRES_MALLOC(rres.chunks[0].props[0]);
+        text = (char *)RL_MALLOC(rres.chunks[0].props[0]);
         memcpy(text, rres.chunks[0].data, rres.chunks[0].props[0]);
     }
 
@@ -123,10 +133,16 @@ Image rresLoadImage(rresData rres)
         image.width = rres.chunks[0].props[0];
         image.height = rres.chunks[0].props[1];
         image.mipmaps = rres.chunks[0].props[2];
-        image.format =  rres.chunks[0].props[3];
+        
+        // WARNING: rresPixelFormat enum matches raylib PixelFormat enum values
+        image.format = rres.chunks[0].props[3];
 
-        // data size?
-        //memcpy(image.data, data.chunks[0].data, data.chunks[0].props[0]);   
+        // NOTE: Image data size can computed from image properties
+        unsigned int size = GetPixelDataSize(image.width, image.height, image.format);
+        image.data = RL_MALLOC(size);
+        memcpy(image.data, data.chunks[0].data, size);
+        
+        // TODO: Consider mipmaps data!
     }
     
     return image;
@@ -143,8 +159,11 @@ Wave rresLoadWave(rresData rres)
         wave.sampleSize = rres.chunks[0].props[2];
         wave.channels = rres.chunks[0].props[3];
         
-        // data size?
-        //memcpy(wave.data, data.chunks[0].data, data.chunks[0].props[0]);   
+        props[0]:sampleCount, props[1]:sampleRate, props[2]:sampleSize, props[3]:channels
+        
+        unsigned int size = sampleCount*sampleSize/8;
+        wave.data = RL_MALLOC(size);
+        memcpy(wave.data, data.chunks[0].data, size);   
     }
     
     return wave;
@@ -154,13 +173,33 @@ Font rresLoadFont(rresData rres)
 {
     Font font = { 0 };
 
-    // To load a Font we expect at least 2 resource data packages
+    // Font resource could consist of several chunks:
+    //  - RRES_DATA_FONT: Basic font properties, no data
+    //  - RRES_DATA_IMAGE: Image atlas for the font characters
+    //  - RRES_DATA_CHARS: Font glyphs information (optional)
     if (rres.count >= 2)
     {
         if (rres.chunks[0].type == RRES_DATA_FONT)
         {
-            // TODO: Load font basic properties from chunk[0]
+            // Load font basic properties from chunk[0]
+            font.baseSize = rres.chunks[0].props[0];           // Base size (default chars height)
+            font.charsCount = rres.chunks[0].props[1];         // Number of characters (glyphs)
+            font.charsPadding = rres.chunks[0].props[2];       // Padding around the chars
             
+            // Font rectangle properties come as individual properties
+            font.recs = (Rectangle *)RRES_MALLOC(font.charsCount*sizeof(Rectangle));
+            
+            for (int i = 0; i < font.charsCount; i++)
+            {
+                font.recs[i].x = (float)rres.chunks[0].props[3 + i*4];
+                font.recs[i].y = (float)rres.chunks[0].props[3 + i*4 + 1];
+                font.recs[i].width = (float)rres.chunks[0].props[3 + i*4 + 2];
+                font.recs[i].height = (float)rres.chunks[0].props[3 + i*4 + 3];
+            }
+            
+            // NOTE: RRES_DATA_FONT chunk does not contain data (chunks[0].data == NULL) 
+            
+            // Load font image chunk
             if (rres.chunks[1].type == RRES_DATA_IMAGE)
             {
                 Image image = { 0 };
@@ -169,30 +208,28 @@ Font rresLoadFont(rresData rres)
                 image.height = rres.chunks[1].props[1];
                 image.mipmaps = rres.chunks[1].props[2];
                 image.format =  rres.chunks[1].props[3];
-                //memcpy(image.data, data.chunks[0].data, data.chunks[0].props[0]);   
                 
+                unsigned int size = GetPixelDataSize(image.width, image.height, image.format);
+                image.data = RL_MALLOC(size);
+                memcpy(image.data, data.chunks[0].data, size);
                 font.texture = LoadTextureFromImage(image);
-                
                 UnloadImage(image);
+                
+                // TODO: Consider the case there is no RRES_DATA_CHARS?
+                //LoadFontFromImage(image, Color key, int firstChar);
             }
             
+            // Load font chars info chunk
             if ((rres.count >= 3) && (rres.chunks[2].type == RRES_DATA_CHARS))
             {
-                // TODO: Load font.chars data
-                font.charsCount = rres.chunks[2].props[0];
-                font.baseSize = rres.chunks[2].props[1];
-                
-                // Font rectangle properties come as individual properties
-                font.recs = (Rectangle *)RRES_MALLOC(font.charsCount*sizeof(Rectangle));
-                
-                for (int i = 0; i < font.charsCount; i++)
+                // TODO: Maybe that's not the best way to store chars data...
+                /*
+                rres[0]: props[0]:charsCount | data: -
                 {
-                    font.recs[i].x = (float)rres.chunks[2].props[2 + i*4];
-                    font.recs[i].y = (float)rres.chunks[2].props[2 + i*4 + 1];
-                    font.recs[i].width = (float)rres.chunks[2].props[2 + i*4 + 2];
-                    font.recs[i].height = (float)rres.chunks[2].props[2 + i*4 + 3];
+                    rres[n]: props[0]:value, props[1]:offsetX, props[2]:offsetY, props[3]:advanceX | data: -
+                    rres[n+1]: RRES_DATA_IMAGE
                 }
-                
+                */
                 font.chars = (CharInfo *)rres.chunks[2].data;
             }
         }
@@ -231,4 +268,57 @@ Mesh rresLoadMesh(rresData rres)
     
     return mesh;
 }
+
+//----------------------------------------------------------------------------------
+// Module specific Functions Definition
+//----------------------------------------------------------------------------------
+
+// Load data chunk: RRES_DATA_RAW
+static void *rresLoadDataChunkRaw(rresDataChunk chunk)
+{
+    void *rawData = NULL;
+    
+    if (chunk.type == RRES_DATA_RAW)
+    {
+        rawData = (char *)RL_MALLOC(chunks.props[0]);
+        memcpy(rawData, chunk.data, chunk.props[0]);
+    }
+    
+    return rawData;
+}
+
+// Load data chunk: RRES_DATA_TEXT
+static char *rresLoadDataChunkText(rresDataChunk chunk)
+{
+    
+}
+
+// Load data chunk: RRES_DATA_IMAGE
+static Image rresLoadDataChunkImage(rresDataChunk chunk)
+{
+    
+}
+
+// Load data chunk: RRES_DATA_WAVE
+static Wave rresLoadDataChunkWave(rresDataChunk chunk)
+{
+    
+    
+}
+
+// Load data chunk: RRES_DATA_VERTEX
+static void *rresLoadDataChunkVertex(rresDataChunk chunk)
+{
+    
+}
+
+// Load data chunk: RRES_DATA_CHARS (multi)
+static CharInfo *rresLoadDataChunkChars(rresDataChunk chunk)
+{
+    
+}
+
+// Load data chunk: RRES_DATA_MESH (multi)
+//static Mesh *rresLoadDataChunkMesh(rresDataChunk chunk);
+
 #endif // RRES_RAYLIB_IMPLEMENTATION
