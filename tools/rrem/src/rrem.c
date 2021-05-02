@@ -71,6 +71,7 @@
 #include <stdio.h>                      // Required for:
 #include <string.h>                     // Required for: strlen(), strrchr(), strcmp()
 
+#define MAX_RESOURCES       512
 
 //----------------------------------------------------------------------------------
 // Defines and Macros
@@ -85,24 +86,27 @@ bool __stdcall FreeConsole(void);       // Close console from code (kernel32.lib
 
 // Loaded resource file required info
 typedef struct {
-    int id;
+    int hashId;         // Id no customId provided uses hashId
+    int customId;
     int type;
     int compType;
     int crypType;
     bool forceRaw;
-    int forcedId;
-    unsigned char fileName[512];
-} ResFileInfo;
+    
+    // Central directory data
+    int fileNameLength;
+    char *fileName;
+} FileInfo;
 
 //----------------------------------------------------------------------------------
 // Global variables
 //----------------------------------------------------------------------------------
 static const char *toolName = "rREM";
 static const char *toolVersion = "1.0";
-static const char *toolDescription = "A simple and easy-to-use resource packer and embedder";
+static const char *toolDescription = "A simple and easy-to-use rres resources packer";
 
-static ResFileInfo resources[512] = { 0 };
-static unsigned int resCount = 0;
+static FileInfo resources[MAX_RESOURCES] = { 0 };
+static unsigned int fileCount = 0;
 static unsigned int prevResCount = 0;
 
 static bool saveCentralDir = true;
@@ -117,48 +121,9 @@ static char outFileName[512] = { 0 };      // Output file name (required for fil
 static void ShowCommandLineInfo(void);                      // Show command line usage info
 static void ProcessCommandLine(int argc, char *argv[]);     // Process command line input
 
-//static int GetRRESFileType(const char *ext);
-//static void GenRRESHeaderFile(const char *rresHeaderName, RRES *resources, int resCount);
-//static void GenRRESObjectFile(const char *rresFileName);
-//static int GenerateUniqueRRESId(void);
-
+static int GetFileType(const char *fileName);               // Get rres file type from fileName extension
 static void GenerateRRES(const char *fileName);             // Process all required files data and generate .rres
 
-// List all files in a directory tree recursively
-static int ScanDirectoryTreeFiles(const char *name)
-{
-    DIR *dir;
-    struct dirent *entry;
-    int filesCount = 0;
-
-    if (!(dir = opendir(name))) return 0;
-
-    while ((entry = readdir(dir)) != NULL)
-    {
-        if ((strcmp(entry->d_name, ".") != 0) && 
-            (strcmp(entry->d_name, "..") != 0))
-        {
-            char path[1024] = { 0 };
-            snprintf(path, sizeof(path), "%s/%s", name, entry->d_name);
-
-            // print only files, no directories
-            if (!DirectoryExists(path)) 
-            {
-                strcpy(resources[resCount].fileName, path);
-                filesCount++;
-                resCount++;
-            }
-            
-            filesCount += ScanDirectoryTreeFiles(path);
-        }
-    }
-    
-    //printf("Total files: %i\n", filesCount);
-
-    closedir(dir);
-    
-    return filesCount;
-}
 
 //------------------------------------------------------------------------------------
 // Program main entry point
@@ -218,34 +183,37 @@ int main(int argc, char *argv[])
             for (int i = 0; i < dropsCount; i++)
             {
                 // Check if dropped file is a directory and scan it
-                if (DirectoryExists(droppedFiles[i])) ScanDirectoryTreeFiles(droppedFiles[i]);
+                if (DirectoryExists(droppedFiles[i])) 
+                {
+                    // TODO: ScanDirectoryTreeFiles(droppedFiles[i]);
+                }
                 else 
                 {
-                    strcpy(resources[resCount].fileName, droppedFiles[i]);
+                    strcpy(resources[fileCount].fileName, droppedFiles[i]);
                     
-                    resCount++;
-                    if (resCount >= 512) break;
+                    fileCount++;
+                    if (fileCount >= MAX_RESOURCES) break;
                 }
             }
 
             ClearDroppedFiles();
             
             // Review new files types added to list
-            if (resCount > prevResCount)
+            if (fileCount > prevResCount)
             {
-                for (int i = prevResCount; i < resCount; i++)
+                for (int i = prevResCount; i < fileCount; i++)
                 {
-                    if (IsFileExtension(resources[i].fileName, ".png;.bmp;.tga;.gif;.jpg;.psd;.hdr;.dds;.pkm;.ktx;.pvr;.astc")) resources[i].type = RRES_TYPE_IMAGE;
-                    else if (IsFileExtension(resources[i].fileName, ".txt;.vs;.fs;.info;.c;.h;.json;.xml")) resources[i].type = RRES_TYPE_TEXT;
-                    else if (IsFileExtension(resources[i].fileName, ".obj;.iqm;.gltf")) resources[i].type = RRES_TYPE_MESH;
-                    else if (IsFileExtension(resources[i].fileName, ".wav")) resources[i].type = RRES_TYPE_WAVE;
-                    else if (IsFileExtension(resources[i].fileName, ".fnt")) resources[i].type = RRES_TYPE_FONT;
-                    else if (IsFileExtension(resources[i].fileName, ".mtl")) resources[i].type = RRES_TYPE_MATERIAL;
-                    else resources[i].type = RRES_TYPE_RAWFILE;
+                    if (IsFileExtension(resources[i].fileName, ".png;.bmp;.tga;.gif;.jpg;.psd;.hdr;.dds;.pkm;.ktx;.pvr;.astc")) resources[i].type = RRES_DATA_IMAGE;
+                    else if (IsFileExtension(resources[i].fileName, ".txt;.vs;.fs;.info;.c;.h;.json;.xml")) resources[i].type = RRES_DATA_TEXT;
+                    else if (IsFileExtension(resources[i].fileName, ".obj;.iqm;.gltf")) resources[i].type = RRES_DATA_MESH;
+                    else if (IsFileExtension(resources[i].fileName, ".wav")) resources[i].type = RRES_DATA_WAVE;
+                    else if (IsFileExtension(resources[i].fileName, ".fnt")) resources[i].type = RRES_DATA_FONT;
+                    else if (IsFileExtension(resources[i].fileName, ".mtl")) resources[i].type = RRES_DATA_MATERIAL;
+                    else resources[i].type = RRES_DATA_RAW;
                 }
             }
             
-            prevResCount = resCount;
+            prevResCount = fileCount;
         }
 
         // TODO: Implement files scrolling with mouse wheel
@@ -260,12 +228,12 @@ int main(int argc, char *argv[])
 
             ClearBackground(RAYWHITE);
 
-            if (resCount == 0) DrawText("Drop your files to this window!", 100, 40, 20, DARKGRAY);
+            if (fileCount == 0) DrawText("Drop your files to this window!", 100, 40, 20, DARKGRAY);
             else
             {
                 DrawText("Dropped files:", 100, 40, 20, DARKGRAY);
 
-                for (int i = 0; i < resCount; i++)
+                for (int i = 0; i < fileCount; i++)
                 {
                     if (i%2 == 0) DrawRectangle(0, 85 + 40*i, GetScreenWidth(), 40, Fade(LIGHTGRAY, 0.5f));
                     else DrawRectangle(0, 85 + 40*i, GetScreenWidth(), 40, Fade(LIGHTGRAY, 0.3f));
@@ -273,10 +241,10 @@ int main(int argc, char *argv[])
                     DrawText(resources[i].fileName, 120, 100 + 40*i, 10, GRAY);
                 }
 
-                DrawText("Drop new files...", 100, 110 + 40*resCount, 20, DARKGRAY);
+                DrawText("Drop new files...", 100, 110 + 40*fileCount, 20, DARKGRAY);
             }
             
-            DrawText(TextFormat("%02i", resCount), 10, 10, 20, MAROON);
+            DrawText(TextFormat("%02i", fileCount), 10, 10, 20, MAROON);
             
             if (GuiButton((Rectangle){ 10, GetScreenHeight() - 50, 160, 40 }, "Generate RRES"))
             {
@@ -468,223 +436,133 @@ static void ProcessCommandLine(int argc, char *argv[])
     if (showUsageInfo) ShowCommandLineInfo();
 }
 
-static int GetRRESFileType(const char *ext)
+static int GetFileType(const char *fileName)
 {
-    int type = -1;
-/*
-    if ((strcmp(ext,"png")==0) ||
-        (strcmp(ext,"jpg")==0) ||
-        (strcmp(ext,"bmp")==0) ||
-        (strcmp(ext,"tga")==0) ||
-        (strcmp(ext,"gif")==0) ||
-        (strcmp(ext,"pic")==0) ||
-        (strcmp(ext,"psd")==0)) type = RRES_TYPE_IMAGE;         // Image
-    else if ((strcmp(ext,"txt")==0) ||
-             (strcmp(ext,"csv")==0)  ||
-             (strcmp(ext,"info")==0)  ||
-             (strcmp(ext,"md")==0)) type = RRES_TYPE_TEXT;      // Text
-    else if ((strcmp(ext,"wav")==0) ||
-             (strcmp(ext,"ogg")==0)) type = RRES_TYPE_WAVE;     // Audio
-    else if (strcmp(ext,"obj")==0) type = RRES_TYPE_MESH;       // Mesh
-    else type = RRES_TYPE_RAW;     // Unknown
-*/
+    int type = RRES_DATA_RAW;
+
+    if (IsFileExtension(fileName, ".png;.bmp;.tga;.gif;.jpg;.psd;.hdr;.dds;.pkm;.ktx;.pvr;.astc")) type = RRES_DATA_IMAGE;
+    else if (IsFileExtension(fileName, ".txt;.vs;.fs;.info;.c;.h;.json;.xml")) type = RRES_DATA_TEXT;
+    else if (IsFileExtension(fileName, ".obj;.iqm;.gltf")) type = RRES_DATA_MESH;
+    else if (IsFileExtension(fileName, ".wav")) type = RRES_DATA_WAVE;
+    else if (IsFileExtension(fileName, ".fnt")) type = RRES_DATA_FONT;
+    else if (IsFileExtension(fileName, ".mtl")) type = RRES_DATA_MATERIAL;
+
     return type;
 }
 
-// Generate C header data for resource usage
-// NOTE: Defines resource name and identifier
-static void GenRRESHeaderFile(const char *rresHeaderName, RRES *resources, int resCount)
-{
-    FILE *headerFile = fopen(rresHeaderName, "wt");
-
-    fprintf(headerFile, "#define NUM_RESOURCES %i\n\n", resCount);
-
-    char *name = NULL;
-    char *typeName = NULL;
-    char *baseFileName = NULL;
-    /*
-    for (int i = firstFileArgPos; i < argc; i++)
-    {
-        baseFileName = GetFileName(argv[i]);
-
-        int type = GetRRESFileType(GetFileExtension(argv[i]));
-
-        switch (type)
-        {
-            case 0: typeName = "IMAGE"; break;
-            case 1: typeName = "SOUND"; break;
-            case 2: typeName = "MODEL"; break;
-            case 3: typeName = "TEXT"; break;
-            case 4: typeName = "RAW"; break;
-            default: typeName = "UNKNOWN"; break;
-        }
-
-        name = GetFilenameWithoutEx(baseFileName, '.', '/');      // String should be freed manually
-
-        fprintf(headerFile, "#define RES_%s 0x%08x\t\t// Embedded as %s\n", name, resId, typeName);
-
-        resId++;
-    }
-    */
-    // free(name);
-    // free(typeName);
-    // free(baseFileName);
-
-    fclose(headerFile);
-}
-
-// Generate C object compiled file to embed in executable
-static void GenRRESObjectFile(const char *rresFileName)
-{
-    // If .o file generation is required, then we must generate a data.c file and compile it
-    // OPTION: Include tcc compiler lib in program to do not depend on external programs (that can not exist)
-
-    FILE *rresFile = fopen(rresFileName, "rb");
-    FILE *codeFile = fopen("data.c", "wt");
-
-    // Get rresFile file size
-    fseek(rresFile, 0, SEEK_END);
-    int fileSize = ftell(rresFile);
-
-    if (fileSize > (32*1024*1024)) printf("WARNING: The file you pretend to embed in the exe is larger than 32Mb!!!\n");
-
-    printf("rRES file size: %i\n", fileSize);
-
-    fprintf(codeFile, "// This file has been automatically generated by rREM - raylib Resource Embedder\n\n");
-
-    fprintf(codeFile, "const unsigned char data[%i] = {\n    ", fileSize);
-
-    unsigned char *data = (unsigned char *)malloc(fileSize);
-
-    fseek(rresFile, 0, SEEK_SET);
-    fread(data, fileSize, 1, rresFile);
-
-    int blCounter = 0;		// break line counter
-
-    for (int i = 0; i < fileSize-1; i ++)
-    {
-        blCounter++;
-
-        fprintf(codeFile, "0x%.2x, ", data[i]);
-
-        if (blCounter >= 24)
-        {
-            fprintf(codeFile, "\n    ");
-            blCounter = 0;
-        }
-    }
-
-    fprintf(codeFile, "0x%.2x };\n", data[fileSize-1]);
-
-    fclose(codeFile);
-    fclose(rresFile);
-
-    free(data);
-
-    //system("gcc -c data.c");  // Compile resource file into object file
-    //remove("data.c");         // Remove .c file
-}
-
-
 // Process all required files data and generate .rres
-static void GenerateRRES(const char *fileName)
+// WARNING: Requires global variables: resources, fileCount
+static void GenerateRRES(const char *fileName)//, FileInfo *resources, int count)
 {
+    int chunksCounter = 0;
     FILE *rresFile = fopen(fileName, "wb");
 
     if (rresFile == NULL) TRACELOG(LOG_WARNING, "[%s] rRES raylib resource file could not be opened", fileName);
     else
     {
-        RRESFileHeader header = { 0 };  // WARNING: File Header not exposed!
+        rresFileHeader header = { 0 };  // WARNING: File Header not exposed!
         header.id[0] = 'r';
         header.id[1] = 'R';
         header.id[2] = 'E';
         header.id[3] = 'S';
         header.version = 100;
-        header.resCount = resCount;
+        header.resCount = fileCount;    // WARNING: Resources chunk count is not the same as file count!
         header.cdOffset = 0;            // WARNING: This value is filled at the end (if required)
 
         // Write rres file header into file
-        fwrite(&header, sizeof(RRESFileHeader), 1, rresFile);
+        fwrite(&header, sizeof(rresFileHeader), 1, rresFile);
         
-        RRESCentralDir cdir = { 0 };
+        rresCentralDir cdir = { 0 };
         cdir.count = header.resCount;
-        cdir.entries = (RRESDirEntry *)RRES_MALLOC(cdir.count*sizeof(RRESDirEntry));
-        int resOffset = sizeof(RRESFileHeader);
+        cdir.entries = (rresDirEntry *)RRES_MALLOC(cdir.count*sizeof(rresDirEntry));
+        int resOffset = sizeof(rresFileHeader);
         int cdirSize = 0;
 
         for (int i = 0; i < header.resCount; i++)
         {
-            RRESInfoHeader info = { 0 };
+            rresInfoHeader info = { 0 };
             
-            if (IsFileExtension(resources[i].fileName, ".png;.bmp;.tga;.gif;.jpg;.psd;.hdr;.dds;.pkm;.ktx;.pvr;.astc")) 
+            switch(resources[i].type)
             {
-                Image image = LoadImage(resources[i].fileName);
-                
-                RRESData *rres = (RRESData *)RRES_CALLOC(sizeof(RRESData), 1);
-                rres->propsCount = 4;
-                rres->props = (int *)RRES_MALLOC(rres->propsCount*sizeof(int));
-                rres->props[0] = image.width;
-                rres->props[1] = image.height;
-                rres->props[2] = image.format;
-                rres->props[3] = image.mipmaps;
-                rres->data = image.data;
-                
-                strncpy(info.type, "IMGE", 4);
-                info.id = resources[i].id;    // TODO: GenUniqueRRESId();
-                info.compType = resources[i].compType;
-                info.crypType = resources[i].crypType;
-                info.flags = 0;
-                info.compSize = 0;  // Filled on compression
-                info.uncompSize = GetPixelDataSize(image.width, image.height, image.format) + rres->propsCount*sizeof(int);
-                
-                // NOTE: Depending on the type of data to package,
-                // we will need related resources offset 
-                info.nextOffset = 0;
-
-                unsigned char *dataChunk = NULL;
-                
-                // NOTE: It is better to compress before encrypting but any proven block cipher will reduce the data to 
-                // a pseudo-random sequence of bytes that will typically yield little to no compression gain at all, so,
-                // in most cases it's better to just encrypt the uncompressed data and be done with it.
-                
-                if (info.compSize == RRES_COMP_NONE) dataChunk = (((unsigned char *)rres) + 4);
-                else if (info.compSize == RRES_COMP_DEFLATE)
+                case RRES_DATA_RAW:
                 {
-                    dataChunk = CompressDEFLATE(((unsigned char *)rres) + 4, info.uncompSize, &info.compSize);
-                }
-                
-                info.crc32 = ComputeCRC32(dataChunk, info.compSize);
-                
-                // Write resource info and data
-                fwrite(&info, sizeof(RRESInfoHeader), 1, rresFile);
-                fwrite(dataChunk, info.compSize, 1, rresFile);
-                
-                // Free all loaded resources
-                if (info.compSize == RRES_COMP_DEFLATE) RRES_FREE(dataChunk);
-                RRES_FREE(rres->props);
-                RRES_FREE(rres->data);      // Unloads image.data
-                RRES_FREE(rres);
-            }
-            else if (IsFileExtension(resources[i].fileName, ".txt;.vs;.fs;.info;.c;.h;.json;.xml")) 
-            {
+                    // Save RAW file
+                } break;
+                case RRES_DATA_TEXT:
+                {
 
-            }
-            else if (IsFileExtension(resources[i].fileName, ".wav"))
-            {
+                } break;
+                case RRES_DATA_IMAGE:
+                {
+                    Image image = LoadImage(resources[i].fileName);
+                    
+                    rresDataChunk *chunk = (rresDataChunk *)RRES_CALLOC(sizeof(rresDataChunk), 1);
+                    chunk->propsCount = 4;
+                    chunk->props = (int *)RRES_MALLOC(chunk->propsCount*sizeof(int));
+                    chunk->props[0] = image.width;
+                    chunk->props[1] = image.height;
+                    chunk->props[2] = image.format;
+                    chunk->props[3] = image.mipmaps;
+                    chunk->data = image.data;
+                    
+                    strncpy(info.type, "IMGE", 4);
+                    info.id = resources[i].hashId;    // TODO: rresComputeHashId();
+                    info.compType = resources[i].compType;
+                    info.crypType = resources[i].crypType;
+                    info.flags = 0;
+                    info.compSize = 0;  // Filled on compression
+                    info.uncompSize = GetPixelDataSize(image.width, image.height, image.format) + chunk->propsCount*sizeof(int);
+                    
+                    // NOTE: Depending on the type of data to package, we will need a next chunk offset 
+                    info.nextOffset = 0;
 
-            }
-            else if (IsFileExtension(resources[i].fileName, ".fnt")) resources[i].type = RRES_TYPE_FONT;
-            else if (IsFileExtension(resources[i].fileName, ".mtl")) resources[i].type = RRES_TYPE_MATERIAL;
-            else if (IsFileExtension(resources[i].fileName, ".obj;.iqm;.gltf")) resources[i].type = RRES_TYPE_MESH;
-            else
-            {
-                // Save RAW file
+                    unsigned char *compData = NULL;
+                    
+                    // NOTE: It is better to compress before encrypting but any proven block cipher will reduce the data to 
+                    // a pseudo-random sequence of bytes that will typically yield little to no compression gain at all, so,
+                    // in most cases it's better to just encrypt the uncompressed data and be done with it.
+                    
+                    if (info.compSize == RRES_COMP_NONE) compData = (((unsigned char *)chunk) + 4);
+                    else if (info.compSize == RRES_COMP_DEFLATE)
+                    {
+                        compData = CompressData(((unsigned char *)chunk) + 4, info.uncompSize, &info.compSize);
+                    }
+                    
+                    info.crc32 = ComputeCRC32(compData, info.compSize);
+                    
+                    // Write resource info and data
+                    fwrite(&info, sizeof(rresInfoHeader), 1, rresFile);
+                    fwrite(compData, info.compSize, 1, rresFile);
+                    
+                    // Free all loaded resources
+                    if (info.compSize == RRES_COMP_DEFLATE) RRES_FREE(compData);
+                    RRES_FREE(chunk->props);
+                    RRES_FREE(chunk->data);      // Unloads image.data
+                    RRES_FREE(chunk);
+                } break;
+                case RRES_DATA_WAVE:
+                {
+
+                } break;
+                case RRES_DATA_FONT:
+                {
+                    
+                } break;
+                case RRES_DATA_MATERIAL:
+                {
+                    
+                } break;
+                case RRES_DATA_MESH:
+                {
+                    
+                } break;
+                default: break;
             }
             
-            cdir.entries[i].id = resources[i].id;       // Resource unique ID
+            cdir.entries[i].id = resources[i].hashId;   // Resource unique ID
             
             // Resource offset in file
-            resOffset += (sizeof(RRESInfoHeader) + info.compSize);
+            resOffset += (sizeof(rresInfoHeader) + info.compSize);
             cdir.entries[i].offset = resOffset;
             
             // Resource fileName info ('\0' terminated)
@@ -697,13 +575,13 @@ static void GenerateRRES(const char *fileName)
         if (saveCentralDir)
         {
             // Write rres central directory info
-            RRESData *rres = (RRESData *)RRES_CALLOC(sizeof(RRESData), 1);
-            rres->propsCount = 1;
-            rres->props = (int *)RRES_MALLOC(rres->propsCount*sizeof(int));
-            rres->props[0] = cdir.count;
-            rres->data = cdir.entries;
+            rresDataChunk *chunk = (rresDataChunk *)RRES_CALLOC(sizeof(rresDataChunk), 1);
+            chunk->propsCount = 1;
+            chunk->props = (int *)RRES_MALLOC(chunk->propsCount*sizeof(int));
+            chunk->props[0] = cdir.count;
+            chunk->data = cdir.entries;
             
-            RRESInfoHeader info = { 0 };
+            rresInfoHeader info = { 0 };
             strncpy(info.type, "CDIR", 4);
             info.id = 0;        
             info.compType = 0;
@@ -713,19 +591,19 @@ static void GenerateRRES(const char *fileName)
             info.uncompSize = cdirSize;
             info.nextOffset = 0;
 
-            unsigned char *dataChunk = NULL;
+            unsigned char *compData = NULL;
 
-            if (info.compSize == RRES_COMP_NONE) dataChunk = (((unsigned char *)rres) + 4);
+            if (info.compSize == RRES_COMP_NONE) compData = (((unsigned char *)chunk) + 4);
             
-            info.crc32 = ComputeCRC32(dataChunk, info.compSize);
+            info.crc32 = ComputeCRC32(compData, info.compSize);
             
             // Write resource info and data
-            fwrite(&info, sizeof(RRESInfoHeader), 1, rresFile);
-            fwrite(dataChunk, info.compSize, 1, rresFile);
+            fwrite(&info, sizeof(rresInfoHeader), 1, rresFile);
+            fwrite(compData, info.compSize, 1, rresFile);
             
             // Free all loaded resources
-            RRES_FREE(rres->props);
-            RRES_FREE(rres);
+            RRES_FREE(chunk->props);
+            RRES_FREE(chunk);
             
             for (int i = 0; i < header.resCount; i++) RRES_FREE(cdir.entries[i].fileName);
             RRES_FREE(cdir.entries);
@@ -734,7 +612,6 @@ static void GenerateRRES(const char *fileName)
     
     fclose(rresFile);
 }
-
 
 //--------------------------------------------------------------------
 // Auxiliar functions (utilities)
