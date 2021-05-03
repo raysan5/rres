@@ -152,62 +152,44 @@ Font rresLoadFont(rresData rres)
 {
     Font font = { 0 };
 
-    // Font resource could consist of several chunks:
-    //  - RRES_DATA_FONT: Basic font properties, no data
+    // Font resource consist of (2) chunks:
+    //  - RRES_DATA_FONT_INFO: Basic font and glyphs properties/data
     //  - RRES_DATA_IMAGE: Image atlas for the font characters
-    //  - RRES_DATA_CHARS: Font glyphs information (optional)
     if (rres.count >= 2)
     {
-        if (rres.chunks[0].type == RRES_DATA_FONT)
+        if (rres.chunks[0].type == RRES_DATA_FONT_INFO)
         {
             // Load font basic properties from chunk[0]
             font.baseSize = rres.chunks[0].props[0];           // Base size (default chars height)
             font.charsCount = rres.chunks[0].props[1];         // Number of characters (glyphs)
             font.charsPadding = rres.chunks[0].props[2];       // Padding around the chars
             
-            // Font rectangle properties come as individual properties
-            font.recs = (Rectangle *)RRES_MALLOC(font.charsCount*sizeof(Rectangle));
-            
+            font.recs = (Rectangle *)RL_MALLOC(font.charsCount*sizeof(Rectangle));
+            font.chars = (CharInfo *)RL_MALLOC(font.charsCount*sizeof(CharInfo));
+
             for (int i = 0; i < font.charsCount; i++)
             {
-                font.recs[i].x = (float)rres.chunks[0].props[3 + i*4];
-                font.recs[i].y = (float)rres.chunks[0].props[3 + i*4 + 1];
-                font.recs[i].width = (float)rres.chunks[0].props[3 + i*4 + 2];
-                font.recs[i].height = (float)rres.chunks[0].props[3 + i*4 + 3];
-            }
-            
-            // NOTE: RRES_DATA_FONT chunk does not contain data (chunks[0].data == NULL) 
-            
-            // Load font image chunk
-            if ((rres.count >= 2) && (rres.chunks[1].type == RRES_DATA_IMAGE))
-            {
-                Image image = rresLoadDataChunkImage(rres.chunks[1]);
-                font.texture = LoadTextureFromImage(image);
-                UnloadImage(image);
+                // Font glyphs info comes as a data blob
+                font.recs[i].x = (float)((rresFontGlyphsInfo *)rres.chunks[0].data)[i].x;
+                font.recs[i].y = (float)((rresFontGlyphsInfo *)rres.chunks[0].data)[i].y;
+                font.recs[i].width = (float)((rresFontGlyphsInfo *)rres.chunks[0].data)[i].width;
+                font.recs[i].height = (float)((rresFontGlyphsInfo *)rres.chunks[0].data)[i].height;
                 
-                // TODO: Consider the case there is no RRES_DATA_CHARS?
-                //LoadFontFromImage(image, Color key, int firstChar);
-            }
-            
-            // Load font chars info chunk
-            if ((rres.count >= 4) && (rres.chunks[2].type == RRES_DATA_CHARS))
-            {
-                int charsCount = rres.chunks[2].props[0];
+                font.chars[i].value = ((rresFontGlyphsInfo *)rres.chunks[0].data)[i].value;
+                font.chars[i].offsetX = ((rresFontGlyphsInfo *)rres.chunks[0].data)[i].offsetX;
+                font.chars[i].offsetY = ((rresFontGlyphsInfo *)rres.chunks[0].data)[i].offsetY;
+                font.chars[i].advanceX = ((rresFontGlyphsInfo *)rres.chunks[0].data)[i].advanceX;
                 
-                for (int i = 0; i < charsCount; i++)
-                {
-                    // Check if next char resource is available
-                    if (rres.count >= (5 + i*2))
-                    {
-                        font.chars[i].value = rres.chunks[3 + i].props[0];
-                        font.chars[i].offsetX = rres.chunks[3 + i].props[1]; 
-                        font.chars[i].offsetY = rres.chunks[3 + i].props[2]; 
-                        font.chars[i].advanceX = rres.chunks[3 + i].props[3];
-                    
-                        font.chars[i].image = rresLoadDataChunkImage(rres.chunks[3 + i + 1]);
-                    }
-                }
+                // NOTE: font.chars[i].image is not loaded
             }
+        }
+
+        // Load font image chunk
+        if (rres.chunks[1].type == RRES_DATA_IMAGE)
+        {
+            Image image = rresLoadDataChunkImage(rres.chunks[1]);
+            font.texture = LoadTextureFromImage(image);
+            UnloadImage(image);
         }
     }
 
@@ -222,6 +204,7 @@ Mesh rresLoadMesh(rresData rres)
     
     // TODO: Make sure all rres.chunks[i] vertexCount are the same?
     
+    // Mesh resource consist of (n) chunks:
     for (int i = 0; i < rres.count; i++)
     {
         if (rres.chunks[i].type == RRES_DATA_VERTEX)
@@ -250,6 +233,7 @@ Mesh rresLoadMesh(rresData rres)
 //----------------------------------------------------------------------------------
 
 // Load data chunk: RRES_DATA_RAW
+// NOTE: This chunk can be used raw files embedding or other binary blobs
 static void *rresLoadDataChunkRaw(rresDataChunk chunk)
 {
     void *rawData = NULL;
@@ -264,6 +248,7 @@ static void *rresLoadDataChunkRaw(rresDataChunk chunk)
 }
 
 // Load data chunk: RRES_DATA_TEXT
+// NOTE: This chunk can be used for shaders or other text data elements (materials?)
 static char *rresLoadDataChunkText(rresDataChunk chunk)
 {
     void *text = NULL;
@@ -278,6 +263,7 @@ static char *rresLoadDataChunkText(rresDataChunk chunk)
 }
 
 // Load data chunk: RRES_DATA_IMAGE
+// NOTE: Many data types use images data in some way (font, material...)
 static Image rresLoadDataChunkImage(rresDataChunk chunk)
 {
     Image image = { 0 };
