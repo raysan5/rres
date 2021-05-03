@@ -108,6 +108,8 @@ typedef struct {
     rresDataChunk *chunks;      // Resource chunks
 } rresData;
 
+// Specific data for some chunk types
+//----------------------------------------------------------------------
 // rres central directory entry
 typedef struct {
     int id;                     // Resource unique id
@@ -122,43 +124,38 @@ typedef struct {
     rresDirEntry *entries;      // Central directory entries 
 } rresCentralDir;
 
+// rres font glyphs info
+typedef struct {
+    int x, y, width, height;    // Glyph rectangle in the atals image
+    int value;                  // Glyph codepoint value
+    int offsetX, offsetY;       // Glyph drawing offset (from base line)
+    int advanceX;               // Glyph advance X for next character
+} rresFontGlyphsInfo;
+
+
 // rres resource data type
 // NOTE: Data type determines the proporties and the data included in every chunk
 typedef enum {
-    // Basic chunks
-    RRES_DATA_RAW       = 1,    // [RAWD] Single chunk: rres[0]: props[0]:size | data: raw bytes
-    RRES_DATA_TEXT      = 2,    // [TEXT] Single chunk: rres[0]: props[0]:size, props[1]:cultureCode | data: text
-    RRES_DATA_IMAGE     = 3,    // [IMGE] Single chunk: rres[0]: props[0]:width, props[1]:height, props[2]:mipmaps, props[3]:rresPixelFormat | data: pixels
-    RRES_DATA_WAVE      = 4,    // [WAVE] Single chunk: rres[0]: props[0]:sampleCount, props[1]:sampleRate, props[2]:sampleSize, props[3]:channels | data: samples
-    RRES_DATA_VERTEX    = 5,    // [VRTX] Single chunk: rres[0]: props[0]:vertexCount, props[1]:rresVertexAttribute, props[2]:rresVertexFormat | data: vertex
-    RRES_DATA_CHARS     = 11,   // [CHRS] Single chunk: rres[0]: props[0]:glyphsCount, props[1+4*i]:charsInfo[0..glyphsCount] | data: -
-                                //                               > charsInfo[i]: { value, offsetX, offsetY, advanceX }
-    // Complex chunks
-    RRES_DATA_FONT      = 10,   // [FONT] Multiple chunks:
-                                //          rres[0]: props[0]:baseSize, props[1]:glyphsCount, props[2]:glyphsPadding, props[3+4*i]:atlasRecs[0..glyphsCount] | data: -
-                                //                   > atlasRecs[i]: { x, y, width, height } 
-                                //          rres[1]: RRES_DATA_IMAGE
-                                //          rres[2]: RRES_DATA_CHARS (optional)
-    RRES_DATA_MESH      = 12,   // [MESH] Multiple chunks:
-                                //          rres[0]: props[0]:vertexBuffersCount | data: -
-                                //          {
-                                //              rres[1+i]: RRES_DATA_VERTEX
-                                //          }
-    RRES_DATA_MATMAP    = 13,   // [MMAP] Multiple chunks:
-                                //          rres[0]: props[0]:color, props[1]:value | data: -
-                                //          rres[1]: RRES_DATA_IMAGE
-    RRES_DATA_MATERIAL  = 14,   // [MATR] Multiple chunks:
-                                //          rres[0]: props[0]:mapsCount, props[1]:params | data: -
-                                //          {
-                                //              rres[1+2*i]: RRES_DATA_MATMAP
-                                //          }
-    RRES_DATA_MODEL     = 20,   // [MODL] Multiple chunks:
-                                //          rres[0]: props[0]:meshCount, props[1]:materialCount, props[2+n]:transform, props[18+m]:meshMaterial | data: -
-                                //          {
-                                //              rres[n]: RRES_DATA_MESH
-                                //              rres[m]: RRES_DATA_MATERIAL
-                                //          }
-    RRES_DATA_DIRECTORY = 100,  // [CDIR] Single chunk: props[0]:entryCount | data: rresDirEntry[]
+    // Basic data (one chunk)
+    //-----------------------------------------------------
+    RRES_DATA_RAW       = 1,    // [RAWD] props[0]:size | data: raw bytes
+    RRES_DATA_TEXT      = 2,    // [TEXT] props[0]:size, props[1]:cultureCode | data: text
+    RRES_DATA_IMAGE     = 3,    // [IMGE] props[0]:width, props[1]:height, props[2]:mipmaps, props[3]:rresPixelFormat | data: pixels
+    RRES_DATA_WAVE      = 4,    // [WAVE] props[0]:sampleCount, props[1]:sampleRate, props[2]:sampleSize, props[3]:channels | data: samples
+    RRES_DATA_VERTEX    = 5,    // [VRTX] props[0]:vertexCount, props[1]:rresVertexAttribute, props[2]:rresVertexFormat | data: vertex
+    RRES_DATA_FONT_INFO = 6,    // [FONT] props[0]:baseSize, props[1]:glyphsCount, props[2]:glyphsPadding | data: rresFontGlyphsInfo[0..glyphsCount]
+    RRES_DATA_DIRECTORY = 100,  // [CDIR] props[0]:entryCount | data: rresDirEntry[0..entryCount]
+    
+    // Complex data (multiple chunks)
+    //-----------------------------------------------------
+    // Font consists of (2) chunks:
+    //  - [FONT] rres[0]: RRES_DATA_FONT_INFO
+    //  - [IMGE] rres[1]: RRES_DATA_IMAGE                    
+    //
+    // Mesh consists of (n) chunks:
+    //  - [VRTX] rres[0]: RRES_DATA_VERTEX
+    //  ...
+    //  - [VRTX] rres[n]: RRES_DATA_VERTEX
 } rresDataType;
 
 //----------------------------------------------------------------------------------
@@ -317,11 +314,6 @@ typedef enum {
 //----------------------------------------------------------------------------------
 // Module specific Functions Declaration
 //----------------------------------------------------------------------------------
-// #if defined(SUPPORT_LIBRARY_MINIZ)
-// static unsigned char *CompressDEFLATE(const unsigned char *data, unsigned long uncompSize, unsigned long *outCompSize);
-// static unsigned char *DecompressDEFLATE(const unsigned char *data, unsigned long compSize, int uncompSize);
-// #endif
-
 static rresDataChunk rresLoadDataChunk(rresInfoHeader info, void *data);
 static void rresUnloadDataChunk(rresDataChunk chunk);
 
