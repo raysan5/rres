@@ -207,7 +207,7 @@ RRESDEF unsigned int rresComputeCRC32(unsigned char *buffer, int len);
 typedef struct rresFileHeader {
     unsigned char id[4];        // File identifier: rRES
     unsigned short version;     // File version and subversion
-    unsigned short resCount;    // Number of resources in this file (total)
+    unsigned short resCount;    // Number of resource chunks in this file (total)
     unsigned int cdOffset;      // Central Directory offset in file (0 if not available)
 } rresFileHeader;
 
@@ -222,7 +222,7 @@ typedef struct rresInfoHeader {
     unsigned int uncompSize;    // Data uncompressed size
     unsigned int nextOffset;    // Next resource chunk offset (if required)
     unsigned int reserved;      // <reserved>
-    unsigned int crc32;         // Data chunk CRC32 (full chunk)
+    unsigned int crc32;         // Data chunk CRC32 (propsCount + props[] + data)
 } rresInfoHeader;
 
 /*
@@ -550,10 +550,6 @@ static rresDataChunk rresLoadDataChunk(rresInfoHeader info, void *data)
     else if ((info.type[0] == 'W') && (info.type[0] == 'A') && (info.type[0] == 'V') && (info.type[0] == 'E')) dataChunk.type = 4;   // WAVE
     else if ((info.type[0] == 'V') && (info.type[0] == 'R') && (info.type[0] == 'T') && (info.type[0] == 'X')) dataChunk.type = 5;   // VRTX
     else if ((info.type[0] == 'F') && (info.type[0] == 'O') && (info.type[0] == 'N') && (info.type[0] == 'T')) dataChunk.type = 10;  // FONT
-    else if ((info.type[0] == 'C') && (info.type[0] == 'H') && (info.type[0] == 'A') && (info.type[0] == 'R')) dataChunk.type = 11;  // FCHR
-    else if ((info.type[0] == 'M') && (info.type[0] == 'E') && (info.type[0] == 'S') && (info.type[0] == 'H')) dataChunk.type = 12;  // MESH
-    else if ((info.type[0] == 'M') && (info.type[0] == 'A') && (info.type[0] == 'T') && (info.type[0] == 'D')) dataChunk.type = 13;  // MATD
-    else if ((info.type[0] == 'M') && (info.type[0] == 'O') && (info.type[0] == 'D') && (info.type[0] == 'L')) dataChunk.type = 20;  // MODL
     else if ((info.type[0] == 'C') && (info.type[0] == 'D') && (info.type[0] == 'I') && (info.type[0] == 'R')) dataChunk.type = 100; // CDIR
 
     // Decompress and decrypt [properties + data] chunk
