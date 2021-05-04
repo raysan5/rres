@@ -124,21 +124,6 @@ typedef enum {
     //...
 } FileType;
 
-/*
-// rres resource chunk info header (32 bytes)
-typedef struct rresInfoHeader {
-    unsigned char type[4];      // Resource chunk type (FOURCC)
-    unsigned int id;            // Resource chunk identifier (filename hash!)
-    unsigned char compType;     // Data compression type
-    unsigned char crypType;     // Data encription type
-    unsigned short flags;       // Data flags (if required)
-    unsigned int compSize;      // Data compressed size (if compressed)
-    unsigned int uncompSize;    // Data uncompressed size
-    unsigned int nextOffset;    // Next resource chunk offset (if required)
-    unsigned int reserved;      // <reserved>
-    unsigned int crc32;         // Data chunk CRC32 (full chunk)
-} rresInfoHeader;
-*/
 //----------------------------------------------------------------------------------
 // Global variables
 //----------------------------------------------------------------------------------
@@ -194,7 +179,7 @@ int main(int argc, char *argv[])
     // WARNING (Windows): If program is compiled as Window application (instead of console),
     // no console is available to show output info... solution is compiling a console application
     // and closing console (FreeConsole()) when changing to GUI interface
-    FreeConsole();
+    //FreeConsole();
 #endif
 
     char currentPath[1024] = { 0 };
@@ -507,8 +492,7 @@ static int GetFileType(const char *fileName)
 static void GenerateRRES(const char *fileName)//, FileInfo *resources, int count)
 {
     #define MAX_CENTRALDIR_ENTRIES  1024
-    
-    int chunksCounter = 0;
+
     FILE *rresFile = fopen(fileName, "wb");
 
     if (rresFile == NULL) TRACELOG(LOG_WARNING, "[%s] rRES raylib resource file could not be opened", fileName);
@@ -528,6 +512,7 @@ static void GenerateRRES(const char *fileName)//, FileInfo *resources, int count
         
         rresCentralDir cdir = { 0 };
         cdir.entries = (rresDirEntry *)RL_MALLOC(MAX_CENTRALDIR_ENTRIES*sizeof(rresDirEntry));
+        cdir.count = 0;     // Use to counter resource chunks as added
         
         int nextChunkOffset = sizeof(rresFileHeader);
         int cdirSize = 0;
@@ -536,6 +521,8 @@ static void GenerateRRES(const char *fileName)//, FileInfo *resources, int count
         {
             if (resFiles[i].forceRaw) resFiles[i].fileType = FILE_RAW;
             unsigned int resId = (resFiles[i].customId > 0)? resFiles[i].customId : resFiles[i].hashId;
+            
+            TraceLog(LOG_INFO, "[Id: %X] Processing file [%i]: %s", resId, i, resFiles[i].fileName);
             
             // Save required number of resource chunks depending on file type
             switch (resFiles[i].fileType)
@@ -584,21 +571,16 @@ static void GenerateRRES(const char *fileName)//, FileInfo *resources, int count
                     RL_FREE(chunk->data); 
                     RL_FREE(chunk);
                     
-                    // TODO: Register central directory entry!
-                    // Write new entry in central directory --> TODO: Create a function!!!
-                    cdir.entries[i].id = resFiles[i].hashId;   // Resource unique ID
-                    
-                    // Resource offset in file
+                    // Register central directory entry
+                    cdir.entries[cdir.count].id = resId;
                     nextChunkOffset += (sizeof(rresInfoHeader) + info.compSize);
-                    cdir.entries[i].offset = nextChunkOffset;
+                    cdir.entries[cdir.count].offset = nextChunkOffset;
+                    cdir.entries[cdir.count].fileNameLen = strlen(resFiles[i].fileName) + 1;  // EOL: \0
+                    cdir.entries[cdir.count].fileName = (char *)RRES_CALLOC(cdir.entries[cdir.count].fileNameLen + 1, 1);
+                    strcpy(cdir.entries[cdir.count].fileName, resFiles[i].fileName);
+                    cdirSize += (12 + cdir.entries[cdir.count].fileNameLen + 1); // 12 bytes: (id + offset + fileNameLen)
                     
-                    // Resource fileName info ('\0' terminated)
-                    cdir.entries[i].fileNameLen = strlen(resFiles[i].fileName) + 1;
-                    cdir.entries[i].fileName = (char *)RRES_CALLOC(cdir.entries[i].fileNameLen + 1, 1);
-                    strcpy(cdir.entries[i].fileName, resFiles[i].fileName);
-                    cdirSize += (12 + cdir.entries[i].fileNameLen + 1);
-                    
-                    chunksCounter++;
+                    cdir.count++;
             
                 } break;
                 case FILE_TEXT:     // Simple data: Text, (1) chunk
@@ -613,6 +595,20 @@ static void GenerateRRES(const char *fileName)//, FileInfo *resources, int count
                 } break;
                 case FILE_IMAGE:    // Simple data: Image, (1) chunk
                 {
+                    // Read file data
+                    Image image = LoadImage(resFiles[i].fileName);
+                    unsigned int imDataSize = GetPixelDataSize(image.width, image.height, image.format);
+                    
+                    unsigned int bufferSize = sizeof(int) + 4*sizeof(int) + imDataSize;
+                    unsigned char *buffer = RRES_CALLOC(bufferSize, 1);
+                    ((unsigned int *)buffer)[0] = 4;      //chunk->propsCount
+                    ((unsigned int *)buffer)[1] = image.width;
+                    ((unsigned int *)buffer)[2] = image.height;
+                    ((unsigned int *)buffer)[3] = image.format;
+                    ((unsigned int *)buffer)[4] = image.mipmaps;
+                    memcpy(buffer + 16, image.data, imDataSize);
+                    
+                    /*
                     // Init data chunk: RRES_DATA_IMAGE
                     rresDataChunk *chunk = (rresDataChunk *)RRES_CALLOC(sizeof(rresDataChunk), 1);
                     chunk->propsCount = 4;
@@ -625,6 +621,9 @@ static void GenerateRRES(const char *fileName)//, FileInfo *resources, int count
                     chunk->props[2] = image.format;
                     chunk->props[3] = image.mipmaps;
                     chunk->data = image.data;
+                    */
+                    
+                    // WARNING: Is it valid to use rresDataChunk??? Maybe not, we should create a buffer containing all required data!!!
  
                     // Define data chunk info header
                     rresInfoHeader info = { 0 };
@@ -634,18 +633,18 @@ static void GenerateRRES(const char *fileName)//, FileInfo *resources, int count
                     info.crypType = (unsigned char)resFiles[i].crypType;          // Data encription type
                     info.flags = 0;                 // Data flags (if required)
                     info.compSize = 0;              // TO FILL! Data compressed size (if compressed)
-                    info.uncompSize = 4 + chunk->propsCount*sizeof(int) + GetPixelDataSize(image.width, image.height, image.format);
+                    info.uncompSize = bufferSize;
                     info.nextOffset = 0;            // Next resource chunk offset (if required)
                     info.reserved = 0;              // <reserved>
                     info.crc32 = 0;                 // TO FILL! Data chunk CRC32 (propsCount + props[] + data)
 
-                    // Process data chunk
+                    // Process data buffer
                     // NOTE: It is better to compress before encrypting but any proven block cipher will reduce the data to 
                     // a pseudo-random sequence of bytes that will typically yield little to no compression gain at all, so,
                     // in most cases it's better to just encrypt the uncompressed data and be done with it.
                     unsigned char *compData = NULL;
-                    if (info.compType == RRES_COMP_NONE) compData = (((unsigned char *)chunk) + 4);
-                    else if (info.compType == RRES_COMP_DEFLATE) compData = CompressData((((unsigned char *)chunk) + 4), info.uncompSize, &info.compSize);
+                    if (info.compType == RRES_COMP_NONE) compData = buffer;
+                    else if (info.compType == RRES_COMP_DEFLATE) compData = CompressData(buffer, info.uncompSize, &info.compSize);
                     
                     // Update data chunk info
                     info.crc32 = rresComputeCRC32(compData, info.compSize);
@@ -656,11 +655,21 @@ static void GenerateRRES(const char *fileName)//, FileInfo *resources, int count
                     
                     // Free all loaded resources
                     if (info.compType > RRES_COMP_NONE) RL_FREE(compData);
-                    RL_FREE(chunk->props);
-                    RL_FREE(chunk->data);      // Unloads image.data
-                    RL_FREE(chunk);
+                    RL_FREE(buffer);
+                    //RL_FREE(chunk->props);
+                    //RL_FREE(chunk->data);      // Unloads image.data
+                    //RL_FREE(chunk);
                     
-                    chunksCounter++;
+                    // Register central directory entry
+                    cdir.entries[cdir.count].id = resId;
+                    nextChunkOffset += (sizeof(rresInfoHeader) + info.compSize);
+                    cdir.entries[cdir.count].offset = nextChunkOffset;
+                    cdir.entries[cdir.count].fileNameLen = strlen(resFiles[i].fileName) + 1;  // EOL: \0
+                    cdir.entries[cdir.count].fileName = (char *)RRES_CALLOC(cdir.entries[cdir.count].fileNameLen + 1, 1);
+                    strcpy(cdir.entries[cdir.count].fileName, resFiles[i].fileName);
+                    cdirSize += (12 + cdir.entries[cdir.count].fileNameLen + 1); // 12 bytes: (id + offset + fileNameLen)
+                    
+                    cdir.count++;
                     
                 } break;
                 case FILE_AUDIO:    // Simple data: Audio, (1) chunk
@@ -712,11 +721,22 @@ static void GenerateRRES(const char *fileName)//, FileInfo *resources, int count
                     RL_FREE(chunk->data);      // Unloads wave.data
                     RL_FREE(chunk);
                     
-                    chunksCounter++;
+                    // Register central directory entry
+                    cdir.entries[cdir.count].id = resId;
+                    nextChunkOffset += (sizeof(rresInfoHeader) + info.compSize);
+                    cdir.entries[cdir.count].offset = nextChunkOffset;
+                    cdir.entries[cdir.count].fileNameLen = strlen(resFiles[i].fileName) + 1;  // EOL: \0
+                    cdir.entries[cdir.count].fileName = (char *)RRES_CALLOC(cdir.entries[cdir.count].fileNameLen + 1, 1);
+                    strcpy(cdir.entries[cdir.count].fileName, resFiles[i].fileName);
+                    cdirSize += (12 + cdir.entries[cdir.count].fileNameLen + 1); // 12 bytes: (id + offset + fileNameLen)
+                    
+                    cdir.count++;
                     
                 } break;
                 case FILE_FONT:     // Complex data: Font, (2) chunks
                 {
+                    
+                    cdir.count += 2;
                     
                 } break;
                 case FILE_MESH:     // Complex data: Mesh, (n) chunks
@@ -747,25 +767,24 @@ static void GenerateRRES(const char *fileName)//, FileInfo *resources, int count
             info.uncompSize = cdirSize;
             info.nextOffset = 0;
 
+            // Process data chunk
             unsigned char *compData = NULL;
-
             if (info.compType == RRES_COMP_NONE) compData = (((unsigned char *)chunk) + 4);
             else if (info.compType == RRES_COMP_DEFLATE) compData = CompressData((((unsigned char *)chunk) + 4), info.uncompSize, &info.compSize);
             
+            // Update data chunk info
             info.crc32 = rresComputeCRC32(compData, info.compSize);
             
             // Write resource info and data
             fwrite(&info, sizeof(rresInfoHeader), 1, rresFile);
             fwrite(compData, info.compSize, 1, rresFile);
             
-            if (info.compType > RRES_COMP_NONE) RL_FREE(compData);
-            
             // Free all loaded resources
+            if (info.compType > RRES_COMP_NONE) RL_FREE(compData);
             RL_FREE(chunk->props);
-            RL_FREE(chunk);
-            
             for (int i = 0; i < header.resCount; i++) RL_FREE(cdir.entries[i].fileName);
-            RL_FREE(cdir.entries);
+            RL_FREE(chunk->data);      // Unloads cdir.entries
+            RL_FREE(chunk);
         }
     }
     
