@@ -492,20 +492,21 @@ static int GetFileType(const char *fileName)
 static void GenerateRRES(const char *fileName)//, FileInfo *resources, int count)
 {
     #define MAX_CENTRALDIR_ENTRIES  1024
-
+    
     FILE *rresFile = fopen(fileName, "wb");
 
     if (rresFile == NULL) TRACELOG(LOG_WARNING, "[%s] rRES raylib resource file could not be opened", fileName);
     else
     {
-        rresFileHeader header = { 0 };  // WARNING: File Header not exposed!
-        header.id[0] = 'r';
-        header.id[1] = 'R';
-        header.id[2] = 'E';
-        header.id[3] = 'S';
-        header.version = 100;
-        header.resCount = 0;            // WARNING: Resources chunk count is filled at the end
-        header.cdOffset = 0;            // WARNING: This value is filled at the end (if required)
+        rresFileHeader header = {
+            .id[0] = 'r',
+            .id[1] = 'R',
+            .id[2] = 'E',
+            .id[3] = 'S',
+            .version = 100,
+            .resCount = 0,          // WARNING: Resources chunk count is filled at the end
+            .cdOffset = 0,          // WARNING: Central directory offset is filled at the end
+        };
 
         // Write rres file header into file
         fwrite(&header, sizeof(rresFileHeader), 1, rresFile);
@@ -529,119 +530,37 @@ static void GenerateRRES(const char *fileName)//, FileInfo *resources, int count
             {
                 case FILE_RAW:      // Simple data: Raw, (1) chunk
                 {
-                    // Init data chunk: RRES_DATA_RAW
-                    rresDataChunk *chunk = (rresDataChunk *)RRES_CALLOC(sizeof(rresDataChunk), 1);
-                    chunk->propsCount = 1;
-                    chunk->props = (int *)RL_MALLOC(chunk->propsCount*sizeof(int));
-
                     // Read file data
                     unsigned int bytesRead = 0;
                     unsigned char *data = LoadFileData(resFiles[i].fileName, &bytesRead);
-                    chunk->props[0] = bytesRead;
-                    chunk->data = data;
                     
-                    // Define data chunk info header
-                    rresInfoHeader info = { 0 };
-                    strncpy(info.type, "RAWD", 4);  // Resource chunk type (FOURCC)
-                    info.id = resId;                // Resource chunk identifier (filename hash!)
-                    info.compType = (unsigned char)resFiles[i].compType;     // Data compression type
-                    info.crypType = (unsigned char)resFiles[i].crypType;          // Data encription type
-                    info.flags = 0;                 // Data flags (if required)
-                    info.compSize = 0;              // TO FILL! Data compressed size (if compressed)
-                    info.uncompSize = bytesRead;    // Data uncompressed size
-                    info.nextOffset = 0;            // Next resource chunk offset (if required)
-                    info.reserved = 0;              // <reserved>
-                    info.crc32 = 0;                 // TO FILL! Data chunk CRC32 (propsCount + props[] + data)
-                
-                    // Process data chunk
-                    unsigned char *compData = NULL;
-                    if (info.compType == RRES_COMP_NONE) compData = (((unsigned char *)chunk) + 4);
-                    else if (info.compType == RRES_COMP_DEFLATE) compData = CompressData((((unsigned char *)chunk) + 4), info.uncompSize, &info.compSize);
-                    
-                    // Update data chunk info
-                    info.crc32 = rresComputeCRC32(compData, info.compSize);
-                    
-                    // Write resource info and data
-                    fwrite(&info, sizeof(rresInfoHeader), 1, rresFile);
-                    fwrite(compData, info.compSize, 1, rresFile);
-                    
-                    // Free all loaded resources
-                    if (info.compType > RRES_COMP_NONE) RL_FREE(compData);
-                    RL_FREE(chunk->props);
-                    RL_FREE(chunk->data); 
-                    RL_FREE(chunk);
-                    
-                    // Register central directory entry
-                    cdir.entries[cdir.count].id = resId;
-                    nextChunkOffset += (sizeof(rresInfoHeader) + info.compSize);
-                    cdir.entries[cdir.count].offset = nextChunkOffset;
-                    cdir.entries[cdir.count].fileNameLen = strlen(resFiles[i].fileName) + 1;  // EOL: \0
-                    cdir.entries[cdir.count].fileName = (char *)RRES_CALLOC(cdir.entries[cdir.count].fileNameLen + 1, 1);
-                    strcpy(cdir.entries[cdir.count].fileName, resFiles[i].fileName);
-                    cdirSize += (12 + cdir.entries[cdir.count].fileNameLen + 1); // 12 bytes: (id + offset + fileNameLen)
-                    
-                    cdir.count++;
-            
-                } break;
-                case FILE_TEXT:     // Simple data: Text, (1) chunk
-                {
-                    // Init data chunk: RRES_DATA_TEXT
-                    rresDataChunk *chunk = (rresDataChunk *)RRES_CALLOC(sizeof(rresDataChunk), 1);
-                    chunk->propsCount = 2;
-                    chunk->props = (int *)RL_MALLOC(chunk->propsCount*sizeof(int));
-                    
-                    // TODO.
-                    
-                } break;
-                case FILE_IMAGE:    // Simple data: Image, (1) chunk
-                {
-                    // Read file data
-                    Image image = LoadImage(resFiles[i].fileName);
-                    unsigned int imDataSize = GetPixelDataSize(image.width, image.height, image.format);
-                    
-                    unsigned int bufferSize = sizeof(int) + 4*sizeof(int) + imDataSize;
-                    unsigned char *buffer = RRES_CALLOC(bufferSize, 1);
-                    ((unsigned int *)buffer)[0] = 4;      //chunk->propsCount
-                    ((unsigned int *)buffer)[1] = image.width;
-                    ((unsigned int *)buffer)[2] = image.height;
-                    ((unsigned int *)buffer)[3] = image.format;
-                    ((unsigned int *)buffer)[4] = image.mipmaps;
-                    memcpy(buffer + 16, image.data, imDataSize);
-                    
-                    /*
-                    // Init data chunk: RRES_DATA_IMAGE
-                    rresDataChunk *chunk = (rresDataChunk *)RRES_CALLOC(sizeof(rresDataChunk), 1);
-                    chunk->propsCount = 4;
-                    chunk->props = (int *)RL_MALLOC(chunk->propsCount*sizeof(int));
+                    // Create chunk data buffer: RRES_DATA_RAW
+                    unsigned int propsCount = 1;    // props[0]:size
+                    unsigned int bufferSize = sizeof(int) + propsCount*sizeof(int) + bytesRead;
+                    unsigned char *buffer = RL_CALLOC(bufferSize, 1);
+                    ((unsigned int *)buffer)[0] = propsCount;
+                    ((unsigned int *)buffer)[1] = bytesRead;
+                    memcpy(buffer + sizeof(int) + propsCount*sizeof(int), data, bytesRead);
 
-                    // Read file data
-                    Image image = LoadImage(resFiles[i].fileName);
-                    chunk->props[0] = image.width;
-                    chunk->props[1] = image.height;
-                    chunk->props[2] = image.format;
-                    chunk->props[3] = image.mipmaps;
-                    chunk->data = image.data;
-                    */
-                    
-                    // WARNING: Is it valid to use rresDataChunk??? Maybe not, we should create a buffer containing all required data!!!
- 
                     // Define data chunk info header
-                    rresInfoHeader info = { 0 };
-                    strncpy(info.type, "IMGE", 4);
-                    info.id = resId;
-                    info.compType = (unsigned char)resFiles[i].compType;     // Data compression type
-                    info.crypType = (unsigned char)resFiles[i].crypType;          // Data encription type
-                    info.flags = 0;                 // Data flags (if required)
-                    info.compSize = 0;              // TO FILL! Data compressed size (if compressed)
-                    info.uncompSize = bufferSize;
-                    info.nextOffset = 0;            // Next resource chunk offset (if required)
-                    info.reserved = 0;              // <reserved>
-                    info.crc32 = 0;                 // TO FILL! Data chunk CRC32 (propsCount + props[] + data)
-
+                    rresInfoHeader info = {
+                        .type[0] = 'R',
+                        .type[1] = 'A',
+                        .type[2] = 'W',
+                        .type[3] = 'D',
+                        .id = resId,                // Resource chunk identifier
+                        .compType = (unsigned char)resFiles[i].compType,    // Data compression type
+                        .crypType = (unsigned char)resFiles[i].crypType,    // Data encription type
+                        .flags = 0,                 // Data flags (if required)
+                        .compSize = bufferSize,     // Data compressed size
+                        .uncompSize = bufferSize,   // Data uncompressed size
+                        .nextOffset = 0,            // Next resource chunk offset (if required)
+                        .reserved = 0,
+                        .crc32 = 0,                 // Data chunk CRC32 (propsCount + props[] + data)
+                    };
+                    
+                    //------------------------------------------------------------------------------------------------------
                     // Process data buffer
-                    // NOTE: It is better to compress before encrypting but any proven block cipher will reduce the data to 
-                    // a pseudo-random sequence of bytes that will typically yield little to no compression gain at all, so,
-                    // in most cases it's better to just encrypt the uncompressed data and be done with it.
                     unsigned char *compData = NULL;
                     if (info.compType == RRES_COMP_NONE) compData = buffer;
                     else if (info.compType == RRES_COMP_DEFLATE) compData = CompressData(buffer, info.uncompSize, &info.compSize);
@@ -655,58 +574,58 @@ static void GenerateRRES(const char *fileName)//, FileInfo *resources, int count
                     
                     // Free all loaded resources
                     if (info.compType > RRES_COMP_NONE) RL_FREE(compData);
+                    //------------------------------------------------------------------------------------------------------
                     RL_FREE(buffer);
-                    //RL_FREE(chunk->props);
-                    //RL_FREE(chunk->data);      // Unloads image.data
-                    //RL_FREE(chunk);
-                    
+                    UnloadFileData(data);
+
                     // Register central directory entry
                     cdir.entries[cdir.count].id = resId;
-                    nextChunkOffset += (sizeof(rresInfoHeader) + info.compSize);
                     cdir.entries[cdir.count].offset = nextChunkOffset;
-                    cdir.entries[cdir.count].fileNameLen = strlen(resFiles[i].fileName) + 1;  // EOL: \0
-                    cdir.entries[cdir.count].fileName = (char *)RRES_CALLOC(cdir.entries[cdir.count].fileNameLen + 1, 1);
+                    cdir.entries[cdir.count].fileNameLen = strlen(resFiles[i].fileName) + 1;  // EOL:'\0'
                     strcpy(cdir.entries[cdir.count].fileName, resFiles[i].fileName);
-                    cdirSize += (12 + cdir.entries[cdir.count].fileNameLen + 1); // 12 bytes: (id + offset + fileNameLen)
+                    cdirSize += (12 + cdir.entries[cdir.count].fileNameLen);    // 12 bytes: (id + offset + fileNameLen)
                     
+                    nextChunkOffset += (sizeof(rresInfoHeader) + info.compSize);
                     cdir.count++;
-                    
+            
                 } break;
-                case FILE_AUDIO:    // Simple data: Audio, (1) chunk
+                case FILE_TEXT:     // Simple data: Text, (1) chunk
                 {
-                    // Init data chunk: RRES_DATA_WAVE
-                    rresDataChunk *chunk = (rresDataChunk *)RRES_CALLOC(sizeof(rresDataChunk), 1);
-                    chunk->propsCount = 4;
-                    chunk->props = (int *)RL_MALLOC(chunk->propsCount*sizeof(int));
-
                     // Read file data
-                    Wave wave = LoadWave(resFiles[i].fileName);
-                    chunk->props[0] = wave.sampleCount;
-                    chunk->props[1] = wave.sampleRate;
-                    chunk->props[2] = wave.sampleSize;
-                    chunk->props[3] = wave.channels;
-                    chunk->data = wave.data;
- 
-                    // Define data chunk info header
-                    rresInfoHeader info = { 0 };
-                    strncpy(info.type, "WAVE", 4);
-                    info.id = resId;
-                    info.compType = (unsigned char)resFiles[i].compType;     // Data compression type
-                    info.crypType = (unsigned char)resFiles[i].crypType;          // Data encription type
-                    info.flags = 0;                 // Data flags (if required)
-                    info.compSize = 0;              // TO FILL! Data compressed size (if compressed)
-                    info.uncompSize = 4 + chunk->propsCount*sizeof(int) + (wave.sampleCount*wave.sampleSize/8);
-                    info.nextOffset = 0;            // Next resource chunk offset (if required)
-                    info.reserved = 0;              // <reserved>
-                    info.crc32 = 0;                 // TO FILL! Data chunk CRC32 (propsCount + props[] + data)
+                    char *text = LoadFileText(resFiles[i].fileName);
+                    unsigned int textLen = strlen(text);
+                    
+                    // Create chunk data buffer: RRES_DATA_RAW
+                    unsigned int propsCount = 2;    // props[0]:size, props[1]:cultureCode
+                    unsigned int bufferSize = sizeof(int) + propsCount*sizeof(int) + textLen;
+                    unsigned char *buffer = RL_CALLOC(bufferSize, 1);
+                    ((unsigned int *)buffer)[0] = propsCount;
+                    ((unsigned int *)buffer)[1] = textLen;
+                    ((unsigned int *)buffer)[2] = 0x0409;    // en-US: English - United States
+                    memcpy(buffer + sizeof(int) + propsCount*sizeof(int), text, textLen);
 
-                    // Process data chunk
-                    // NOTE: It is better to compress before encrypting but any proven block cipher will reduce the data to 
-                    // a pseudo-random sequence of bytes that will typically yield little to no compression gain at all, so,
-                    // in most cases it's better to just encrypt the uncompressed data and be done with it.
+                    // Define data chunk info header
+                    rresInfoHeader info = {
+                        .type[0] = 'T',
+                        .type[1] = 'E',
+                        .type[2] = 'X',
+                        .type[3] = 'T',
+                        .id = resId,                // Resource chunk identifier
+                        .compType = (unsigned char)resFiles[i].compType,    // Data compression type
+                        .crypType = (unsigned char)resFiles[i].crypType,    // Data encription type
+                        .flags = 0,                 // Data flags (if required)
+                        .compSize = bufferSize,     // Data compressed size
+                        .uncompSize = bufferSize,   // Data uncompressed size
+                        .nextOffset = 0,            // Next resource chunk offset (if required)
+                        .reserved = 0,
+                        .crc32 = 0,                 // Data chunk CRC32 (propsCount + props[] + data)
+                    };
+                    
+                    //------------------------------------------------------------------------------------------------------
+                    // Process data buffer
                     unsigned char *compData = NULL;
-                    if (info.compType == RRES_COMP_NONE) compData = (((unsigned char *)chunk) + 4);
-                    else if (info.compType == RRES_COMP_DEFLATE) compData = CompressData((((unsigned char *)chunk) + 4), info.uncompSize, &info.compSize);
+                    if (info.compType == RRES_COMP_NONE) compData = buffer;
+                    else if (info.compType == RRES_COMP_DEFLATE) compData = CompressData(buffer, info.uncompSize, &info.compSize);
                     
                     // Update data chunk info
                     info.crc32 = rresComputeCRC32(compData, info.compSize);
@@ -717,19 +636,148 @@ static void GenerateRRES(const char *fileName)//, FileInfo *resources, int count
                     
                     // Free all loaded resources
                     if (info.compType > RRES_COMP_NONE) RL_FREE(compData);
-                    RL_FREE(chunk->props);
-                    RL_FREE(chunk->data);      // Unloads wave.data
-                    RL_FREE(chunk);
+                    //------------------------------------------------------------------------------------------------------
+                    RL_FREE(buffer);
+                    UnloadFileText(text);
+
+                    // Register central directory entry
+                    cdir.entries[cdir.count].id = resId;
+                    cdir.entries[cdir.count].offset = nextChunkOffset;
+                    cdir.entries[cdir.count].fileNameLen = strlen(resFiles[i].fileName) + 1;  // EOL:'\0'
+                    strcpy(cdir.entries[cdir.count].fileName, resFiles[i].fileName);
+                    cdirSize += (12 + cdir.entries[cdir.count].fileNameLen);    // 12 bytes: (id + offset + fileNameLen)
+                    
+                    nextChunkOffset += (sizeof(rresInfoHeader) + info.compSize);
+                    cdir.count++;
+                    
+                } break;
+                case FILE_IMAGE:    // Simple data: Image, (1) chunk
+                {
+                    // Read file data
+                    Image image = LoadImage(resFiles[i].fileName);
+                    unsigned int imDataSize = GetPixelDataSize(image.width, image.height, image.format);
+                    
+                    // Create chunk data buffer: RRES_DATA_IMAGE
+                    unsigned int propsCount = 4;    // props[0]:width, props[1]:height, props[2]:mipmaps, props[3]:rresPixelFormat
+                    unsigned int bufferSize = sizeof(int) + propsCount*sizeof(int) + imDataSize;
+                    unsigned char *buffer = RL_CALLOC(bufferSize, 1);
+                    ((unsigned int *)buffer)[0] = propsCount;
+                    ((unsigned int *)buffer)[1] = image.width;
+                    ((unsigned int *)buffer)[2] = image.height;
+                    ((unsigned int *)buffer)[3] = image.format;
+                    ((unsigned int *)buffer)[4] = image.mipmaps;
+                    memcpy(buffer + sizeof(int) + propsCount*sizeof(int), image.data, imDataSize);
+
+                    // Define data chunk info header
+                    rresInfoHeader info = {
+                        .type[0] = 'I',
+                        .type[1] = 'M',
+                        .type[2] = 'G',
+                        .type[3] = 'E',
+                        .id = resId,                // Resource chunk identifier
+                        .compType = (unsigned char)resFiles[i].compType,    // Data compression type
+                        .crypType = (unsigned char)resFiles[i].crypType,    // Data encription type
+                        .flags = 0,                 // Data flags (if required)
+                        .compSize = bufferSize,     // Data compressed size
+                        .uncompSize = bufferSize,   // Data uncompressed size
+                        .nextOffset = 0,            // Next resource chunk offset (if required)
+                        .reserved = 0,
+                        .crc32 = 0,                 // Data chunk CRC32 (propsCount + props[] + data)
+                    };
+                    
+                    
+                    //rresWriteResource(FILE *file, rresInfoHeader *info, unsigned char *buffer, unsigned int bufferSize);
+                    //------------------------------------------------------------------------------------------------------
+                    // Process data buffer
+                    unsigned char *compData = NULL;
+                    if (info.compType == RRES_COMP_NONE) compData = buffer;
+                    else if (info.compType == RRES_COMP_DEFLATE) compData = CompressData(buffer, info.uncompSize, &info.compSize);
+                    
+                    // Update data chunk info
+                    info.crc32 = rresComputeCRC32(compData, info.compSize);
+                    
+                    // Write resource info and data
+                    fwrite(&info, sizeof(rresInfoHeader), 1, rresFile);     // Use a memory buffer?
+                    fwrite(compData, info.compSize, 1, rresFile);
+                    
+                    // Free all loaded resources
+                    if (info.compType > RRES_COMP_NONE) RL_FREE(compData);
+                    //------------------------------------------------------------------------------------------------------
+                    RL_FREE(buffer);
+                    UnloadImage(image);
                     
                     // Register central directory entry
                     cdir.entries[cdir.count].id = resId;
-                    nextChunkOffset += (sizeof(rresInfoHeader) + info.compSize);
                     cdir.entries[cdir.count].offset = nextChunkOffset;
-                    cdir.entries[cdir.count].fileNameLen = strlen(resFiles[i].fileName) + 1;  // EOL: \0
-                    cdir.entries[cdir.count].fileName = (char *)RRES_CALLOC(cdir.entries[cdir.count].fileNameLen + 1, 1);
+                    cdir.entries[cdir.count].fileNameLen = strlen(resFiles[i].fileName) + 1;  // EOL:'\0'
                     strcpy(cdir.entries[cdir.count].fileName, resFiles[i].fileName);
-                    cdirSize += (12 + cdir.entries[cdir.count].fileNameLen + 1); // 12 bytes: (id + offset + fileNameLen)
+                    cdirSize += (12 + cdir.entries[cdir.count].fileNameLen);    // 12 bytes: (id + offset + fileNameLen)
                     
+                    nextChunkOffset += (sizeof(rresInfoHeader) + info.compSize);
+                    cdir.count++;
+                    
+                } break;
+                case FILE_AUDIO:    // Simple data: Audio, (1) chunk
+                {
+                    // Read file data
+                    Wave wave = LoadWave(resFiles[i].fileName);
+                    unsigned int waveDataSize = wave.sampleCount*wave.sampleSize/8;
+                    
+                    // Create chunk data buffer: RRES_DATA_WAVE
+                    unsigned int propsCount = 4;    // props[0]:sampleCount, props[1]:sampleRate, props[2]:sampleSize, props[3]:channels
+                    unsigned int bufferSize = sizeof(int) + propsCount*sizeof(int) + waveDataSize;
+                    unsigned char *buffer = RL_CALLOC(bufferSize, 1);
+                    ((unsigned int *)buffer)[0] = propsCount;
+                    ((unsigned int *)buffer)[1] = wave.sampleCount;
+                    ((unsigned int *)buffer)[2] = wave.sampleRate;
+                    ((unsigned int *)buffer)[3] = wave.sampleSize;
+                    ((unsigned int *)buffer)[4] = wave.channels;
+                    memcpy(buffer + sizeof(int) + propsCount*sizeof(int), wave.data, waveDataSize);
+
+                    // Define data chunk info header
+                    rresInfoHeader info = {
+                        .type[0] = 'W',
+                        .type[1] = 'A',
+                        .type[2] = 'V',
+                        .type[3] = 'E',
+                        .id = resId,                // Resource chunk identifier
+                        .compType = (unsigned char)resFiles[i].compType,    // Data compression type
+                        .crypType = (unsigned char)resFiles[i].crypType,    // Data encription type
+                        .flags = 0,                 // Data flags (if required)
+                        .compSize = bufferSize,     // Data compressed size
+                        .uncompSize = bufferSize,   // Data uncompressed size
+                        .nextOffset = 0,            // Next resource chunk offset (if required)
+                        .reserved = 0,
+                        .crc32 = 0,                 // Data chunk CRC32 (propsCount + props[] + data)
+                    };
+                    
+                    //------------------------------------------------------------------------------------------------------
+                    // Process data buffer
+                    unsigned char *compData = NULL;
+                    if (info.compType == RRES_COMP_NONE) compData = buffer;
+                    else if (info.compType == RRES_COMP_DEFLATE) compData = CompressData(buffer, info.uncompSize, &info.compSize);
+                    
+                    // Update data chunk info
+                    info.crc32 = rresComputeCRC32(compData, info.compSize);
+                    
+                    // Write resource info and data
+                    fwrite(&info, sizeof(rresInfoHeader), 1, rresFile);
+                    fwrite(compData, info.compSize, 1, rresFile);
+                    
+                    // Free all loaded resources
+                    if (info.compType > RRES_COMP_NONE) RL_FREE(compData);
+                    //------------------------------------------------------------------------------------------------------
+                    RL_FREE(buffer);
+                    UnloadWave(wave);
+                    
+                    // Register central directory entry
+                    cdir.entries[cdir.count].id = resId;
+                    cdir.entries[cdir.count].offset = nextChunkOffset;
+                    cdir.entries[cdir.count].fileNameLen = strlen(resFiles[i].fileName) + 1;  // EOL:'\0'
+                    strcpy(cdir.entries[cdir.count].fileName, resFiles[i].fileName);
+                    cdirSize += (12 + cdir.entries[cdir.count].fileNameLen);    // 12 bytes: (id + offset + fileNameLen)
+                    
+                    nextChunkOffset += (sizeof(rresInfoHeader) + info.compSize);
                     cdir.count++;
                     
                 } break;
@@ -748,29 +796,45 @@ static void GenerateRRES(const char *fileName)//, FileInfo *resources, int count
         }
         
         if (saveCentralDir)
-        {
-            // Get data chunk
-            rresDataChunk *chunk = (rresDataChunk *)RRES_CALLOC(sizeof(rresDataChunk), 1);
-            chunk->propsCount = 1;
-            chunk->props = (int *)RL_MALLOC(chunk->propsCount*sizeof(int));
-            chunk->props[0] = cdir.count;
-            chunk->data = cdir.entries;
+        {           
+            // Create chunk data buffer: RRES_DATA_DIRECTORY
+            unsigned int propsCount = 1;        // props[0]:entryCount
+            unsigned int bufferSize = sizeof(int) + propsCount*sizeof(int) + cdirSize;
+            unsigned char *buffer = RL_CALLOC(bufferSize, 1);
+            ((unsigned int *)buffer)[0] = propsCount;
+            ((unsigned int *)buffer)[1] = cdir.count;
+            for (unsigned int i = 0, offset = 0; i < cdir.count; i++)
+            {
+                memcpy(buffer + offset, &cdir.entries[i].id, sizeof(int));
+                memcpy(buffer + offset + 4, &cdir.entries[i].offset, sizeof(int));
+                memcpy(buffer + offset + 8, &cdir.entries[i].fileNameLen, sizeof(int));
+                memcpy(buffer + offset + 12, cdir.entries[i].fileName, cdir.entries[i].fileNameLen);
+                
+                offset += (12 + cdir.entries[i].fileNameLen);
+            }
             
             // Define data chunk info header 
-            rresInfoHeader info = { 0 };
-            strncpy(info.type, "CDIR", 4);
-            info.id = 0;        
-            info.compType = RRES_COMP_NONE;
-            info.crypType = RRES_CRYPTO_NONE;
-            info.flags = 0;
-            info.compSize = cdirSize;
-            info.uncompSize = cdirSize;
-            info.nextOffset = 0;
+            rresInfoHeader info = {
+                .type[0] = 'C',
+                .type[1] = 'D',
+                .type[2] = 'I',
+                .type[3] = 'R',
+                .id = 0,                        // Resource chunk identifier
+                .compType = RRES_COMP_NONE,     // Data compression type
+                .crypType = RRES_CRYPTO_NONE,   // Data encription type
+                .flags = 0,                     // Data flags (if required)
+                .compSize = cdirSize,           // Data compressed size
+                .uncompSize = cdirSize,         // Data uncompressed size
+                .nextOffset = 0,                // Next resource chunk offset (if required)
+                .reserved = 0,
+                .crc32 = 0,                     // Data chunk CRC32 (propsCount + props[] + data)
+            };
 
-            // Process data chunk
+            //------------------------------------------------------------------------------------------------------
+            // Process data buffer
             unsigned char *compData = NULL;
-            if (info.compType == RRES_COMP_NONE) compData = (((unsigned char *)chunk) + 4);
-            else if (info.compType == RRES_COMP_DEFLATE) compData = CompressData((((unsigned char *)chunk) + 4), info.uncompSize, &info.compSize);
+            if (info.compType == RRES_COMP_NONE) compData = buffer;
+            else if (info.compType == RRES_COMP_DEFLATE) compData = CompressData(buffer, info.uncompSize, &info.compSize);
             
             // Update data chunk info
             info.crc32 = rresComputeCRC32(compData, info.compSize);
@@ -781,11 +845,11 @@ static void GenerateRRES(const char *fileName)//, FileInfo *resources, int count
             
             // Free all loaded resources
             if (info.compType > RRES_COMP_NONE) RL_FREE(compData);
-            RL_FREE(chunk->props);
-            for (int i = 0; i < header.resCount; i++) RL_FREE(cdir.entries[i].fileName);
-            RL_FREE(chunk->data);      // Unloads cdir.entries
-            RL_FREE(chunk);
+            //------------------------------------------------------------------------------------------------------
+            RL_FREE(buffer);
         }
+       
+        RL_FREE(cdir.entries);
     }
     
     fclose(rresFile);
@@ -804,32 +868,6 @@ unsigned int ComputeHashId(const char *fileName)
     for (unsigned int i = 0; i < length; i++) hash = hash*31 + (unsigned int)fileName[i];
     
     return hash;
-}
-
-// Convert int value into 4-bytes array (char buffer)
-static unsigned char *IntToChar(int myint)
-{
-    unsigned char mychars[4];
-
-    mychars[3] = (myint & (0xFF));
-    mychars[2] = ((myint >> 8) & 0xFF);
-    mychars[1] = ((myint >> 16) & 0xFF);
-    mychars[0] = ((myint >> 24) & 0xFF);
-
-/*
-    unsigned int final = 0;
-    final |= ( mychars[0] << 24 );
-    final |= ( mychars[1] << 16 );
-    final |= ( mychars[2] <<  8 );
-    final |= ( mychars[3]       );
-
-    int num = (chars[0] << 24) + (chars[1] << 16) + (chars[2] << 8) + chars[3];
-
-    int num = 0;
-    for (int i = 0; i != 4; ++i) {
-        num += chars[i] << (24 - i * 8);    // |= could have also been used
-    }
-*/
 }
 
 // Swap 16 bit data
