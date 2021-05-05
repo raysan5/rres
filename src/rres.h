@@ -115,7 +115,7 @@ typedef struct {
     int id;                     // Resource unique id
     int offset;                 // Resource offset in file
     int fileNameLen;            // Resource fileName length
-    char *fileName;             // Resource fileName ('\0' terminated)
+    char fileName[512];         // Resource fileName ('\0' terminated)
 } rresDirEntry;
 
 // rres central directory
@@ -218,10 +218,10 @@ typedef struct rresInfoHeader {
     unsigned char compType;     // Data compression type
     unsigned char crypType;     // Data encription type
     unsigned short flags;       // Data flags (if required)
-    unsigned int compSize;      // Data compressed size (if compressed)
+    unsigned int compSize;      // Data compressed size
     unsigned int uncompSize;    // Data uncompressed size
     unsigned int nextOffset;    // Next resource chunk offset (if required)
-    unsigned int reserved;      // <reserved>
+    unsigned int reserved;
     unsigned int crc32;         // Data chunk CRC32 (propsCount + props[] + data)
 } rresInfoHeader;
 
