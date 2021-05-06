@@ -133,7 +133,6 @@ static const char *toolDescription = "A simple and easy-to-use rres resources pa
 
 static FileInfo *resFiles = NULL;           // Init to MAX_RESOURCES
 static unsigned int fileCount = 0;
-static unsigned int rresCount = 0;
 
 static bool saveCentralDir = true;
 
@@ -493,6 +492,8 @@ static void GenerateRRES(const char *fileName)//, FileInfo *resources, int count
 {
     #define MAX_CENTRALDIR_ENTRIES  1024
     
+    int chunkCounter = 0;
+    
     FILE *rresFile = fopen(fileName, "wb");
 
     if (rresFile == NULL) TRACELOG(LOG_WARNING, "[%s] rRES raylib resource file could not be opened", fileName);
@@ -504,7 +505,7 @@ static void GenerateRRES(const char *fileName)//, FileInfo *resources, int count
             .id[2] = 'E',
             .id[3] = 'S',
             .version = 100,
-            .resCount = 0,          // WARNING: Resources chunk count is filled at the end
+            .chunkCount = 0,        // WARNING: Resources chunk count is filled at the end
             .cdOffset = 0,          // WARNING: Central directory offset is filled at the end
         };
 
@@ -513,7 +514,7 @@ static void GenerateRRES(const char *fileName)//, FileInfo *resources, int count
         
         rresCentralDir cdir = { 0 };
         cdir.entries = (rresDirEntry *)RL_MALLOC(MAX_CENTRALDIR_ENTRIES*sizeof(rresDirEntry));
-        cdir.count = 0;     // Use to counter resource chunks as added
+        cdir.count = 0;     // Use to count central directory entries
         
         int nextChunkOffset = sizeof(rresFileHeader);
         int cdirSize = 0;
@@ -587,6 +588,7 @@ static void GenerateRRES(const char *fileName)//, FileInfo *resources, int count
                     
                     nextChunkOffset += (sizeof(rresInfoHeader) + info.compSize);
                     cdir.count++;
+                    chunkCounter++;
             
                 } break;
                 case FILE_TEXT:     // Simple data: Text, (1) chunk
@@ -649,6 +651,7 @@ static void GenerateRRES(const char *fileName)//, FileInfo *resources, int count
                     
                     nextChunkOffset += (sizeof(rresInfoHeader) + info.compSize);
                     cdir.count++;
+                    chunkCounter++;
                     
                 } break;
                 case FILE_IMAGE:    // Simple data: Image, (1) chunk
@@ -715,6 +718,7 @@ static void GenerateRRES(const char *fileName)//, FileInfo *resources, int count
                     
                     nextChunkOffset += (sizeof(rresInfoHeader) + info.compSize);
                     cdir.count++;
+                    chunkCounter++;
                     
                 } break;
                 case FILE_AUDIO:    // Simple data: Audio, (1) chunk
@@ -776,25 +780,31 @@ static void GenerateRRES(const char *fileName)//, FileInfo *resources, int count
                     cdir.entries[cdir.count].fileNameLen = strlen(resFiles[i].fileName) + 1;  // EOL:'\0'
                     strcpy(cdir.entries[cdir.count].fileName, resFiles[i].fileName);
                     cdirSize += (12 + cdir.entries[cdir.count].fileNameLen);    // 12 bytes: (id + offset + fileNameLen)
-                    
+                                       
                     nextChunkOffset += (sizeof(rresInfoHeader) + info.compSize);
                     cdir.count++;
+                    chunkCounter++;
                     
                 } break;
                 case FILE_FONT:     // Complex data: Font, (2) chunks
                 {
                     
-                    cdir.count += 2;
+                    
+                    cdir.count++;
+                    chunkCounter += 2;
                     
                 } break;
                 case FILE_MESH:     // Complex data: Mesh, (n) chunks
                 {
                     
+                    cdir.count++;
+                    chunkCounter += 6;
+                    
                 } break;
                 default: break;
             }
         }
-        
+               
         if (saveCentralDir)
         {           
             // Create chunk data buffer: RRES_DATA_DIRECTORY
@@ -805,6 +815,8 @@ static void GenerateRRES(const char *fileName)//, FileInfo *resources, int count
             ((unsigned int *)buffer)[1] = cdir.count;
             for (unsigned int i = 0, offset = 0; i < cdir.count; i++)
             {
+                TraceLog(LOG_INFO, "CDIR: [%08X] Entry (0x%x): %s (len: %i)", cdir.entries[i].id, cdir.entries[i].offset, cdir.entries[i].fileName, cdir.entries[i].fileNameLen);
+
                 memcpy(buffer + offset, &cdir.entries[i].id, sizeof(int));
                 memcpy(buffer + offset + 4, &cdir.entries[i].offset, sizeof(int));
                 memcpy(buffer + offset + 8, &cdir.entries[i].fileNameLen, sizeof(int));
@@ -850,6 +862,15 @@ static void GenerateRRES(const char *fileName)//, FileInfo *resources, int count
         }
        
         RL_FREE(cdir.entries);
+        
+        // Update rres file header
+        header.chunkCount = (unsigned short)chunkCounter;
+        header.cdOffset = (unsigned int)nextChunkOffset - sizeof(rresFileHeader);
+        fseek(rresFile, 6, SEEK_SET);
+        fwrite(&header.chunkCount, sizeof(unsigned short), 1, rresFile);
+        fwrite(&header.cdOffset, sizeof(unsigned int), 1, rresFile);
+        
+        TraceLog(LOG_WARNING, "CDIR: Offset: %08x", header.cdOffset);
     }
     
     fclose(rresFile);

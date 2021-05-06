@@ -37,7 +37,7 @@ int main(void)
         // List all files contained
         for (int i = 0; i < dir.count; i++)
         {
-            TraceLog(LOG_INFO, "FILE: [%i] %s (Offset: %i)", dir.entries[i].id, dir.entries[i].fileName, dir.entries[i].offset);
+            TraceLog(LOG_INFO, "FILE: [%08X] Entry (0x%x): %s (len: %i)", dir.entries[i].id, dir.entries[i].offset, dir.entries[i].fileName, dir.entries[i].fileNameLen);
         }
     }        
 

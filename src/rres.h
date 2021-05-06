@@ -87,6 +87,8 @@
 //----------------------------------------------------------------------------------
 #define RRES_CURRENT_VERSION    100
 
+//#define RRES_CDIR_MAXFN_LENGTH  512
+
 //----------------------------------------------------------------------------------
 // Types and Structures Definition
 //----------------------------------------------------------------------------------
@@ -207,7 +209,7 @@ RRESDEF unsigned int rresComputeCRC32(unsigned char *buffer, int len);
 typedef struct rresFileHeader {
     unsigned char id[4];        // File identifier: rRES
     unsigned short version;     // File version and subversion
-    unsigned short resCount;    // Number of resource chunks in this file (total)
+    unsigned short chunkCount;  // Number of resource chunks in this file (total)
     unsigned int cdOffset;      // Central Directory offset in file (0 if not available)
 } rresFileHeader;
 
@@ -348,7 +350,7 @@ rresData rresLoadData(const char *fileName, int rresId)
             (header.id[2] == 'E') && 
             (header.id[3] == 'S'))
         {
-            for (int i = 0; i < header.resCount; i++)
+            for (int i = 0; i < header.chunkCount; i++)
             {
                 rresInfoHeader info = { 0 };
                 
@@ -438,6 +440,8 @@ rresCentralDir rresLoadCentralDirectory(const char *fileName)
             (header.id[3] == 'S') &&
             (header.cdOffset != 0))
         {
+            TraceLog(LOG_WARNING, "CDIR: Found at offset: %08x", header.cdOffset);
+            
             rresInfoHeader info = { 0 };
             
             fseek(rresFile, header.cdOffset, SEEK_CUR);         // Move to central directory position
@@ -448,14 +452,34 @@ rresCentralDir rresLoadCentralDirectory(const char *fileName)
                 (info.type[2] == 'I') &&
                 (info.type[3] == 'R'))
             {
+                TraceLog(LOG_WARNING, "CDIR: Found! Comp.Size: %i", info.compSize);
+                
                 void *data = RRES_MALLOC(info.compSize);
                 fread(data, info.compSize, 1, rresFile);
                 
-                rresDataChunk dataChunk = rresLoadDataChunk(info, data);
-                RRES_FREE(data);
+                rresDataChunk chunk = rresLoadDataChunk(info, data);
+                //RRES_FREE(data);
                 
-                dir.count = dataChunk.props[0];                 // Files count
-                dir.entries = (rresDirEntry *)dataChunk.data;   // Files data
+                //dir.count = chunk.props[0];                 // Files count
+                
+                //dir.entries = (rresDirEntry *)chunk.data;   // Files data
+                /*
+                char *ptr = &chunk.data;
+                dir.entries = (rresDirEntry *)RRES_CALLOC(dir.count, sizeof(rresDirEntry));
+                
+                for (int i = 0; i < dir.count; i++)
+                {
+                    dir.entries[i].id = (int *)ptr;         // Resource unique id
+                    ptr += 4;
+                    dir.entries[i].offset = (int *)ptr;     // Resource offset in file
+                    ptr += 4;
+                    dir.entries[i].fileNameLen = (int *)ptr;    // Resource fileName length
+                    ptr += 4;
+                    memcpy(dir.entries[i].fileName, ptr, dir.entries[i].fileNameLen);   // Resource fileName ('\0' terminated)
+                    ptr += dir.entries[i].fileNameLen + 1;
+                }
+                */
+                //rresUnloadDataChunk(chunk);
             }
         }
 
