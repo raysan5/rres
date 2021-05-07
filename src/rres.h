@@ -564,17 +564,17 @@ unsigned int rresComputeCRC32(unsigned char *buffer, int len)
 // NOTE: Raw data can be compressed and encrypted, it also contains the props data embedded
 static rresDataChunk rresLoadDataChunk(rresInfoHeader info, void *data)
 {
-    rresDataChunk dataChunk = { 0 };
+    rresDataChunk chunk = { 0 };
     void *result = NULL;
 
     // Assign rres.type (int) from info.type (FOURCC)
-    if ((info.type[0] == 'R') && (info.type[0] == 'A') && (info.type[0] == 'W') && (info.type[0] == 'D')) dataChunk.type = 1;        // RAWD
-    else if ((info.type[0] == 'T') && (info.type[0] == 'E') && (info.type[0] == 'X') && (info.type[0] == 'T')) dataChunk.type = 2;   // TEXT
-    else if ((info.type[0] == 'I') && (info.type[0] == 'M') && (info.type[0] == 'G') && (info.type[0] == 'E')) dataChunk.type = 3;   // IMGE
-    else if ((info.type[0] == 'W') && (info.type[0] == 'A') && (info.type[0] == 'V') && (info.type[0] == 'E')) dataChunk.type = 4;   // WAVE
-    else if ((info.type[0] == 'V') && (info.type[0] == 'R') && (info.type[0] == 'T') && (info.type[0] == 'X')) dataChunk.type = 5;   // VRTX
-    else if ((info.type[0] == 'F') && (info.type[0] == 'O') && (info.type[0] == 'N') && (info.type[0] == 'T')) dataChunk.type = 10;  // FONT
-    else if ((info.type[0] == 'C') && (info.type[0] == 'D') && (info.type[0] == 'I') && (info.type[0] == 'R')) dataChunk.type = 100; // CDIR
+    if ((info.type[0] == 'R') && (info.type[0] == 'A') && (info.type[0] == 'W') && (info.type[0] == 'D')) chunk.type = 1;        // RAWD
+    else if ((info.type[0] == 'T') && (info.type[0] == 'E') && (info.type[0] == 'X') && (info.type[0] == 'T')) chunk.type = 2;   // TEXT
+    else if ((info.type[0] == 'I') && (info.type[0] == 'M') && (info.type[0] == 'G') && (info.type[0] == 'E')) chunk.type = 3;   // IMGE
+    else if ((info.type[0] == 'W') && (info.type[0] == 'A') && (info.type[0] == 'V') && (info.type[0] == 'E')) chunk.type = 4;   // WAVE
+    else if ((info.type[0] == 'V') && (info.type[0] == 'R') && (info.type[0] == 'T') && (info.type[0] == 'X')) chunk.type = 5;   // VRTX
+    else if ((info.type[0] == 'F') && (info.type[0] == 'O') && (info.type[0] == 'N') && (info.type[0] == 'T')) chunk.type = 10;  // FONT
+    else if ((info.type[0] == 'C') && (info.type[0] == 'D') && (info.type[0] == 'I') && (info.type[0] == 'R')) chunk.type = 100; // CDIR
 
     // Decompress and decrypt [properties + data] chunk
     // TODO: Support multiple compression/encryption types
@@ -585,7 +585,7 @@ static rresDataChunk rresLoadDataChunk(rresInfoHeader info, void *data)
     }
     else if (info.compType == RRES_COMP_DEFLATE)
     {
-        //result = DecompressDEFLATE(data, info.compSize, info.uncompSize);   // TODO.
+        //result = Decompress(data, info.compSize, info.uncompSize);   // TODO.
     }
 
     // CRC32 data validation
@@ -593,16 +593,16 @@ static rresDataChunk rresLoadDataChunk(rresInfoHeader info, void *data)
     
     if (crc32 == info.crc32)    // Check CRC32
     {
-        dataChunk.propsCount = ((int *)result)[0];
+        chunk.propsCount = ((int *)result)[0];
         
-        if (dataChunk.propsCount > 0)
+        if (chunk.propsCount > 0)
         {
-            dataChunk.props = (int *)RRES_MALLOC(dataChunk.propsCount*sizeof(int));
-            for (int i = 0; i < dataChunk.propsCount; i++) dataChunk.props[i] = ((int *)result)[1 + i];
+            chunk.props = (int *)RRES_MALLOC(chunk.propsCount*sizeof(int));
+            for (int i = 0; i < chunk.propsCount; i++) chunk.props[i] = ((int *)result)[1 + i];
         }
     
-        dataChunk.data = RRES_MALLOC(info.uncompSize);
-        memcpy(dataChunk.data, ((unsigned char *)result) + (dataChunk.propsCount*sizeof(int)), info.uncompSize);
+        chunk.data = RRES_MALLOC(info.uncompSize);
+        memcpy(chunk.data, ((unsigned char *)result) + (chunk.propsCount*sizeof(int)), info.uncompSize);
     }
     else 
     {
@@ -610,7 +610,7 @@ static rresDataChunk rresLoadDataChunk(rresInfoHeader info, void *data)
         if (info.compType == RRES_COMP_DEFLATE) RRES_FREE(result);
     }
 
-    return dataChunk;
+    return chunk;
 }
 
 // Unload data chunk
