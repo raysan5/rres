@@ -17,6 +17,8 @@
 #define RRES_RAYLIB_IMPLEMENTATION
 #include "../src/rres-raylib.h"
 
+#include <stdio.h>
+
 int main(void)
 {
     // Initialization
@@ -47,31 +49,49 @@ int main(void)
     rresData rres = { 0 };
 
     // TEST 01: RRES_DATA_RAW
-    // TODO.
-
-    // TEST 02: RRES_DATA_TEXT: OK!!!
+    rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "C:\\GitHub\\rres\\examples\\resources\\image.png.raw"));
+    unsigned int dataSize = 0;
+    void *data = rresLoadRaw(rres, &dataSize);
+    rresUnloadData(rres);
+    
+    FILE *rawFile = fopen("export_image.png", "wb");
+    fwrite(data, dataSize, 1, rawFile);
+    fclose(rawFile);
+    
+    // TEST 02: RRES_DATA_TEXT -> OK!!!
     rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "C:\\GitHub\\rres\\examples\\resources\\text_data.txt"));
     char* text = rresLoadText(rres);
+    rresUnloadData(rres);
     
-    // TEST 03: RRES_DATA_IMAGE: OK!!!
+    // TEST 03: RRES_DATA_IMAGE -> OK!!!
     rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "C:\\GitHub\\rres\\examples\\resources\\images\\fudesumi.png"));
     Image image = rresLoadImage(rres);
+    rresUnloadData(rres);
+    
     Texture2D texture = LoadTextureFromImage(image);
     UnloadImage(image);
     
-    // TEST 03: RRES_DATA_WAVE: OK!!!
+    // TEST 03: RRES_DATA_WAVE -> OK!!!
     rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "C:\\GitHub\\rres\\examples\\resources\\audio\\target.ogg"));
     Wave wave = rresLoadWave(rres);
+    rresUnloadData(rres);
+    
     Sound sound = LoadSoundFromWave(wave);
     UnloadWave(wave);
 
     // TEST 04: RRES_DATA_FONT_INFO (multichunk!)
     rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "C:\\GitHub\\rres\\examples\\resources\\fonts\\pixantiqua.ttf"));
     Font font = rresLoadFont(rres);
+    rresUnloadData(rres);
     
     // TEST 05: RRES_DATA_VERTEX (multichunk!)
-    
+    rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "C:\\GitHub\\rres\\examples\\resources\\models\\castle.obj"));
+    Mesh mesh = rresLoadMesh(rres);
     rresUnloadData(rres);
+    
+    Model model = LoadModelFromMesh(mesh);
+    
+    // Unload central directory info, not required any more
     rresUnloadCentralDirectory(dir);
 
     SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
@@ -102,14 +122,16 @@ int main(void)
 
     // De-Initialization
     //--------------------------------------------------------------------------------------
-    RL_FREE(text);
-    UnloadTexture(texture);
-    UnloadFont(font);
+    MemFree(data);              // Unload raw data
+    MemFree(text);              // Unload text data
+    UnloadTexture(texture);     // Unload texture (VRAM)
     UnloadSound(sound);
+    UnloadFont(font);
+    UnloadModel(model);
     
-    CloseAudioDevice();     // Close audio device
+    CloseAudioDevice();         // Close audio device
     
-    CloseWindow();          // Close window and OpenGL context
+    CloseWindow();              // Close window and OpenGL context
     //--------------------------------------------------------------------------------------
 
     return 0;

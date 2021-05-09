@@ -240,7 +240,7 @@ static void *rresLoadDataChunkRaw(rresDataChunk chunk)
     
     if (chunk.type == RRES_DATA_RAW)
     {
-        rawData = RL_MALLOC(chunk.props[0]);
+        rawData = RL_CALLOC(chunk.props[0], 1);
         memcpy(rawData, chunk.data, chunk.props[0]);
     }
     
