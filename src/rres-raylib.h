@@ -272,10 +272,10 @@ static Image rresLoadDataChunkImage(rresDataChunk chunk)
     {
         image.width = chunk.props[0];
         image.height = chunk.props[1];
-        image.mipmaps = chunk.props[2];
+        image.mipmaps = chunk.props[3];
         
         // WARNING: rresPixelFormat enum matches raylib PixelFormat enum values
-        image.format = chunk.props[3];
+        image.format = chunk.props[2];
 
         // NOTE: Image data size can computed from image properties
         unsigned int size = GetPixelDataSize(image.width, image.height, image.format);

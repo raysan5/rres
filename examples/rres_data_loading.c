@@ -44,7 +44,7 @@ int main(void)
     // Load content from rres file
     rresData rres = { 0 };
     
-    rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "resources/images/fudesumi.png"));
+    rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "C:\\GitHub\\rres\\examples\\resources\\images\\fudesumi.png"));
     Image image = rresLoadImage(rres);
     Texture2D texture = LoadTextureFromImage(image);
     UnloadImage(image);
