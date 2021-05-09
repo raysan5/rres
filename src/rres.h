@@ -30,7 +30,7 @@
 *           Data UncompSize     (4 bytes)   // Data uncompressed size
 *           Next Offset         (4 bytes)   // Next resource offset (if required)
 *           Reserved            (4 bytes)   // <reserved>
-*           CRC32               (4 bytes)   // Data Chunk CRC32 (full chunk)
+*           CRC32               (4 bytes)   // Data Chunk CRC32
 *   
 *       rres Data Chunk         (n bytes)   // Data: [propsCount + props[n] + data]
 *   }

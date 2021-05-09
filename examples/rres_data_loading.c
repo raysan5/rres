@@ -28,34 +28,48 @@ int main(void)
     
     InitAudioDevice();
     
+    // TEST 00: RRES_DATA_DIRECTORY: OK!!!
     rresCentralDir dir = rresLoadCentralDirectory("resources.rres");
     
     // Check if central directory is available
     // NOTE: CDIR is not mandatory, resources are referenced by its id
-    if (dir.count > 0)
+    if (dir.count == 0) TraceLog(LOG_WARNING, "No central directory available in the file");
+    else
     {
-        // List all files contained
+        // List all files contained on central directory
         for (int i = 0; i < dir.count; i++)
         {
             TraceLog(LOG_INFO, "FILE: [%08X] Entry (0x%x): %s (len: %i)", dir.entries[i].id, dir.entries[i].offset, dir.entries[i].fileName, dir.entries[i].fileNameLen);
         }
-    }        
+    }
 
     // Load content from rres file
     rresData rres = { 0 };
+
+    // TEST 01: RRES_DATA_RAW
+    // TODO.
+
+    // TEST 02: RRES_DATA_TEXT: OK!!!
+    rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "C:\\GitHub\\rres\\examples\\resources\\text_data.txt"));
+    char* text = rresLoadText(rres);
     
+    // TEST 03: RRES_DATA_IMAGE: OK!!!
     rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "C:\\GitHub\\rres\\examples\\resources\\images\\fudesumi.png"));
     Image image = rresLoadImage(rres);
     Texture2D texture = LoadTextureFromImage(image);
     UnloadImage(image);
     
-    rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "resources/fonts/pixantiqua.ttf"));
-    Font font = rresLoadFont(rres);
-    
-    rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "resources/audio/sound.wav"));
+    // TEST 03: RRES_DATA_WAVE: OK!!!
+    rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "C:\\GitHub\\rres\\examples\\resources\\audio\\target.ogg"));
     Wave wave = rresLoadWave(rres);
     Sound sound = LoadSoundFromWave(wave);
     UnloadWave(wave);
+
+    // TEST 04: RRES_DATA_FONT_INFO (multichunk!)
+    rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "C:\\GitHub\\rres\\examples\\resources\\fonts\\pixantiqua.ttf"));
+    Font font = rresLoadFont(rres);
+    
+    // TEST 05: RRES_DATA_VERTEX (multichunk!)
     
     rresUnloadData(rres);
     rresUnloadCentralDirectory(dir);
@@ -80,7 +94,7 @@ int main(void)
             DrawText("rres file loading example", 10, 10, 20, DARKGRAY);
 
             DrawTexture(texture, 20, 20, WHITE);
-            DrawTextEx(font, "custom font!", (Vector2){ 100, 100 }, 40, 2, BLUE);
+            DrawTextEx(font, text, (Vector2){ 300, 20 }, 40, 2, BLUE);
 
         EndDrawing();
         //----------------------------------------------------------------------------------
@@ -88,6 +102,7 @@ int main(void)
 
     // De-Initialization
     //--------------------------------------------------------------------------------------
+    RL_FREE(text);
     UnloadTexture(texture);
     UnloadFont(font);
     UnloadSound(sound);

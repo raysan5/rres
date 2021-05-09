@@ -255,7 +255,7 @@ static char *rresLoadDataChunkText(rresDataChunk chunk)
     
     if (chunk.type == RRES_DATA_TEXT)
     {
-        text = (char *)RL_MALLOC(chunk.props[0]);
+        text = (char *)RL_CALLOC(chunk.props[0] + 1, 1);    // Add EOL ('\0') on loading?
         memcpy(text, chunk.data, chunk.props[0]);
     }
     
