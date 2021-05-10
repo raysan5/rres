@@ -1,6 +1,6 @@
 /**********************************************************************************************
 *
-*   rres v1.0 - A simple and easy-to-use resource packaging file-format
+*   rres v1.0 - A simple and easy-to-use file-format to package resources
 *
 *   CONFIGURATION:
 *
@@ -87,7 +87,7 @@
 //----------------------------------------------------------------------------------
 #define RRES_CURRENT_VERSION    100
 
-//#define RRES_CDIR_MAXFN_LENGTH  512
+//#define RRES_CDIR_MAX_FILENAME_LENGTH  512
 
 //----------------------------------------------------------------------------------
 // Types and Structures Definition
@@ -226,14 +226,6 @@ typedef struct rresInfoHeader {
     unsigned int reserved;
     unsigned int crc32;         // Data chunk CRC32 (propsCount + props[] + data)
 } rresInfoHeader;
-
-/*
-// rres resource raw data chunk (as stored in file)
-typedef struct rresFileDataChunk {
-    rresInfoHeader info;        // Resource info header
-    void *data;                 // Resource data chunk (props + data, compressed and encripted)
-} rresFileDataChunk;
-*/
 
 //----------------------------------------------------------------------------------
 // Enums Definition
@@ -467,7 +459,7 @@ rresCentralDir rresLoadCentralDirectory(const char *fileName)
                 rresDataChunk chunk = rresLoadDataChunk(info, data);
                 RRES_FREE(data);
                 
-                dir.count = chunk.props[0];                 // Files count
+                dir.count = chunk.props[0];     // Files count
 
                 unsigned char *ptr = chunk.data;
                 dir.entries = (rresDirEntry *)RRES_CALLOC(dir.count, sizeof(rresDirEntry));
@@ -475,11 +467,13 @@ rresCentralDir rresLoadCentralDirectory(const char *fileName)
                 for (int i = 0; i < dir.count; i++)
                 {
                     dir.entries[i].id = ((int *)ptr)[0];         // Resource unique id
-                    dir.entries[i].offset = ((int*)ptr)[1];     // Resource offset in file
-                    dir.entries[i].fileNameLen = ((int*)ptr)[2];    // Resource fileName length
-                    memcpy(dir.entries[i].fileName, ptr + 12, dir.entries[i].fileNameLen);   // Resource fileName ('\0' terminated)
+                    dir.entries[i].offset = ((int*)ptr)[1];      // Resource offset in file
+                    dir.entries[i].fileNameLen = ((int*)ptr)[2]; // Resource fileName length
+                    
+                    // Resource fileName, '\0' terminated, length considers that extra byte
+                    memcpy(dir.entries[i].fileName, ptr + 12, dir.entries[i].fileNameLen);
 
-                    ptr += (12 + dir.entries[i].fileNameLen);
+                    ptr += (12 + dir.entries[i].fileNameLen);    // Move pointer for next entry
                 }
 
                 rresUnloadDataChunk(chunk);
@@ -586,7 +580,9 @@ static rresDataChunk rresLoadDataChunk(rresInfoHeader info, void *data)
     }
     else if (info.compType == RRES_COMP_DEFLATE)
     {
-        //uncompData = Decompress(data, info.compSize, info.uncompSize);   // TODO.
+        // Data decompression can be done here or done on the engine-specific library
+        // just returning the compressed data package -> Return comp/crypto type?
+        //uncompData = DecompressData(data, info.compSize, &info.uncompSize);   // TODO.
     }
 
     // CRC32 data validation
