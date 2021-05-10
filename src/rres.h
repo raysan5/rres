@@ -13,9 +13,9 @@
 *   FILE STRUCTURE:
 *
 *   rresFileHeader             (12 bytes)
-*       File ID                 (4 bytes)   // File type id: 'rres'
+*       Signature Id            (4 bytes)   // File signature id: 'rRES'
 *       Version                 (2 bytes)   // Format version
-*       Res Count               (2 bytes)   // Number of resources contained
+*       Chunk Count             (2 bytes)   // Number of resource chunks contained
 *       CD Offset               (4 bytes)   // Central Directory offset (if available)
 *
 *   rres resource chunk
