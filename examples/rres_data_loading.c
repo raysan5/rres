@@ -27,12 +27,12 @@ int main(void)
     const int screenHeight = 450;
 
     InitWindow(screenWidth, screenHeight, "raylib [rres] example - rres data loading");
-    
+
     InitAudioDevice();
-    
+
     // TEST 00: RRES_DATA_DIRECTORY: OK!!!
     rresCentralDir dir = rresLoadCentralDirectory("resources.rres");
-    
+
     // Check if central directory is available
     // NOTE: CDIR is not mandatory, resources are referenced by its id
     if (dir.count == 0) TraceLog(LOG_WARNING, "No central directory available in the file");
@@ -53,29 +53,29 @@ int main(void)
     unsigned int dataSize = 0;
     void *data = rresLoadRaw(rres, &dataSize);
     rresUnloadData(rres);
-    
+
     FILE *rawFile = fopen("export_image.png", "wb");
     fwrite(data, dataSize, 1, rawFile);
     fclose(rawFile);
-    
+
     // TEST 02: RRES_DATA_TEXT -> OK!!!
     rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "C:\\GitHub\\rres\\examples\\resources\\text_data.txt"));
-    char* text = rresLoadText(rres);
+    char *text = rresLoadText(rres);
     rresUnloadData(rres);
-    
+
     // TEST 03: RRES_DATA_IMAGE -> OK!!!
     rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "C:\\GitHub\\rres\\examples\\resources\\images\\fudesumi.png"));
     Image image = rresLoadImage(rres);
     rresUnloadData(rres);
-    
+
     Texture2D texture = LoadTextureFromImage(image);
     UnloadImage(image);
-    
+
     // TEST 03: RRES_DATA_WAVE -> OK!!!
     rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "C:\\GitHub\\rres\\examples\\resources\\audio\\target.ogg"));
     Wave wave = rresLoadWave(rres);
     rresUnloadData(rres);
-    
+
     Sound sound = LoadSoundFromWave(wave);
     UnloadWave(wave);
 
@@ -83,14 +83,14 @@ int main(void)
     rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "C:\\GitHub\\rres\\examples\\resources\\fonts\\pixantiqua.ttf"));
     Font font = rresLoadFont(rres);
     rresUnloadData(rres);
-    
+
     // TEST 05: RRES_DATA_VERTEX (multichunk!)
     rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "C:\\GitHub\\rres\\examples\\resources\\models\\castle.obj"));
     Mesh mesh = rresLoadMesh(rres);
     rresUnloadData(rres);
-    
+
     Model model = LoadModelFromMesh(mesh);
-    
+
     // Unload central directory info, not required any more
     rresUnloadCentralDirectory(dir);
 
@@ -110,7 +110,7 @@ int main(void)
         BeginDrawing();
 
             ClearBackground(RAYWHITE);
-            
+
             DrawText("rres file loading example", 10, 10, 20, DARKGRAY);
 
             DrawTexture(texture, 20, 20, WHITE);
@@ -128,9 +128,9 @@ int main(void)
     UnloadSound(sound);
     UnloadFont(font);
     UnloadModel(model);
-    
+
     CloseAudioDevice();         // Close audio device
-    
+
     CloseWindow();              // Close window and OpenGL context
     //--------------------------------------------------------------------------------------
 
