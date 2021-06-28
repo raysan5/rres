@@ -368,7 +368,7 @@ rresData rresLoadData(const char *fileName, int rresId)
                     fseek(rresFile, currentFileOffset, SEEK_SET);           // Get to first resource chunk position
 
                     // Read and load data chunk from file data
-                    void* data = RRES_MALLOC(info.compSize);
+                    void *data = RRES_MALLOC(info.compSize);
                     fread(data, info.compSize, 1, rresFile);
                     rres.chunks[0] = rresLoadDataChunk(info, data);
                     RRES_FREE(data);
