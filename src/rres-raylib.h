@@ -165,7 +165,7 @@ Font rresLoadFont(rresData rres)
             font.charsPadding = rres.chunks[0].props[2];       // Padding around the chars
 
             font.recs = (Rectangle *)RL_MALLOC(font.charsCount*sizeof(Rectangle));
-            font.chars = (CharInfo *)RL_MALLOC(font.charsCount*sizeof(CharInfo));
+            font.chars = (GlyphInfo *)RL_MALLOC(font.charsCount*sizeof(GlyphInfo));
 
             for (int i = 0; i < font.charsCount; i++)
             {
