@@ -161,13 +161,13 @@ Font rresLoadFont(rresData rres)
         {
             // Load font basic properties from chunk[0]
             font.baseSize = rres.chunks[0].props[0];           // Base size (default chars height)
-            font.charsCount = rres.chunks[0].props[1];         // Number of characters (glyphs)
-            font.charsPadding = rres.chunks[0].props[2];       // Padding around the chars
+            font.glyphCount = rres.chunks[0].props[1];         // Number of characters (glyphs)
+            font.glyphPadding = rres.chunks[0].props[2];      // Padding around the chars
 
-            font.recs = (Rectangle *)RL_MALLOC(font.charsCount*sizeof(Rectangle));
-            font.chars = (GlyphInfo *)RL_MALLOC(font.charsCount*sizeof(GlyphInfo));
+            font.recs = (Rectangle *)RL_MALLOC(font.glyphCount*sizeof(Rectangle));
+            font.glyphs = (GlyphInfo *)RL_MALLOC(font.glyphCount*sizeof(GlyphInfo));
 
-            for (int i = 0; i < font.charsCount; i++)
+            for (int i = 0; i < font.glyphCount; i++)
             {
                 // Font glyphs info comes as a data blob
                 font.recs[i].x = (float)((rresFontGlyphsInfo *)rres.chunks[0].data)[i].x;
@@ -175,12 +175,12 @@ Font rresLoadFont(rresData rres)
                 font.recs[i].width = (float)((rresFontGlyphsInfo *)rres.chunks[0].data)[i].width;
                 font.recs[i].height = (float)((rresFontGlyphsInfo *)rres.chunks[0].data)[i].height;
 
-                font.chars[i].value = ((rresFontGlyphsInfo *)rres.chunks[0].data)[i].value;
-                font.chars[i].offsetX = ((rresFontGlyphsInfo *)rres.chunks[0].data)[i].offsetX;
-                font.chars[i].offsetY = ((rresFontGlyphsInfo *)rres.chunks[0].data)[i].offsetY;
-                font.chars[i].advanceX = ((rresFontGlyphsInfo *)rres.chunks[0].data)[i].advanceX;
+                font.glyphs[i].value = ((rresFontGlyphsInfo *)rres.chunks[0].data)[i].value;
+                font.glyphs[i].offsetX = ((rresFontGlyphsInfo *)rres.chunks[0].data)[i].offsetX;
+                font.glyphs[i].offsetY = ((rresFontGlyphsInfo *)rres.chunks[0].data)[i].offsetY;
+                font.glyphs[i].advanceX = ((rresFontGlyphsInfo *)rres.chunks[0].data)[i].advanceX;
 
-                // NOTE: font.chars[i].image is not loaded
+                // NOTE: font.glyphs[i].image is not loaded
             }
         }
 
