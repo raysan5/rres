@@ -60,23 +60,23 @@
 #ifndef RRES_H
 #define RRES_H
 
-//#define RRES_STATIC
-#if defined(RRES_STATIC)
-    #define RRESDEF static              // Functions just visible to module including this file
-#else
-    #ifdef __cplusplus
-        #define RRESDEF extern "C"      // Functions visible from other files (no name mangling of functions in C++)
-    #else
-        #define RRESDEF extern          // Functions visible from other files
+// Function specifiers definition
+#ifndef RRESAPI
+    #define RRESAPI       // Functions defined as 'extern' by default (implicit specifiers)
+#endif
+
+// Function specifiers in case library is build/used as a shared library (Windows)
+// NOTE: Microsoft specifiers to tell compiler that symbols are imported/exported from a .dll
+#if defined(_WIN32)
+    #if defined(BUILD_LIBTYPE_SHARED)
+        #define RRESAPI __declspec(dllexport)     // We are building the library as a Win32 shared library (.dll)
+    #elif defined(USE_LIBTYPE_SHARED)
+        #define RRESAPI __declspec(dllimport)     // We are using the library as a Win32 shared library (.dll)
     #endif
 #endif
 
-#define TRACELOG(level, ...) (void)0
-
 // Check if custom malloc/free functions defined, if not, using standard ones
-#if !defined(RRES_MALLOC)
-    #include <stdlib.h>             // Required for: malloc(), free()
-
+#ifndef RRES_MALLOC
     #define RRES_MALLOC(size)       malloc(size)
     #define RRES_CALLOC(n,sz)       calloc(n,sz)
     #define RRES_FREE(ptr)          free(ptr)
@@ -88,6 +88,9 @@
 #define RRES_CURRENT_VERSION    100
 
 //#define RRES_CDIR_MAX_FILENAME_LENGTH  512
+
+// TODO: Implement custom rresTraceLog()
+#define TRACELOG(level, ...) (void)0
 
 //----------------------------------------------------------------------------------
 // Types and Structures Definition
@@ -173,15 +176,23 @@ typedef enum {
 // Module Functions Declaration
 //----------------------------------------------------------------------------------
 
+#ifdef __cplusplus
+extern "C" {            // Prevents name mangling of functions
+#endif
+
 // Load all data chunks for specified rresId
-RRESDEF rresData rresLoadData(const char *fileName, int rresId);
-RRESDEF void rresUnloadData(rresData data);
+RRESAPI rresData rresLoadData(const char *fileName, int rresId);
+RRESAPI void rresUnloadData(rresData data);
 
-RRESDEF rresCentralDir rresLoadCentralDirectory(const char *fileName);
-RRESDEF void rresUnloadCentralDirectory(rresCentralDir dir);
-RRESDEF int rresGetIdFromFileName(rresCentralDir dir, const char *fileName);
+RRESAPI rresCentralDir rresLoadCentralDirectory(const char *fileName);
+RRESAPI void rresUnloadCentralDirectory(rresCentralDir dir);
+RRESAPI int rresGetIdFromFileName(rresCentralDir dir, const char *fileName);
 
-RRESDEF unsigned int rresComputeCRC32(unsigned char *buffer, int len);
+RRESAPI unsigned int rresComputeCRC32(unsigned char *buffer, int len);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif // RRES_H
 
@@ -194,6 +205,7 @@ RRESDEF unsigned int rresComputeCRC32(unsigned char *buffer, int len);
 
 #if defined(RRES_IMPLEMENTATION)
 
+#include <stdlib.h>             // Required for: malloc(), free()
 #include <stdio.h>              // Required for: FILE, fopen(), fclose()
 #include <string.h>             // Required for: memcpy()
 
