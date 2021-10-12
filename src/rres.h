@@ -60,11 +60,6 @@
 #ifndef RRES_H
 #define RRES_H
 
-// Function specifiers definition
-#ifndef RRESAPI
-    #define RRESAPI       // Functions defined as 'extern' by default (implicit specifiers)
-#endif
-
 // Function specifiers in case library is build/used as a shared library (Windows)
 // NOTE: Microsoft specifiers to tell compiler that symbols are imported/exported from a .dll
 #if defined(_WIN32)
@@ -75,22 +70,33 @@
     #endif
 #endif
 
-// Check if custom malloc/free functions defined, if not, using standard ones
-#ifndef RRES_MALLOC
-    #define RRES_MALLOC(size)       malloc(size)
-    #define RRES_CALLOC(n,sz)       calloc(n,sz)
-    #define RRES_FREE(ptr)          free(ptr)
+// Function specifiers definition
+#ifndef RRESAPI
+    #define RRESAPI       // Functions defined as 'extern' by default (implicit specifiers)
 #endif
 
 //----------------------------------------------------------------------------------
 // Defines and Macros
 //----------------------------------------------------------------------------------
-#define RRES_CURRENT_VERSION    100
 
-//#define RRES_CDIR_MAX_FILENAME_LENGTH  512
+// Allow custom memory allocators
+#ifndef RRES_MALLOC
+    #define RRES_MALLOC(sz)         malloc(sz)
+#endif
+#ifndef RRES_CALLOC
+    #define RRES_CALLOC(ptr,sz)     calloc(ptr,sz)
+#endif
+#ifndef RRES_REALLOC
+    #define RRES_REALLOC(ptr,sz)    realloc(ptr,sz)
+#endif
+#ifndef RRES_FREE
+    #define RRES_FREE(ptr)          free(ptr)
+#endif
 
 // TODO: Implement custom rresTraceLog()
 #define TRACELOG(level, ...) (void)0
+
+//#define RRES_CDIR_MAX_FILENAME_LENGTH  512
 
 //----------------------------------------------------------------------------------
 // Types and Structures Definition
