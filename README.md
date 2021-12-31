@@ -29,4 +29,4 @@ _IN PROGRESS_
 
 rRES file-format is licensed under MIT license. Check [LICENSE](LICENSE) for further details.
 
-*Copyright (c) 2014-2021 Ramon Santamaria ([@raysan5](https://twitter.com/raysan5))*
+*Copyright (c) 2014-2022 Ramon Santamaria ([@raysan5](https://twitter.com/raysan5))*
