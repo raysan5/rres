@@ -45,14 +45,14 @@
 // Module Functions Declaration
 //----------------------------------------------------------------------------------
 
-RRESDEF void *rresLoadRaw(rresData rres, int *size);
-RRESDEF char *rresLoadText(rresData rres);
-RRESDEF Image rresLoadImage(rresData rres);
-RRESDEF Wave rresLoadWave(rresData rres);
-RRESDEF Font rresLoadFont(rresData rres);
-RRESDEF Mesh rresLoadMesh(rresData rres);
-RRESDEF Material rresLoadMaterial(rresData rres);
-RRESDEF Model rresLoadModel(rresData rres);
+RRESAPI void *rresLoadRaw(rresData rres, int *size);
+RRESAPI char *rresLoadText(rresData rres);
+RRESAPI Image rresLoadImage(rresData rres);
+RRESAPI Wave rresLoadWave(rresData rres);
+RRESAPI Font rresLoadFont(rresData rres);
+RRESAPI Mesh rresLoadMesh(rresData rres);
+RRESAPI Material rresLoadMaterial(rresData rres);
+RRESAPI Model rresLoadModel(rresData rres);
 
 #endif // RRES_RAYLIB_H
 
