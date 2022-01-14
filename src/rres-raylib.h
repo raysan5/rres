@@ -135,12 +135,12 @@ Wave rresLoadWave(rresData rres)
 
     if ((rres.count >= 1) && (rres.chunks[0].type == RRES_DATA_WAVE))
     {
-        wave.sampleCount = rres.chunks[0].props[0];
+        wave.frameCount = rres.chunks[0].props[0];
         wave.sampleRate = rres.chunks[0].props[1];
         wave.sampleSize = rres.chunks[0].props[2];
         wave.channels = rres.chunks[0].props[3];
 
-        unsigned int size = wave.sampleCount*wave.sampleSize/8;
+        unsigned int size = wave.frameCount*wave.sampleSize/8;
         wave.data = RL_MALLOC(size);
         memcpy(wave.data, rres.chunks[0].data, size);
     }
