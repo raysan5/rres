@@ -264,6 +264,9 @@ typedef enum {
 } rresCompressionType;
 
 // Encryption types
+// TODO: REVIEW: Encryption algorythm could require additional data chunks
+// TODO: Hash algorythms to verify data integrity: CRC32, MD5, SHA-3, BLAKE2b...
+// TODO: Do we really need to encrypt the data for a videogame??? Probably not...
 typedef enum {
     RRES_CRYPTO_NONE = 0,       // No data encryption
     RRES_CRYPTO_XOR,            // XOR (128 bit) encryption
