@@ -27,6 +27,11 @@
 *
 *   FILE STRUCTURE:
 *
+*   rres files consist of a file header followed by a number of resource chunks.
+*   Optionally it can contain a Central Directory resource chunk at the end with info of all the files processed into the rres file.
+*   NOTE: Chunks count could not match files count, some processed files (Font, Mesh)
+*   could generate multiple chunks with the same id that are loaded together.
+*
 *   rresFileHeader             (16 bytes)
 *       Signature Id            (4 bytes)   // File signature id: 'rres'
 *       Version                 (2 bytes)   // Format version
@@ -34,22 +39,38 @@
 *       CD Offset               (4 bytes)   // Central Directory offset (if available)
 *       reserved                (4 bytes)   // reserved for the future
 *
-*   rres resource chunk
+*   rres resource chunk[]
 *   {
 *       rresInfoHeader         (32 bytes)
 *           Type                (4 bytes)   // Resource type (FOURCC)
-*           Id                  (4 bytes)   // Resource identifier (filename hash CRC32) -> MD5 is 16 bytes
-*           Comp Type           (1 byte)    // Data compression algorithm
-*           Cipher Type         (1 byte)    // Data encryption algorithm
+*           Id                  (4 bytes)   // Resource identifier (CRC32 filename hash)
+*           Compressor          (1 byte)    // Data compression algorithm
+*           Cipher              (1 byte)    // Data encryption algorithm
 *           Flags               (2 bytes)   // Data flags (if required)
 *           Data CompSize       (4 bytes)   // Data compressed size
 *           Data UncompSize     (4 bytes)   // Data uncompressed size
 *           Next Offset         (4 bytes)   // Next resource offset (if required)
 *           Reserved            (4 bytes)   // <reserved>
-*           CRC32               (4 bytes)   // Data Chunk CRC32 -> MD5 is 16 bytes
+*           CRC32               (4 bytes)   // Data Chunk CRC32
 *
-*       rres Data Chunk         (n bytes)   // Data: [propsCount + props[n] + data]
+*       rres Data Chunk         (n bytes)   // Data: propertyCount + props[propertyCount] + data
 *   }
+*
+*   rres resource chunk: CENTRAL DIRECTORY
+*   {
+*       rresInfoHeader         (32 bytes)
+*
+*       rresCentralDir          (n bytes)
+*           Entries Count       (4 bytes)   // Central directory entries count
+*           rresDirEntry[]
+*           {
+*               Id              (4 bytes)   // Resource id
+*               Offset          (4 bytes)   // Resource global offset in file
+*               reserved        (4 bytes)   // reserved
+*               FileName Size   (4 bytes)   // Resource fileName size ('\0' terminator and 4-bytes align padding considered!)
+*               FileName        (m bytes)   // Resource original fileName ('\0' terminated and padded with 0 to 4-byte alignment)
+*           }
+*    }
 *
 *
 *   LICENSE: zlib/libpng
@@ -145,10 +166,10 @@ typedef struct {
 //----------------------------------------------------------------------
 // rres central directory entry
 typedef struct {
-    unsigned int id;            // Resource unique id
+    unsigned int id;            // Resource id
     unsigned int offset;        // Resource global offset in file
     unsigned int reserved;      // reserved
-    unsigned int fileNameSize;  // Resource fileName length ('\0' terminator and 4-bytes align padding considered!)
+    unsigned int fileNameSize;  // Resource fileName size ('\0' terminator and 4-bytes align padding considered!)
     char fileName[RRES_MAX_CDIR_FILENAME_LENGTH];  // Resource original fileName ('\0' terminated and padded with 0 to 4-byte alignment)
 } rresDirEntry;
 
@@ -532,11 +553,11 @@ rresCentralDir rresLoadCentralDirectory(const char *fileName)
 
                 for (unsigned int i = 0; i < dir.count; i++)
                 {
-                    dir.entries[i].id = ((int *)ptr)[0];            // Resource unique id
+                    dir.entries[i].id = ((int *)ptr)[0];            // Resource id
                     dir.entries[i].offset = ((int*)ptr)[1];         // Resource offset in file
-                    dir.entries[i].fileNameSize = ((int*)ptr)[2];   // Resource fileName length
+                    dir.entries[i].fileNameSize = ((int*)ptr)[2];   // Resource fileName size
 
-                    // Resource fileName, '\0' terminated, length considers that extra byte
+                    // Resource fileName, '\0' terminated, size considers that extra byte
                     memcpy(dir.entries[i].fileName, ptr + 16, dir.entries[i].fileNameSize);
 
                     ptr += (16 + dir.entries[i].fileNameSize);      // Move pointer for next entry
