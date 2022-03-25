@@ -12,10 +12,10 @@
 #include "raylib.h"
 
 #define RRES_IMPLEMENTATION
-#include "../src/rres.h"
+#include "../src/rres.h"                // Required to read rres data chunks
 
 #define RRES_RAYLIB_IMPLEMENTATION
-#include "../src/rres-raylib.h"
+#include "../src/rres-raylib.h"         // Required to map rres data chunks into raylib structs 
 
 #include <stdio.h>
 
@@ -41,7 +41,7 @@ int main(void)
         // List all files contained on central directory
         for (unsigned int i = 0; i < dir.count; i++)
         {
-            TraceLog(LOG_INFO, "FILE: [%08X] Entry (0x%x): %s (len: %i)", dir.entries[i].id, dir.entries[i].offset, dir.entries[i].fileName, dir.entries[i].fileNameLen);
+            TraceLog(LOG_INFO, "FILE: [%08X] Entry (0x%x): %s (size: %i)", dir.entries[i].id, dir.entries[i].offset, dir.entries[i].fileName, dir.entries[i].fileNameSize);
         }
     }
 

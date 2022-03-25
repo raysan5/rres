@@ -22,6 +22,7 @@
 *       Also note that CRC32 is not used as a security/cryptographic hash, just an identifier for the input file
 *     - CRC32 hash is also used to detect chunk data corruption. CRC32 is smaller and computationally much less complex than MD5 or SHA1.
 *       Using a hash function like MD5 is probably overkill for random error detection
+*     - Central Directory rresDirEntry.fileName is '\0' terminated and padded to 4-byte, rresDirEntry.fileNameSize considers full byte size
 *
 *
 *   FILE STRUCTURE:
@@ -142,16 +143,14 @@ typedef struct {
 
 // Specific data for some chunk types
 //----------------------------------------------------------------------
-// rres central directory entry (524 bytes)
+// rres central directory entry
 typedef struct {
     unsigned int id;            // Resource unique id
-    unsigned int offset;        // Resource offset in file
-    // TODO: fileSize and type?
-    unsigned int fileNameLen;   // Resource fileName length
-    char fileName[RRES_MAX_CDIR_FILENAME_LENGTH];   // Resource fileName ('\0' terminated)
+    unsigned int offset;        // Resource global offset in file
+    unsigned int reserved;      // reserved
+    unsigned int fileNameSize;  // Resource fileName length ('\0' terminator and 4-bytes align padding considered!)
+    char fileName[RRES_MAX_CDIR_FILENAME_LENGTH];  // Resource original fileName ('\0' terminated and padded with 0 to 4-byte alignment)
 } rresDirEntry;
-
-// TODO: Add filename padding to align memory?
 
 // rres central directory
 typedef struct {
@@ -291,8 +290,6 @@ typedef struct {
     void *data;                 // Resource chunk data
 } rresDataChunkInternal;
 */
-
-// NOTE: After every chunk 0-3 bytes of padding are added to align resources to multiple of 4 bytes file offset addresses
 
 //----------------------------------------------------------------------------------
 // Enums Definition
@@ -535,14 +532,14 @@ rresCentralDir rresLoadCentralDirectory(const char *fileName)
 
                 for (unsigned int i = 0; i < dir.count; i++)
                 {
-                    dir.entries[i].id = ((int *)ptr)[0];         // Resource unique id
-                    dir.entries[i].offset = ((int*)ptr)[1];      // Resource offset in file
-                    dir.entries[i].fileNameLen = ((int*)ptr)[2]; // Resource fileName length
+                    dir.entries[i].id = ((int *)ptr)[0];            // Resource unique id
+                    dir.entries[i].offset = ((int*)ptr)[1];         // Resource offset in file
+                    dir.entries[i].fileNameSize = ((int*)ptr)[2];   // Resource fileName length
 
                     // Resource fileName, '\0' terminated, length considers that extra byte
-                    memcpy(dir.entries[i].fileName, ptr + 12, dir.entries[i].fileNameLen);
+                    memcpy(dir.entries[i].fileName, ptr + 16, dir.entries[i].fileNameSize);
 
-                    ptr += (12 + dir.entries[i].fileNameLen);    // Move pointer for next entry
+                    ptr += (16 + dir.entries[i].fileNameSize);      // Move pointer for next entry
                 }
 
                 rresUnloadDataChunk(chunk);
