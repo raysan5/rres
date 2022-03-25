@@ -9,28 +9,43 @@
 *       If not defined, the library is in header only mode and can be included in other headers
 *       or source files without problems. But only ONE file should hold the implementation.
 *
+*   DESIGN DECISIONS / LIMITATIONS:
+*
+*     - rres file maximum chunks: 65535 (16bit chunk count in rresFileHeader)
+*     - rres file maximum size: 4GB (chunk offset and Central Directory Offset is 32bit, so it can not address more than 4GB
+*     - Chunk search by ID is done one by one, starting at first chunk and accessed with fread() function
+*     - Endianness: rres does not care about endianness, data is stored as desired by the host platform (most probably Little Endian)
+*       Endianness won't affect chunk data but it will affect rresFileHeader and rresInfoHeader
+*     - CRC32 hash is used to to generate the rres file identifier from filename
+*       There is a "small" probability of random collision (1 in 2^32 approx.) but considering 
+*       the chance of collision is related to the number of data inputs, not the size of the inputs, we assume that probablility
+*       Also note that CRC32 is not used as a security/cryptographic hash, just an identifier for the input file
+*     - CRC32 hash is also used to detect chunk data corruption. CRC32 is smaller and computationally much less complex than MD5 or SHA1.
+*       Using a hash function like MD5 is probably overkill for random error detection
+*
 *
 *   FILE STRUCTURE:
 *
-*   rresFileHeader             (12 bytes)
-*       Signature Id            (4 bytes)   // File signature id: 'rRES'
+*   rresFileHeader             (16 bytes)
+*       Signature Id            (4 bytes)   // File signature id: 'rres'
 *       Version                 (2 bytes)   // Format version
 *       Chunk Count             (2 bytes)   // Number of resource chunks contained
 *       CD Offset               (4 bytes)   // Central Directory offset (if available)
+*       reserved                (4 bytes)   // reserved for the future
 *
 *   rres resource chunk
 *   {
 *       rresInfoHeader         (32 bytes)
 *           Type                (4 bytes)   // Resource type (FOURCC)
-*           Id                  (4 bytes)   // Resource identifier (filename hash!)
-*           Comp Type           (1 byte)    // Data compression type
-*           Crypt Type          (1 byte)    // Data encryption type
+*           Id                  (4 bytes)   // Resource identifier (filename hash CRC32) -> MD5 is 16 bytes
+*           Comp Type           (1 byte)    // Data compression algorithm
+*           Cipher Type         (1 byte)    // Data encryption algorithm
 *           Flags               (2 bytes)   // Data flags (if required)
 *           Data CompSize       (4 bytes)   // Data compressed size
 *           Data UncompSize     (4 bytes)   // Data uncompressed size
 *           Next Offset         (4 bytes)   // Next resource offset (if required)
 *           Reserved            (4 bytes)   // <reserved>
-*           CRC32               (4 bytes)   // Data Chunk CRC32
+*           CRC32               (4 bytes)   // Data Chunk CRC32 -> MD5 is 16 bytes
 *
 *       rres Data Chunk         (n bytes)   // Data: [propsCount + props[n] + data]
 *   }
@@ -93,10 +108,16 @@
     #define RRES_FREE(ptr)          free(ptr)
 #endif
 
-// TODO: Implement custom rresTraceLog()
-#define TRACELOG(level, ...) (void)0
+// Simple log system to avoid printf() calls if required
+// NOTE: Avoiding those calls, also avoids const strings memory usage
+#define RRES_SUPPORT_LOG_INFO
+#if defined(RRES_SUPPORT_LOG_INFO)
+    #define RRES_LOG(...) printf(__VA_ARGS__)
+#else
+    #define RRES_LOG(...)
+#endif
 
-//#define RRES_CDIR_MAX_FILENAME_LENGTH  512
+#define RRES_MAX_CDIR_FILENAME_LENGTH  512
 
 //----------------------------------------------------------------------------------
 // Types and Structures Definition
@@ -121,13 +142,16 @@ typedef struct {
 
 // Specific data for some chunk types
 //----------------------------------------------------------------------
-// rres central directory entry
+// rres central directory entry (524 bytes)
 typedef struct {
     unsigned int id;            // Resource unique id
     unsigned int offset;        // Resource offset in file
+    // TODO: fileSize and type?
     unsigned int fileNameLen;   // Resource fileName length
-    char fileName[512];         // Resource fileName ('\0' terminated)
+    char fileName[RRES_MAX_CDIR_FILENAME_LENGTH];   // Resource fileName ('\0' terminated)
 } rresDirEntry;
+
+// TODO: Add filename padding to align memory?
 
 // rres central directory
 typedef struct {
@@ -135,9 +159,9 @@ typedef struct {
     rresDirEntry *entries;      // Central directory entries
 } rresCentralDir;
 
-// rres font glyphs info
+// rres font glyphs info (32 bytes)
 typedef struct {
-    int x, y, width, height;    // Glyph rectangle in the atals image
+    int x, y, width, height;    // Glyph rectangle in the atlas image
     int value;                  // Glyph codepoint value
     int offsetX, offsetY;       // Glyph drawing offset (from base line)
     int advanceX;               // Glyph advance X for next character
@@ -149,6 +173,7 @@ typedef struct {
 typedef enum {
     // Basic data (one chunk)
     //-----------------------------------------------------
+    RRES_DATA_NULL      = 0,    // [NULL] Reserved for empty chunks (if required)
     RRES_DATA_RAW       = 1,    // [RAWD] props[0]:size | data: raw bytes
     RRES_DATA_TEXT      = 2,    // [TEXT] props[0]:size, props[1]:cultureCode | data: text (NULL terminated?)
     RRES_DATA_IMAGE     = 3,    // [IMGE] props[0]:width, props[1]:height, props[2]:mipmaps, props[3]:rresPixelFormat | data: pixels
@@ -172,6 +197,15 @@ typedef enum {
     // NOTE: New rres data types can be added here with custom props|data
 
 } rresDataType;
+
+// rres error codes
+// NOTE: Error codes when processing rres files
+typedef enum {
+    RRES_SUCCESS = 0,               // rres file loaded/saved successfully
+    RRES_ERROR_FILE_NOT_FOUND,      // rres file can not be opened (spelling issues, file actually does not exist...)
+    RRES_ERROR_FILE_FORMAT,         // rres file format not a supported (wrong header, wrong identifier)
+    RRES_ERROR_MEMORY_ALLOC,        // Memory could not be allocated for operation.
+} rresErrorType;
 
 //----------------------------------------------------------------------------------
 // Global variables
@@ -224,27 +258,41 @@ RRESAPI unsigned int rresComputeCRC32(unsigned char *buffer, int len);
 // Types and Structures Definition
 //----------------------------------------------------------------------------------
 
-// rres file header (12 bytes)
-typedef struct rresFileHeader {
-    unsigned char id[4];        // File identifier: rRES
+// rres file header (16 bytes)
+typedef struct {
+    unsigned char id[4];        // File identifier: rres
     unsigned short version;     // File version and subversion
-    unsigned short chunkCount;  // Number of resource chunks in this file (total)
+    unsigned short chunkCount;  // Number of resource chunks in this file (total) -> MAX: 65535
     unsigned int cdOffset;      // Central Directory offset in file (0 if not available)
+    unsigned int reserved;      // reserved
 } rresFileHeader;
 
 // rres resource chunk info header (32 bytes)
-typedef struct rresInfoHeader {
+typedef struct {
     unsigned char type[4];      // Resource chunk type (FOURCC)
-    unsigned int id;            // Resource chunk identifier (filename hash!)
-    unsigned char compType;     // Data compression type
-    unsigned char crypType;     // Data encription type
+    unsigned int id;            // Resource chunk identifier (generated from filename CRC32 hash)
+    unsigned char compType;     // Data compression algorithm
+    unsigned char cipherType;   // Data encription algorithm
     unsigned short flags;       // Data flags (if required)
-    unsigned int compSize;      // Data compressed size
-    unsigned int uncompSize;    // Data uncompressed size
-    unsigned int nextOffset;    // Next resource chunk offset (if required)
-    unsigned int reserved;
+    unsigned int compSize;      // Data compressed size (considering full data chunk)
+    unsigned int uncompSize;    // Data uncompressed size (considering full data chunk)
+    unsigned int nextOffset;    // Next resource chunk global offset (if resource has multiple chunks)
+    unsigned int reserved;      // reserved
     unsigned int crc32;         // Data chunk CRC32 (propsCount + props[] + data)
 } rresInfoHeader;
+
+/*
+// rres resource data chunk
+// NOTE: This is not the rresDataChunk type returned on loading,
+// only the internal chunk data representation, actually this struct is not used
+typedef struct {
+    unsigned int propsCount;    // Resource chunk properties count
+    int *props;                 // Resource chunk properties
+    void *data;                 // Resource chunk data
+} rresDataChunkInternal;
+*/
+
+// NOTE: After every chunk 0-3 bytes of padding are added to align resources to multiple of 4 bytes file offset addresses
 
 //----------------------------------------------------------------------------------
 // Enums Definition
@@ -260,21 +308,21 @@ typedef enum {
     RRES_COMP_BZIP2,            // BZIP2 compression
     RRES_COMP_SNAPPY,           // SNAPPY compression
     RRES_COMP_BROTLI,           // BROTLI compression
-    // gzip, zopfli, lzo, zstd  // Other compression algorythms...
+    // gzip, zopfli, lzo, zstd  // Other compression algorithms...
 } rresCompressionType;
 
 // Encryption types
-// TODO: REVIEW: Encryption algorythm could require additional data chunks
-// TODO: Hash algorythms to verify data integrity: CRC32, MD5, SHA-3, BLAKE2b...
+// TODO: REVIEW: Encryption algorithm could require additional data chunks
+// TODO: Hash algorithms to verify data integrity: CRC32, MD5, SHA-3, BLAKE2b...
 // TODO: Do we really need to encrypt the data for a videogame??? Probably not...
 typedef enum {
-    RRES_CRYPTO_NONE = 0,       // No data encryption
-    RRES_CRYPTO_XOR,            // XOR (128 bit) encryption
-    RRES_CRYPTO_AES,            // RIJNDAEL (128 bit) encryption (AES)
-    RRES_CRYPTO_TDES,           // Triple DES encryption
-    RRES_CRYPTO_BLOWFISH,       // BLOWFISH encryption
-    RRES_CRYPTO_XTEA,           // XTEA encryption
-    // twofish, RC5, RC6        // Other encryption algorythm...
+    RRES_CIPHER_NONE = 0,       // No data encryption
+    RRES_CIPHER_XOR,            // XOR (128 bit) encryption
+    RRES_CIPHER_AES,            // RIJNDAEL (128 bit) encryption (AES)
+    RRES_CIPHER_TDES,           // Triple DES encryption
+    RRES_CIPHER_BLOWFISH,       // BLOWFISH encryption
+    RRES_CIPHER_XTEA,           // XTEA encryption
+    // twofish, RC5, RC6        // Other encryption algorithm...
 } rresEncryptionType;
 
 // Image/Texture data type
@@ -333,7 +381,7 @@ typedef enum {
 //...
 
 //----------------------------------------------------------------------------------
-// Module specific Functions Declaration
+// Module Internal Functions Declaration
 //----------------------------------------------------------------------------------
 static rresDataChunk rresLoadDataChunk(rresInfoHeader info, void *data);
 static void rresUnloadDataChunk(rresDataChunk chunk);
@@ -341,7 +389,6 @@ static void rresUnloadDataChunk(rresDataChunk chunk);
 //----------------------------------------------------------------------------------
 // Module Functions Definition
 //----------------------------------------------------------------------------------
-
 // Load resource from file by id
 // NOTE: All resources conected to base id are loaded
 rresData rresLoadData(const char *fileName, int rresId)
@@ -350,7 +397,7 @@ rresData rresLoadData(const char *fileName, int rresId)
 
     FILE *rresFile = fopen(fileName, "rb");
 
-    if (rresFile == NULL) TRACELOG(LOG_WARNING, "[%s] rres file could not be opened", fileName);
+    if (rresFile == NULL) RRES_LOG("WARNING: [%s] rres file could not be opened\n", fileName);
     else
     {
         rresFileHeader header = { 0 };
@@ -396,7 +443,7 @@ rresData rresLoadData(const char *fileName, int rresId)
                     RRES_FREE(data);
 
                     // Check if there are more chunks to read
-                    if (rres.count > 1) TRACELOG(LOG_INFO, "[%s][ID %i] Multiple resource chunks detected: %i chunks", fileName, (int)info.id, *count);
+                    if (rres.count > 1) RRES_LOG("INFO: [%s][ID %i] Multiple resource chunks detected: %i chunks\n", fileName, (int)info.id, rres.count);
 
                     int i = 0;
 
@@ -437,7 +484,7 @@ rresData rresLoadData(const char *fileName, int rresId)
 // Unload resource data
 void rresUnloadData(rresData rres)
 {
-    for (int i = 0; i < rres.count; i++) rresUnloadDataChunk(rres.chunks[i]);
+    for (unsigned int i = 0; i < rres.count; i++) rresUnloadDataChunk(rres.chunks[i]);
 
     RRES_FREE(rres.chunks);
 }
@@ -461,7 +508,7 @@ rresCentralDir rresLoadCentralDirectory(const char *fileName)
             (header.id[3] == 'S') &&
             (header.cdOffset != 0))
         {
-            TraceLog(LOG_WARNING, "CDIR: Found at offset: %08x", header.cdOffset);
+            RRES_LOG("WARNING: CDIR: Found at offset: %08x\n", header.cdOffset);
 
             rresInfoHeader info = { 0 };
 
@@ -473,7 +520,7 @@ rresCentralDir rresLoadCentralDirectory(const char *fileName)
                 (info.type[2] == 'I') &&
                 (info.type[3] == 'R'))
             {
-                TraceLog(LOG_WARNING, "CDIR: Found! Comp.Size: %i", info.compSize);
+                RRES_LOG("WARNING: CDIR: Found! Comp.Size: %i\n", info.compSize);
 
                 void *data = RRES_MALLOC(info.compSize);
                 fread(data, info.compSize, 1, rresFile);
@@ -486,7 +533,7 @@ rresCentralDir rresLoadCentralDirectory(const char *fileName)
                 unsigned char *ptr = chunk.data;
                 dir.entries = (rresDirEntry *)RRES_CALLOC(dir.count, sizeof(rresDirEntry));
 
-                for (int i = 0; i < dir.count; i++)
+                for (unsigned int i = 0; i < dir.count; i++)
                 {
                     dir.entries[i].id = ((int *)ptr)[0];         // Resource unique id
                     dir.entries[i].offset = ((int*)ptr)[1];      // Resource offset in file
@@ -517,9 +564,9 @@ int rresGetIdFromFileName(rresCentralDir dir, const char *fileName)
 {
     int id = 0;
 
-    for (int i = 0; i < dir.count; i++)
+    for (unsigned int i = 0; i < dir.count; i++)
     {
-        if (strcmp((const char *)dir.entries[i].fileName, fileName) == 0)
+        if (strcmp((const char *)dir.entries[i].fileName, fileName) == 0)   // TODO: Avoid strcmp()?
         {
             id = dir.entries[i].id;
             break;
@@ -575,7 +622,7 @@ unsigned int rresComputeCRC32(unsigned char *buffer, int len)
 }
 
 //----------------------------------------------------------------------------------
-// Module specific Functions Definition
+// Module Internal Functions Definition
 //----------------------------------------------------------------------------------
 // Load data chunk from raw resource data as contained in file
 // NOTE: Raw data can be compressed and encrypted, it also contains the props data embedded
@@ -585,6 +632,7 @@ static rresDataChunk rresLoadDataChunk(rresInfoHeader info, void *data)
     void *uncompData = NULL;
 
     // Assign rres.type (int) from info.type (FOURCC)
+    if ((info.type[0] == 'N') && (info.type[1] == 'U') && (info.type[2] == 'L') && (info.type[3] == 'L')) chunk.type = RRES_DATA_NULL;            // NULL
     if ((info.type[0] == 'R') && (info.type[1] == 'A') && (info.type[2] == 'W') && (info.type[3] == 'D')) chunk.type = RRES_DATA_RAW;             // RAWD
     else if ((info.type[0] == 'T') && (info.type[1] == 'E') && (info.type[2] == 'X') && (info.type[3] == 'T')) chunk.type = RRES_DATA_TEXT;       // TEXT
     else if ((info.type[0] == 'I') && (info.type[1] == 'M') && (info.type[2] == 'G') && (info.type[3] == 'E')) chunk.type = RRES_DATA_IMAGE;      // IMGE
@@ -593,6 +641,8 @@ static rresDataChunk rresLoadDataChunk(rresInfoHeader info, void *data)
     else if ((info.type[0] == 'F') && (info.type[1] == 'O') && (info.type[2] == 'N') && (info.type[3] == 'T')) chunk.type = RRES_DATA_FONT_INFO;  // FONT
     else if ((info.type[0] == 'L') && (info.type[1] == 'I') && (info.type[2] == 'N') && (info.type[3] == 'K')) chunk.type = RRES_DATA_LINK;       // LINK
     else if ((info.type[0] == 'C') && (info.type[1] == 'D') && (info.type[2] == 'I') && (info.type[3] == 'R')) chunk.type = RRES_DATA_DIRECTORY;  // CDIR
+
+    // TODO: Skip NULL chunk if required?
 
     // Decompress and decrypt [properties + data] chunk
     // TODO: Support multiple compression/encryption types
@@ -617,8 +667,8 @@ static rresDataChunk rresLoadDataChunk(rresInfoHeader info, void *data)
 
         if (chunk.propsCount > 0)
         {
-            chunk.props = (int *)RRES_MALLOC(chunk.propsCount*sizeof(int));
-            for (int i = 0; i < chunk.propsCount; i++) chunk.props[i] = ((int *)uncompData)[1 + i];
+            chunk.props = (int *)RRES_CALLOC(chunk.propsCount, sizeof(int));
+            for (unsigned int i = 0; i < chunk.propsCount; i++) chunk.props[i] = ((int *)uncompData)[1 + i];
         }
 
         chunk.data = RRES_MALLOC(info.uncompSize);
@@ -626,7 +676,7 @@ static rresDataChunk rresLoadDataChunk(rresInfoHeader info, void *data)
     }
     else
     {
-        TRACELOG(LOG_WARNING, "[ID %i] CRC32 does not match, data can be corrupted", info.id);
+        RRES_LOG("WARNING: [ID %i] CRC32 does not match, data can be corrupted\n", info.id);
         if (info.compType == RRES_COMP_DEFLATE) RRES_FREE(uncompData);
     }
 
