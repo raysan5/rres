@@ -205,7 +205,7 @@ Mesh rresLoadMesh(rresData rres)
     // TODO: Make sure all rres.chunks[i] vertexCount are the same?
 
     // Mesh resource consist of (n) chunks:
-    for (int i = 0; i < rres.count; i++)
+    for (unsigned int i = 0; i < rres.count; i++)
     {
         if (rres.chunks[i].type == RRES_DATA_VERTEX)
         {

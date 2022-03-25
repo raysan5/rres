@@ -39,7 +39,7 @@ int main(void)
     else
     {
         // List all files contained on central directory
-        for (int i = 0; i < dir.count; i++)
+        for (unsigned int i = 0; i < dir.count; i++)
         {
             TraceLog(LOG_INFO, "FILE: [%08X] Entry (0x%x): %s (len: %i)", dir.entries[i].id, dir.entries[i].offset, dir.entries[i].fileName, dir.entries[i].fileNameLen);
         }
@@ -48,7 +48,7 @@ int main(void)
     // Load content from rres file
     rresData rres = { 0 };
 
-    // TEST 01: RRES_DATA_RAW
+    // TEST 01: RRES_DATA_RAW -> OK!!!
     rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "C:\\GitHub\\rres\\examples\\resources\\image.png.raw"));
     unsigned int dataSize = 0;
     void *data = rresLoadRaw(rres, &dataSize);
@@ -79,12 +79,12 @@ int main(void)
     Sound sound = LoadSoundFromWave(wave);
     UnloadWave(wave);
 
-    // TEST 04: RRES_DATA_FONT_INFO (multichunk!)
+    // TEST 04: RRES_DATA_FONT_INFO (multichunk) -> ...
     rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "C:\\GitHub\\rres\\examples\\resources\\fonts\\pixantiqua.ttf"));
     Font font = rresLoadFont(rres);
     rresUnloadData(rres);
 
-    // TEST 05: RRES_DATA_VERTEX (multichunk!)
+    // TEST 05: RRES_DATA_VERTEX (multichunk!) -> ...
     rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "C:\\GitHub\\rres\\examples\\resources\\models\\castle.obj"));
     Mesh mesh = rresLoadMesh(rres);
     rresUnloadData(rres);
@@ -125,9 +125,9 @@ int main(void)
     MemFree(data);              // Unload raw data
     MemFree(text);              // Unload text data
     UnloadTexture(texture);     // Unload texture (VRAM)
-    UnloadSound(sound);
-    UnloadFont(font);
-    UnloadModel(model);
+    UnloadSound(sound);         // Unload sound
+    UnloadFont(font);           // Unload font
+    UnloadModel(model);         // Unload model
 
     CloseAudioDevice();         // Close audio device
 
