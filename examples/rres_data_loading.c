@@ -49,30 +49,37 @@ int main(void)
     rresData rres = { 0 };
 
     // TEST 01: RRES_DATA_RAW -> OK!!!
-    rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "C:\\GitHub\\rres\\examples\\resources\\image.png.raw"));
+    rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "resources/image.png.raw"));
     unsigned int dataSize = 0;
+    // NOTE: rresLoadRaw() and similar functions already check internally if ((rres.count > 0) && (rres.chunks != NULL))
     void *data = rresLoadRaw(rres, &dataSize);
     rresUnloadData(rres);
-
-    FILE *rawFile = fopen("export_image.png", "wb");
-    fwrite(data, dataSize, 1, rawFile);
-    fclose(rawFile);
+    
+    if ((data != NULL) && (dataSize > 0))
+    {
+        FILE *rawFile = fopen("export_image.png", "wb");
+        fwrite(data, dataSize, 1, rawFile);
+        fclose(rawFile);
+    }
 
     // TEST 02: RRES_DATA_TEXT -> OK!!!
-    rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "C:\\GitHub\\rres\\examples\\resources\\text_data.txt"));
+    rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "resources/text_data.txt"));
     char *text = rresLoadText(rres);
     rresUnloadData(rres);
 
     // TEST 03: RRES_DATA_IMAGE -> OK!!!
-    rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "C:\\GitHub\\rres\\examples\\resources\\images\\fudesumi.png"));
+    rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "resources/images/fudesumi.png"));
     Image image = rresLoadImage(rres);
     rresUnloadData(rres);
 
-    Texture2D texture = LoadTextureFromImage(image);
-    UnloadImage(image);
+    if (image.data != NULL)
+    {
+        Texture2D texture = LoadTextureFromImage(image);
+        UnloadImage(image);
+    }
 
     // TEST 03: RRES_DATA_WAVE -> OK!!!
-    rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "C:\\GitHub\\rres\\examples\\resources\\audio\\target.ogg"));
+    rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "resources/audio/target.ogg"));
     Wave wave = rresLoadWave(rres);
     rresUnloadData(rres);
 
