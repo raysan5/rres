@@ -170,15 +170,15 @@ Font rresLoadFont(rresData rres)
             for (int i = 0; i < font.glyphCount; i++)
             {
                 // Font glyphs info comes as a data blob
-                font.recs[i].x = (float)((rresFontGlyphsInfo *)rres.chunks[0].data)[i].x;
-                font.recs[i].y = (float)((rresFontGlyphsInfo *)rres.chunks[0].data)[i].y;
-                font.recs[i].width = (float)((rresFontGlyphsInfo *)rres.chunks[0].data)[i].width;
-                font.recs[i].height = (float)((rresFontGlyphsInfo *)rres.chunks[0].data)[i].height;
+                font.recs[i].x = (float)((rresFontGlyphInfo *)rres.chunks[0].data)[i].x;
+                font.recs[i].y = (float)((rresFontGlyphInfo *)rres.chunks[0].data)[i].y;
+                font.recs[i].width = (float)((rresFontGlyphInfo *)rres.chunks[0].data)[i].width;
+                font.recs[i].height = (float)((rresFontGlyphInfo *)rres.chunks[0].data)[i].height;
 
-                font.glyphs[i].value = ((rresFontGlyphsInfo *)rres.chunks[0].data)[i].value;
-                font.glyphs[i].offsetX = ((rresFontGlyphsInfo *)rres.chunks[0].data)[i].offsetX;
-                font.glyphs[i].offsetY = ((rresFontGlyphsInfo *)rres.chunks[0].data)[i].offsetY;
-                font.glyphs[i].advanceX = ((rresFontGlyphsInfo *)rres.chunks[0].data)[i].advanceX;
+                font.glyphs[i].value = ((rresFontGlyphInfo *)rres.chunks[0].data)[i].value;
+                font.glyphs[i].offsetX = ((rresFontGlyphInfo *)rres.chunks[0].data)[i].offsetX;
+                font.glyphs[i].offsetY = ((rresFontGlyphInfo *)rres.chunks[0].data)[i].offsetY;
+                font.glyphs[i].advanceX = ((rresFontGlyphInfo *)rres.chunks[0].data)[i].advanceX;
 
                 // NOTE: font.glyphs[i].image is not loaded
             }
@@ -205,7 +205,7 @@ Mesh rresLoadMesh(rresData rres)
     // TODO: Make sure all rres.chunks[i] vertexCount are the same?
 
     // Mesh resource consist of (n) chunks:
-    for (unsigned int i = 0; i < rres.count; i++)
+    for (int i = 0; i < rres.count; i++)
     {
         if (rres.chunks[i].type == RRES_DATA_VERTEX)
         {
