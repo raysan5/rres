@@ -2,6 +2,20 @@
 *
 *   rres-raylib v1.0 - rres loaders specific for raylib data structures
 *
+*   CONFIGURATION:
+*
+*   #define RRES_RAYLIB_IMPLEMENTATION
+*       Generates the implementation of the library into the included file.
+*       If not defined, the library is in header only mode and can be included in other headers
+*       or source files without problems. But only ONE file should hold the implementation.
+*
+*   #define RRES_SUPPORT_COMPRESSION_LZ4
+*       Support data compression LZ4 algorithm, provided by lz4.h/lz4.c library
+* 
+*   #define RRES_SUPPORT_ENCRYPTION_MONOCYPHER
+*       Support data encryption algorithms provided by monocypher.h/monocypher.c library
+* 
+* 
 *   LICENSE: MIT
 *
 *   Copyright (c) 2020-2022 Ramon Santamaria (@raysan5)
@@ -73,11 +87,15 @@ RRESAPI void rresWipeCipherPassword(void);              // Wipe stored password
 #if defined(RRES_RAYLIB_IMPLEMENTATION)
 
 // Include supported compression/encryption algorithms
-#include "external/lz4.h"                   // LZ4 compression algorithm
-#include "external/lz4.c"                   // LZ4 compression algorithm implementation
-
-#include "external/monocypher.h"            // Encryption algorithms
-#include "external/monocypher.c"            // Encryption algorithms
+// NOTE: They should be the same supported by the rres packaging tool (rrespacker)
+#if defined(RRES_SUPPORT_COMPRESSION_LZ4)
+    #include "external/lz4.h"               // LZ4 compression algorithm
+    #include "external/lz4.c"               // LZ4 compression algorithm implementation
+#endif
+#if defined(RRES_SUPPORT_ENCRYPTION_MONOCYPHER)
+    #include "external/monocypher.h"        // Encryption algorithms
+    #include "external/monocypher.c"        // Encryption algorithms implementation
+#endif
 
 //----------------------------------------------------------------------------------
 // Defines and Macros
@@ -341,7 +359,11 @@ static int rresUnpackDataChunk(rresDataChunk *chunk)
     // STEP 1. Decrypt message if encrypted
     if (chunk->cipherType == RRES_CIPHER_XCHACHA20_POLY1305)    // rrespacker supported encryption
     {
+#if defined(RRES_SUPPORT_ENCRYPTION_MONOCYPHER)
         // TODO.
+#else
+        result = 1;
+#endif
     }
     else result = 1;
 
@@ -352,7 +374,11 @@ static int rresUnpackDataChunk(rresDataChunk *chunk)
     }
     else if (chunk->compType == RRES_COMP_LZ4)
     {
+#if defined(RRES_SUPPORT_COMPRESSION_LZ4)
         // TODO.
+#else
+        result = 3;
+#endif
     }
     else if (chunk->compType == RRES_COMP_QOI)
     {
