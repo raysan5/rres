@@ -47,20 +47,20 @@ int main(void)
 
     // Load content from rres file
     rresData rres = { 0 };
+    
+    // NOTE: rresLoadRaw() and similar functions already check internally if ((rres.count > 0) && (rres.chunks != NULL))
 
     // TEST 01: RRES_DATA_RAW -> OK!!!
     rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "resources/image.png.raw"));
     unsigned int dataSize = 0;
-    // NOTE: rresLoadRaw() and similar functions already check internally if ((rres.count > 0) && (rres.chunks != NULL))
-    void *data = rresLoadRaw(rres, &dataSize);
-    rresUnloadData(rres);
-    
+    void *data = rresLoadRaw(rres, &dataSize);      // NOTE: data must be unloaded at the end
     if ((data != NULL) && (dataSize > 0))
     {
         FILE *rawFile = fopen("export_image.png", "wb");
         fwrite(data, dataSize, 1, rawFile);
         fclose(rawFile);
     }
+    rresUnloadData(rres);
 
     // TEST 02: RRES_DATA_TEXT -> OK!!!
     rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "resources/text_data.txt"));
@@ -70,29 +70,27 @@ int main(void)
     // TEST 03: RRES_DATA_IMAGE -> OK!!!
     rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "resources/images/fudesumi.png"));
     Image image = rresLoadImage(rres);
-    rresUnloadData(rres);
-
     if (image.data != NULL)
     {
         Texture2D texture = LoadTextureFromImage(image);
         UnloadImage(image);
     }
+    rresUnloadData(rres);
 
     // TEST 03: RRES_DATA_WAVE -> OK!!!
     rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "resources/audio/target.ogg"));
     Wave wave = rresLoadWave(rres);
-    rresUnloadData(rres);
-
     Sound sound = LoadSoundFromWave(wave);
     UnloadWave(wave);
+    rresUnloadData(rres);
 
     // TEST 04: RRES_DATA_FONT_INFO (multichunk) -> ...
-    rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "C:\\GitHub\\rres\\examples\\resources\\fonts\\pixantiqua.ttf"));
+    rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "resources/fonts/pixantiqua.ttf"));
     Font font = rresLoadFont(rres);
     rresUnloadData(rres);
 
     // TEST 05: RRES_DATA_VERTEX (multichunk!) -> ...
-    rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "C:\\GitHub\\rres\\examples\\resources\\models\\castle.obj"));
+    rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "resources/models/castle.obj"));
     Mesh mesh = rresLoadMesh(rres);
     rresUnloadData(rres);
 
@@ -129,8 +127,8 @@ int main(void)
 
     // De-Initialization
     //--------------------------------------------------------------------------------------
-    MemFree(data);              // Unload raw data
-    MemFree(text);              // Unload text data
+    MemFree(data);              // Unload raw data, using raylib memory allocator (same used by rres-raylib.h)
+    MemFree(text);              // Unload text data, using raylib memory allocator (same used by rres-raylib.h)
     UnloadTexture(texture);     // Unload texture (VRAM)
     UnloadSound(sound);         // Unload sound
     UnloadFont(font);           // Unload font
