@@ -2,24 +2,27 @@
 *
 *   rres-raylib v1.0 - rres loaders specific for raylib data structures
 *
-*   LICENSE: zlib/libpng
+*   LICENSE: MIT
 *
 *   Copyright (c) 2020-2022 Ramon Santamaria (@raysan5)
 *
-*   This software is provided "as-is", without any express or implied warranty. In no event
-*   will the authors be held liable for any damages arising from the use of this software.
+*   Permission is hereby granted, free of charge, to any person obtaining a copy
+*   of this software and associated documentation files (the "Software"), to deal
+*   in the Software without restriction, including without limitation the rights
+*   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+*   copies of the Software, and to permit persons to whom the Software is
+*   furnished to do so, subject to the following conditions:
 *
-*   Permission is granted to anyone to use this software for any purpose, including commercial
-*   applications, and to alter it and redistribute it freely, subject to the following restrictions:
+*   The above copyright notice and this permission notice shall be included in all
+*   copies or substantial portions of the Software.
 *
-*     1. The origin of this software must not be misrepresented; you must not claim that you
-*     wrote the original software. If you use this software in a product, an acknowledgment
-*     in the product documentation would be appreciated but is not required.
-*
-*     2. Altered source versions must be plainly marked as such, and must not be misrepresented
-*     as being the original software.
-*
-*     3. This notice may not be removed or altered from any source distribution.
+*   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+*   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+*   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+*   AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+*   LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+*   OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+*   SOFTWARE.
 *
 **********************************************************************************************/
 
@@ -45,14 +48,19 @@
 // Module Functions Declaration
 //----------------------------------------------------------------------------------
 
-RRESAPI void *rresLoadRaw(rresData rres, int *size);
-RRESAPI char *rresLoadText(rresData rres);
-RRESAPI Image rresLoadImage(rresData rres);
-RRESAPI Wave rresLoadWave(rresData rres);
-RRESAPI Font rresLoadFont(rresData rres);
-RRESAPI Mesh rresLoadMesh(rresData rres);
-RRESAPI Material rresLoadMaterial(rresData rres);
-RRESAPI Model rresLoadModel(rresData rres);
+// rres data loading to raylib data structures
+RRESAPI void *rresLoadRaw(rresData rres, int *size);    // Load raw data from rres resource
+RRESAPI char *rresLoadText(rresData rres);              // Load text data from rres resource
+RRESAPI Image rresLoadImage(rresData rres);             // Load Image data from rres resource
+RRESAPI Wave rresLoadWave(rresData rres);               // Load Wave data from rres resource
+RRESAPI Font rresLoadFont(rresData rres);               // Load Font data from rres resource
+RRESAPI Mesh rresLoadMesh(rresData rres);               // Load Mesh data from rres resource
+//RRESAPI Material rresLoadMaterial(rresData rres);       // TODO: Load Material data from rres resource
+//RRESAPI Model rresLoadModel(rresData rres);             // TODO: Load Model data from rres resource
+
+// Utilities for encrypted data
+RRESAPI void rresSetCipherPassword(const char *pass);   // Set password to be used in case of encrypted data found
+RRESAPI void rresWipeCipherPassword(void);              // Wipe stored password
 
 #endif // RRES_RAYLIB_H
 
@@ -63,6 +71,13 @@ RRESAPI Model rresLoadModel(rresData rres);
 ************************************************************************************/
 
 #if defined(RRES_RAYLIB_IMPLEMENTATION)
+
+// Include supported compression/encryption algorithms
+#include "external/lz4.h"                   // LZ4 compression algorithm
+#include "external/lz4.c"                   // LZ4 compression algorithm implementation
+
+#include "external/monocypher.h"            // Encryption algorithms
+#include "external/monocypher.c"            // Encryption algorithms
 
 //----------------------------------------------------------------------------------
 // Defines and Macros
@@ -77,7 +92,7 @@ RRESAPI Model rresLoadModel(rresData rres);
 //----------------------------------------------------------------------------------
 // Global Variables Definition
 //----------------------------------------------------------------------------------
-//...
+static const char *password = NULL;
 
 //----------------------------------------------------------------------------------
 // Module specific Functions Declaration
@@ -88,10 +103,15 @@ static void *rresLoadDataChunkRaw(rresDataChunk chunk);         // Load chunk: R
 static char *rresLoadDataChunkText(rresDataChunk chunk);        // Load chunk: RRES_DATA_TEXT
 static Image rresLoadDataChunkImage(rresDataChunk chunk);       // Load chunk: RRES_DATA_IMAGE
 
+// Unpack compressed/encrypted data from chunk
+// NOTE: Function return 0 on success or other value on failure
+static int rresUnpackDataChunk(rresDataChunk *chunk);
+
 //----------------------------------------------------------------------------------
 // Module Functions Definition
 //----------------------------------------------------------------------------------
 
+// Load raw data from rres resource
 void *rresLoadRaw(rresData rres, int *size)
 {
     void *data = NULL;
@@ -104,7 +124,8 @@ void *rresLoadRaw(rresData rres, int *size)
     return data;
 }
 
-// NOTE: Text must be '\0' terminated
+// Load text data from rres resource
+// NOTE: Text must be NULL terminated
 char *rresLoadText(rresData rres)
 {
     char *text = NULL;
@@ -117,6 +138,7 @@ char *rresLoadText(rresData rres)
     return text;
 }
 
+// Load Image data from rres resource
 Image rresLoadImage(rresData rres)
 {
     Image image = { 0 };
@@ -129,25 +151,29 @@ Image rresLoadImage(rresData rres)
     return image;
 }
 
+// Load Wave data from rres resource
 Wave rresLoadWave(rresData rres)
 {
     Wave wave = { 0 };
 
     if ((rres.count >= 1) && (rres.chunks[0].type == RRES_DATA_WAVE))
     {
+        if ((chunk.compType > 0) || (chunk.cipherType > 0)) rresUnpackDataChunk(&rres.chunks[0]);
+
         wave.frameCount = rres.chunks[0].props[0];
         wave.sampleRate = rres.chunks[0].props[1];
         wave.sampleSize = rres.chunks[0].props[2];
         wave.channels = rres.chunks[0].props[3];
 
         unsigned int size = wave.frameCount*wave.sampleSize/8;
-        wave.data = RL_MALLOC(size);
+        wave.data = RL_CALLOC(size);
         memcpy(wave.data, rres.chunks[0].data, size);
     }
 
     return wave;
 }
 
+// Load Font data from rres resource
 Font rresLoadFont(rresData rres)
 {
     Font font = { 0 };
@@ -159,13 +185,15 @@ Font rresLoadFont(rresData rres)
     {
         if (rres.chunks[0].type == RRES_DATA_FONT_INFO)
         {
+            if ((chunk.compType > 0) || (chunk.cipherType > 0)) rresUnpackDataChunk(&rres.chunks[0]);
+
             // Load font basic properties from chunk[0]
             font.baseSize = rres.chunks[0].props[0];           // Base size (default chars height)
             font.glyphCount = rres.chunks[0].props[1];         // Number of characters (glyphs)
             font.glyphPadding = rres.chunks[0].props[2];      // Padding around the chars
 
-            font.recs = (Rectangle *)RL_MALLOC(font.glyphCount*sizeof(Rectangle));
-            font.glyphs = (GlyphInfo *)RL_MALLOC(font.glyphCount*sizeof(GlyphInfo));
+            font.recs = (Rectangle *)RL_CALLOC(font.glyphCount*sizeof(Rectangle));
+            font.glyphs = (GlyphInfo *)RL_CALLOC(font.glyphCount*sizeof(GlyphInfo));
 
             for (int i = 0; i < font.glyphCount; i++)
             {
@@ -196,6 +224,7 @@ Font rresLoadFont(rresData rres)
     return font;
 }
 
+// Load Mesh data from rres resource
 Mesh rresLoadMesh(rresData rres)
 {
     Mesh mesh = { 0 };
@@ -240,6 +269,8 @@ static void *rresLoadDataChunkRaw(rresDataChunk chunk)
 
     if (chunk.type == RRES_DATA_RAW)
     {
+        if ((chunk.compType > 0) || (chunk.cipherType > 0)) rresUnpackDataChunk(&chunk);
+
         rawData = RL_CALLOC(chunk.props[0], 1);
         memcpy(rawData, chunk.data, chunk.props[0]);
     }
@@ -255,7 +286,9 @@ static char *rresLoadDataChunkText(rresDataChunk chunk)
 
     if (chunk.type == RRES_DATA_TEXT)
     {
-        text = (char *)RL_CALLOC(chunk.props[0] + 1, 1);    // Add EOL ('\0') on loading?
+        if ((chunk.compType > 0) || (chunk.cipherType > 0)) rresUnpackDataChunk(&chunk);
+
+        text = (char *)RL_CALLOC(chunk.props[0] + 1, 1);    // We add NULL terminator, just in case
         memcpy(text, chunk.data, chunk.props[0]);
     }
 
@@ -270,6 +303,8 @@ static Image rresLoadDataChunkImage(rresDataChunk chunk)
 
     if (chunk.type == RRES_DATA_IMAGE)
     {
+        if ((chunk.compType > 0) || (chunk.cipherType > 0)) rresUnpackDataChunk(&chunk);
+
         image.width = chunk.props[0];
         image.height = chunk.props[1];
         image.mipmaps = chunk.props[3];
@@ -277,15 +312,55 @@ static Image rresLoadDataChunkImage(rresDataChunk chunk)
         // WARNING: rresPixelFormat enum matches raylib PixelFormat enum values
         image.format = chunk.props[2];
 
-        // NOTE: Image data size can computed from image properties
+        // NOTE: Image data size can be computed from image properties
         unsigned int size = GetPixelDataSize(image.width, image.height, image.format);
-        image.data = RL_MALLOC(size);
+        image.data = RL_CALLOC(size);
         memcpy(image.data, chunk.data, size);
 
         // TODO: Consider mipmaps data!
     }
 
     return image;
+}
+
+// Unpack compressed/encrypted data from chunk
+// NOTE: Function return 0 on success or other value on failure
+static int rresUnpackDataChunk(rresDataChunk *chunk)
+{
+    int result = 0;
+
+    // Result error codes:
+    //  0 - No error, decompression/decryption successful
+    //  1 - Encryption algorithm not supported
+    //  2 - Invalid password on decryption
+    //  3 - Compression algorithm not supported
+    //  4 - Error on data decompression
+
+    // TODO: Decompress and decrypt data as required (only rrespacker supported formats)
+
+    // STEP 1. Decrypt message if encrypted
+    if (chunk->cipherType == RRES_CIPHER_XCHACHA20_POLY1305)    // rrespacker supported encryption
+    {
+        // TODO.
+    }
+    else result = 1;
+
+    // STEP 2: Decompress data if compressed
+    if (chunk->compType == RRES_COMP_DEFLATE)
+    {
+        // TODO.
+    }
+    else if (chunk->compType == RRES_COMP_LZ4)
+    {
+        // TODO.
+    }
+    else if (chunk->compType == RRES_COMP_QOI)
+    {
+        // TODO.
+    }
+    else result = 3;
+
+    return result;
 }
 
 #endif // RRES_RAYLIB_IMPLEMENTATION
