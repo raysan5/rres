@@ -248,9 +248,38 @@ _NOTE: Central Directory filename entries are aligned to 4-byte padding to impro
 
 In case a `rres` file is generated with no Central Directory, a secondary header file (`.h`) should be provided with the id references for all resources, to be used in user code.
 
-## rres for raylib
+## rres implementation for a custom engine
 
-`rres` is designed as a engine-agnostic file format, data is mostly threated as generic data, common to any game engine. rres users can implement simple abstraction layers to map rres generic data to their own engines data structures. In the case of raylib, a middle library called rres-raylib.h has been implemented to map the different rres data types to raylib data structures.
+`rres` is designed as a engine-agnostic file format, data is mostly threated as generic data, common to any game engine. `rres` users can implement simple abstraction layers to map `rres` generic data to their own engines data structures. 
+
+`rres-raylib.h` is an example of a `rres` implementation for [`raylib`](https://github.com/raysan5/raylib). It maps the different `rres` data types to `raylib` data structures. The API provided is simple and intuitive:
+
+```c
+RRESAPI void *rresLoadRaw(rresResource rres, int *size);    // Load raw data from rres resource
+RRESAPI char *rresLoadText(rresResource rres);              // Load text data from rres resource
+RRESAPI Image rresLoadImage(rresResource rres);             // Load Image data from rres resource
+RRESAPI Wave rresLoadWave(rresResource rres);               // Load Wave data from rres resource
+RRESAPI Font rresLoadFont(rresResource rres);               // Load Font data from rres resource
+RRESAPI Mesh rresLoadMesh(rresResource rres);               // Load Mesh data from rres resource
+```
+
+`rresResource` is provided by `rres.h` along functions to load it and contains an array of `rresResourceChunk`, defined as following:
+
+```c
+// rres resource chunk
+typedef struct rresResourceChunk {
+    unsigned int type;              // Resource chunk data type
+    unsigned short compType;        // Resource compression algorithm
+    unsigned short cipherType;      // Resource cipher algorythm
+    unsigned int packedSize;        // Packed data size (including props, compressed and/or encripted + additional data appended)
+    unsigned int baseSize;          // Base data size (including propCount, props and uncompressed/decrypted data)
+    unsigned int propCount;         // Resource chunk properties count
+    int *props;                     // Resource chunk properties
+    void *data;                     // Resource chunk data
+} rresResourceChunk;
+```
+
+A similar mapping library can be created for any other engine/framework.
 
 ## rres library and specs license
 
