@@ -24,28 +24,32 @@
 *   rresFileHeader               (16 bytes)
 *       Signature Id              (4 bytes)     // File signature id: 'rres'
 *       Version                   (2 bytes)     // Format version
-*       Chunk Count               (2 bytes)     // Number of resource chunks contained
+*       Resource Count            (2 bytes)     // Number of resource chunks contained
 *       CD Offset                 (4 bytes)     // Central Directory offset (if available)
-*       reserved                  (4 bytes)     // reserved for the future
+*       reserved                  (4 bytes)     // <reserved>
 *
 *   rresResourceChunk[]
 *   {
 *       rresResourceInfoHeader   (32 bytes)
-*           Type                  (4 bytes)     // Resource type (FOURCC)
+*           Type                  (4 bytes)     // Resource type (FourCC)
 *           Id                    (4 bytes)     // Resource identifier (CRC32 filename hash)
 *           Compressor            (1 byte)      // Data compression algorithm
 *           Cipher                (1 byte)      // Data encryption algorithm
 *           Flags                 (2 bytes)     // Data flags (if required)
-*           Packed data Size      (4 bytes)     // Packed data chunk size, it can be compressed or include additional data appended (i.e. encryption MAC)
+*           Packed data Size      (4 bytes)     // Packed data size (compressed/encrypted)
 *           Base data Size        (4 bytes)     // Base data size (uncompressed/decrypted)
-*           Next Offset           (4 bytes)     // Next resource offset (if required)
+*           Next Offset           (4 bytes)     // Next resource chunk offset (if required)
 *           Reserved              (4 bytes)     // <reserved>
-*           CRC32                 (4 bytes)     // Data Chunk CRC32
+*           CRC32                 (4 bytes)     // Resource Data Chunk CRC32
 *                                
-*       rresResourceDataChunk     (n bytes)     // Packed data: propertyCount + props[propertyCount] + data (+ additionalData)
+*       rresResourceDataChunk     (n bytes)     // Packed data
+*           Property Count        (4 bytes)     // Number of properties contained
+*           Properties[]          (4*i bytes)   // Resource data required properties, depend on Type
+*           Data                  (m bytes)     // Resource data
+*           Extra Data            (p bytes)     // OPTIONAL: Additional data when required (i.e. encryption MAC)
 *   }
 *
-*   rres resource chunk: CENTRAL DIRECTORY
+*   rresResourceChunk: RRES_DATA_DIRECTORY      // Central directory (special resource chunk)
 *   {
 *       rresResourceInfoHeader   (32 bytes)
 *
@@ -55,7 +59,7 @@
 *           {
 *               Id                (4 bytes)     // Resource id
 *               Offset            (4 bytes)     // Resource global offset in file
-*               reserved          (4 bytes)     // reserved
+*               reserved          (4 bytes)     // <reserved>
 *               FileName Size     (4 bytes)     // Resource fileName size (NULL terminator and 4-bytes align padding considered)
 *               FileName          (m bytes)     // Resource original fileName (NULL terminated and padded to 4-byte alignment)
 *           }
@@ -173,8 +177,9 @@
 
 // rres resource chunk
 // WARNING: This is the resource type returned to the user after
-// reading and processing data from file, it's not aligned with
-// internal resource data types: rresResourceInfoHeader + dataChunk
+// reading and processing data from file, it's not directly aligned with
+// internal resource data types: rresResourceInfoHeader + rresResourceDataChunk
+// It just returns the data required to process and load the resource by the engine library
 typedef struct rresResourceChunk {
     unsigned int type;              // Resource chunk data type
     unsigned short compType;        // Resource compression algorithm
@@ -221,7 +226,7 @@ typedef struct rresFontGlyphInfo {
 
 // rres resource chunk data type
 // NOTE: Data type determines the proporties and the data included in every chunk
-typedef enum rresResourceChunkType {
+typedef enum rresResourceDataType {
     // Basic data (one chunk)
     //-----------------------------------------------------
     RRES_DATA_NULL         = 0,     // [NULL] Reserved for empty chunks (if required)
@@ -247,7 +252,7 @@ typedef enum rresResourceChunkType {
 
     // NOTE: New rres data types can be added here with custom props|data
 
-} rresResourceChunkType;
+} rresResourceDataType;
 
 // TODO: rres error codes
 // NOTE: Error codes when processing rres files
@@ -312,15 +317,15 @@ RRESAPI unsigned int rresComputeCRC32(unsigned char *buffer, int len);
 // rres file header (16 bytes)
 typedef struct rresFileHeader {
     unsigned char id[4];            // File identifier: rres
-    unsigned short version;         // File version
-    unsigned short chunkCount;      // Number of resource chunks in this file (total) -> MAX: 65535
+    unsigned short version;         // File version: 100 for version 1.0.0
+    unsigned short chunkCount;      // Number of resource chunks in the file (MAX: 65535)
     unsigned int cdOffset;          // Central Directory offset in file (0 if not available)
-    unsigned int reserved;          // reserved
+    unsigned int reserved;          // <reserved>
 } rresFileHeader;
 
 // rres resource chunk info header (32 bytes)
 typedef struct rresResourceInfoHeader {
-    unsigned char type[4];          // Resource chunk type (FOURCC)
+    unsigned char type[4];          // Resource chunk type (FourCC)
     unsigned int id;                // Resource chunk identifier (generated from filename CRC32 hash)
     unsigned char compType;         // Data compression algorithm
     unsigned char cipherType;       // Data encription algorithm
@@ -690,7 +695,7 @@ static rresResourceChunk rresLoadResourceChunk(rresResourceInfoHeader info, void
 {
     rresResourceChunk chunk = { 0 };
 
-    // Assign rres.type (int) from info.type (FOURCC)
+    // Assign rres.type (int) from info.type (FourCC)
     if ((info.type[0] == 'N') && (info.type[1] == 'U') && (info.type[2] == 'L') && (info.type[3] == 'L')) chunk.type = RRES_DATA_NULL;            // NULL
     if ((info.type[0] == 'R') && (info.type[1] == 'A') && (info.type[2] == 'W') && (info.type[3] == 'D')) chunk.type = RRES_DATA_RAW;             // RAWD
     else if ((info.type[0] == 'T') && (info.type[1] == 'E') && (info.type[2] == 'X') && (info.type[3] == 'T')) chunk.type = RRES_DATA_TEXT;       // TEXT
