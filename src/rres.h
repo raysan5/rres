@@ -14,19 +14,19 @@
 *
 *   rres files consist of a file header followed by a number of resource chunks.
 * 
-*   Optionally it can contain a Central Directory resource chunk at the end with the info 
+*   Optionally it can contain a Central Directory resource chunk (usually at the end) with the info 
 *   of all the files processed into the rres file.
 * 
 *   NOTE: Chunks count could not match files count, some processed files (i.e Font, Mesh) 
-*   generate multiple chunks with the same id related by the rresResourceInfoHeader.nextOffset and 
-*   loaded together when resource is loaded
+*   could generate multiple chunks with the same id related by the rresResourceInfoHeader.nextOffset 
+*   Those chunks are loaded together when resource is loaded
 *
 *   rresFileHeader               (16 bytes)
 *       Signature Id              (4 bytes)     // File signature id: 'rres'
 *       Version                   (2 bytes)     // Format version
 *       Resource Count            (2 bytes)     // Number of resource chunks contained
 *       CD Offset                 (4 bytes)     // Central Directory offset (if available)
-*       reserved                  (4 bytes)     // <reserved>
+*       Reserved                  (4 bytes)     // <reserved>
 *
 *   rresResourceChunk[]
 *   {
@@ -36,7 +36,7 @@
 *           Compressor            (1 byte)      // Data compression algorithm
 *           Cipher                (1 byte)      // Data encryption algorithm
 *           Flags                 (2 bytes)     // Data flags (if required)
-*           Packed data Size      (4 bytes)     // Packed data size (compressed/encrypted)
+*           Packed data Size      (4 bytes)     // Packed data size (compressed/encrypted + custom data appended)
 *           Base data Size        (4 bytes)     // Base data size (uncompressed/decrypted)
 *           Next Offset           (4 bytes)     // Next resource chunk offset (if required)
 *           Reserved              (4 bytes)     // <reserved>
@@ -46,7 +46,6 @@
 *           Property Count        (4 bytes)     // Number of properties contained
 *           Properties[]          (4*i bytes)   // Resource data required properties, depend on Type
 *           Data                  (m bytes)     // Resource data
-*           Extra Data            (p bytes)     // OPTIONAL: Additional data when required (i.e. encryption MAC)
 *   }
 *
 *   rresResourceChunk: RRES_DATA_DIRECTORY      // Central directory (special resource chunk)
@@ -65,19 +64,6 @@
 *           }
 *    }
 *
-*   DEPENDENCIES:
-*
-*   This file dependencies has been keep to the minimum. It depends only some libc functionality:
-*
-*     - stdlib.h: Required for memory allocation: malloc(), calloc(), free()
-*                 NOTE: Allocators can be redefined with macros RRES_MALLOC, RRES_CALLOC, RRES_FREE
-*     - stdio.h:  Required for file access functionality: FILE, fopen(), fseek(), fread(), fclose()
-*     - string.h: Required for memory data mamagement: memcpy(), strcmp() 
-*
-*   VERSIONS HISTORY:
-*
-*     - 1.0 (28-Apr-2022): Official release of rres 1.0
-*
 *
 *   DESIGN DECISIONS / LIMITATIONS:
 *
@@ -88,16 +74,30 @@
 *       Endianness won't affect chunk data but it will affect rresFileHeader and rresResourceInfoHeader
 *     - CRC32 hash is used to to generate the rres file identifier from filename
 *       There is a "small" probability of random collision (1 in 2^32 approx.) but considering 
-*       the chance of collision is related to the number of data inputs, not the size of the inputs, we assume that probablility
+*       the chance of collision is related to the number of data inputs, not the size of the inputs, we assume that risk
 *       Also note that CRC32 is not used as a security/cryptographic hash, just an identifier for the input file
 *     - CRC32 hash is also used to detect chunk data corruption. CRC32 is smaller and computationally much less complex than MD5 or SHA1.
 *       Using a hash function like MD5 is probably overkill for random error detection
-*     - Central Directory rresDirEntry.fileName is NULL terminated and padded to 4-byte, rresDirEntry.fileNameSize considers full byte size
-*     - Compression and encryption. rres supports chunks data compression and encryption, it provides to fields in the rresResourceInfoHeader to
-*       note it, but in those cases is up to the user to implement the desired compressor/uncompressor and encryption/decription mechanisms
+*     - Central Directory rresDirEntry.fileName is NULL terminated and padded to 4-byte, rresDirEntry.fileNameSize considers the padding
+*     - Compression and Encryption. rres supports chunks data compression and encryption, it provides two fields in the rresResourceInfoHeader to
+*       note it, but in those cases is up to the user to implement the desired compressor/uncompressor and encryption/decryption mechanisms
 *       In case of data encryption, it's recommended that any additional resource data (i.e. MAC) to be appended to data chunk and properly
-*       noted in the data size in the rresResourceInfoHeader.
-*       Data compression should be applied before encryption
+*       noted in the packed data size field of rresResourceInfoHeader. Data compression should be applied before encryption.
+*
+*
+*   DEPENDENCIES:
+*
+*   This file dependencies has been keep to the minimum. It depends only some libc functionality:
+*
+*     - stdlib.h: Required for memory allocation: malloc(), calloc(), free()
+*                 NOTE: Allocators can be redefined with macros RRES_MALLOC, RRES_CALLOC, RRES_FREE
+*     - stdio.h:  Required for file access functionality: FILE, fopen(), fseek(), fread(), fclose()
+*     - string.h: Required for memory data mamagement: memcpy(), strcmp() 
+*
+*
+*   VERSION HISTORY:
+*
+*     - 1.0 (28-Apr-2022): Initial release of rres specs
 *
 *
 *   LICENSE: MIT
@@ -225,32 +225,60 @@ typedef struct rresFontGlyphInfo {
 } rresFontGlyphInfo;
 
 // rres resource chunk data type
-// NOTE: Data type determines the proporties and the data included in every chunk
+// NOTE 1: Data type determines the properties and the data included in every chunk
+// NOTE 2: This enum defines the basic resource data types, 
+// some input files could generate multiple resource chunks:
+//   Fonts processed could generate (2) resource chunks:
+//   - [FNTG] rres[0]: RRES_DATA_GLYPH_INFO
+//   - [IMGE] rres[1]: RRES_DATA_IMAGE
+//
+//   Mesh processed could generate (n) resource chunks:
+//   - [VRTX] rres[0]: RRES_DATA_VERTEX
+//   ...
+//   - [VRTX] rres[n]: RRES_DATA_VERTEX
 typedef enum rresResourceDataType {
-    // Basic data (one chunk)
-    //-----------------------------------------------------
-    RRES_DATA_NULL         = 0,     // [NULL] Reserved for empty chunks (if required)
-    RRES_DATA_RAW          = 1,     // [RAWD] props[0]:size | data: raw bytes
-    RRES_DATA_TEXT         = 2,     // [TEXT] props[0]:size, props[1]:cultureCode | data: text
-    RRES_DATA_IMAGE        = 3,     // [IMGE] props[0]:width, props[1]:height, props[2]:mipmaps, props[3]:rresPixelFormat | data: pixels
-    RRES_DATA_WAVE         = 4,     // [WAVE] props[0]:sampleCount, props[1]:sampleRate, props[2]:sampleSize, props[3]:channels | data: samples
-    RRES_DATA_VERTEX       = 5,     // [VRTX] props[0]:vertexCount, props[1]:rresVertexAttribute, props[2]:rresVertexFormat | data: vertex
-    RRES_DATA_GLYPH_INFO   = 6,     // [FNTG] props[0]:baseSize, props[1]:glyphsCount, props[2]:glyphsPadding | data: rresFontGlyphInfo[0..glyphsCount]
-    RRES_DATA_LINK         = 99,    // [LINK] props[0]:size | data: path (relative to .rres file)
-    RRES_DATA_DIRECTORY    = 100,   // [CDIR] props[0]:entryCount | data: rresDirEntry[0..entryCount]
+    RRES_DATA_NULL         = 0,     // FourCC: NULL - Reserved for empty chunks, no props/data
+    RRES_DATA_RAW          = 1,     // FourCC: RAWD - Raw file data, 1 property
+                                    //    props[0]:size (bytes)
+                                    //    data: raw bytes
+    RRES_DATA_TEXT         = 2,     // FourCC: TEXT - Text file data, 4 properties
+                                    //    props[0]:size (bytes)
+                                    //    props[1]:encoding 
+                                    //    props[2]:codeLang 
+                                    //    props[3]:cultureCode
+                                    //    data: text
+    RRES_DATA_IMAGE        = 3,     // FourCC: IMGE - Image file data, 4 properties
+                                    //    props[0]:width 
+                                    //    props[1]:height 
+                                    //    props[2]:mipmaps 
+                                    //    props[3]:rresPixelFormat
+                                    //    data: pixels
+    RRES_DATA_WAVE         = 4,     // FourCC: WAVE - Audio file data, 4 properties
+                                    //    props[0]:sampleCount
+                                    //    props[1]:sampleRate
+                                    //    props[2]:sampleSize
+                                    //    props[3]:channels 
+                                    //    data: samples
+    RRES_DATA_VERTEX       = 5,     // FourCC: VRTX - Mesh file data, 4 properties
+                                    //    props[0]:vertexCount
+                                    //    props[1]:rresVertexAttribute
+                                    //    props[2]:componentCount
+                                    //    props[3]:rresVertexFormat
+                                    //    data: vertex
+    RRES_DATA_GLYPH_INFO   = 6,     // FourCC: FNTG - Font file processed, glyphs data, 4 properties
+                                    //    props[0]:baseSize
+                                    //    props[1]:glyphCount
+                                    //    props[2]:glyphPadding
+                                    //    props[3]:glyphFormat
+                                    //    data: rresFontGlyphInfo[0..glyphCount]
+    RRES_DATA_LINK         = 99,    // FourCC: LINK - External linked file, 1 property
+                                    //    props[0]:size (bytes)
+                                    //    data: filepath (as provided on input)
+    RRES_DATA_DIRECTORY    = 100,   // FourCC: CDIR - Central directory for input files
+                                    //    props[0]:entryCount, 1 property
+                                    //    data: rresDirEntry[0..entryCount]
 
-    // Complex data (multiple chunks)
-    //-----------------------------------------------------
-    // Font consists of (2) chunks:
-    //  - [FNTG] rres[0]: RRES_DATA_GLYPH_INFO
-    //  - [IMGE] rres[1]: RRES_DATA_IMAGE
-    //
-    // Mesh consists of (n) chunks:
-    //  - [VRTX] rres[0]: RRES_DATA_VERTEX
-    //  ...
-    //  - [VRTX] rres[n]: RRES_DATA_VERTEX
-
-    // NOTE: New rres data types can be added here with custom props|data
+    // TODO: Add new basic resource data types if required (define props + data)
 
 } rresResourceDataType;
 
@@ -330,10 +358,10 @@ typedef struct rresResourceInfoHeader {
     unsigned char compType;         // Data compression algorithm
     unsigned char cipherType;       // Data encription algorithm
     unsigned short flags;           // Data flags (if required)
-    unsigned int packedSize;        // Data chunk size (data can be compressed or include additional data appended)
-    unsigned int baseSize;          // Data base size (uncompressed and not considering additional data appended)
+    unsigned int packedSize;        // Data chunk size (compressed/encrypted + custom data appended)
+    unsigned int baseSize;          // Data base size (uncompressed/unencrypted)
     unsigned int nextOffset;        // Next resource chunk global offset (if resource has multiple chunks)
-    unsigned int reserved;          // reserved
+    unsigned int reserved;          // <reserved>
     unsigned int crc32;             // Data chunk CRC32 (propCount + props[] + data)
 } rresResourceInfoHeader;
 
@@ -407,7 +435,8 @@ typedef enum rresPixelFormat {
 } rresPixelFormat;
 
 // Vertex data attribute
-// NOTE: The expected number of components for every vertex attributes are the specified ones
+// NOTE: The expected number of components for every vertex attributes is provided as a property to data,
+// the listed components count are the expected/default ones
 typedef enum rresVertexAttribute {
     RRES_VERTEX_ATTRIBUTE_POSITION   = 0,   // Vertex position attribute: [x, y, z]
     RRES_VERTEX_ATTRIBUTE_TEXCOORD1  = 10,  // Vertex texture coordinates attribute: [u, v]
@@ -418,11 +447,11 @@ typedef enum rresVertexAttribute {
     RRES_VERTEX_ATTRIBUTE_TANGENT    = 30,  // Vertex tangent attribute: [x, y, z, w]
     RRES_VERTEX_ATTRIBUTE_COLOR      = 40,  // Vertex color attribute: [r, g, b, a]
     RRES_VERTEX_ATTRIBUTE_INDEX      = 100, // Vertex index attribute: [i]
-    // TODO: Add additional required attributes or attributes with different component count  
+    // TODO: Add additional required attributes
 } rresVertexAttribute;
 
 // Vertex data format type
-typedef enum rresVertexFormat {
+typedef enum rresVertexDataFormat {
     RRES_VERTEX_FORMAT_UBYTE = 0,           // 8 bit unsigned integer data
     RRES_VERTEX_FORMAT_BYTE,                // 8 bit signed integer data
     RRES_VERTEX_FORMAT_USHORT,              // 16 bit unsigned integer data
@@ -432,7 +461,7 @@ typedef enum rresVertexFormat {
     RRES_VERTEX_FORMAT_HFLOAT,              // 16 bit float data
     RRES_VERTEX_FORMAT_FLOAT,               // 32 bit float data
     // TODO: Add additional required vertex formats (i.e. normalized data)
-} rresVertexFormat;
+} rresVertexDataFormat;
 
 //----------------------------------------------------------------------------------
 // Global Variables Definition
