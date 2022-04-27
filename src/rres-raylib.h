@@ -63,24 +63,26 @@
 //----------------------------------------------------------------------------------
 
 // rres data loading to raylib data structures
-RRESAPI void *rresLoadRaw(rresData rres, int *size);    // Load raw data from rres resource
-RRESAPI char *rresLoadText(rresData rres);              // Load text data from rres resource
-RRESAPI Image rresLoadImage(rresData rres);             // Load Image data from rres resource
-RRESAPI Wave rresLoadWave(rresData rres);               // Load Wave data from rres resource
-RRESAPI Font rresLoadFont(rresData rres);               // Load Font data from rres resource
-RRESAPI Mesh rresLoadMesh(rresData rres);               // Load Mesh data from rres resource
-//RRESAPI Material rresLoadMaterial(rresData rres);       // TODO: Load Material data from rres resource
-//RRESAPI Model rresLoadModel(rresData rres);             // TODO: Load Model data from rres resource
+RRESAPI void *rresLoadRaw(rresResource rres, int *size);    // Load raw data from rres resource
+RRESAPI char *rresLoadText(rresResource rres);              // Load text data from rres resource
+RRESAPI Image rresLoadImage(rresResource rres);             // Load Image data from rres resource
+RRESAPI Wave rresLoadWave(rresResource rres);               // Load Wave data from rres resource
+RRESAPI Font rresLoadFont(rresResource rres);               // Load Font data from rres resource
+RRESAPI Mesh rresLoadMesh(rresResource rres);               // Load Mesh data from rres resource
+//RRESAPI Material rresLoadMaterial(rresResource rres);       // TODO: Load Material data from rres resource
+//RRESAPI Model rresLoadModel(rresResource rres);             // TODO: Load Model data from rres resource
 
 // Utilities for encrypted data
-RRESAPI void rresSetCipherPassword(const char *pass);   // Set password to be used in case of encrypted data found
-RRESAPI void rresWipeCipherPassword(void);              // Wipe stored password
+// NOTE: The cipher password is kept as the pointer provided, 
+// no internal copy is done, it's up to the user to manage that sensitive data properly
+// It's recommended to allocate the password previously to rres file loading and wipe that memory space after rres loading
+RRESAPI void rresSetCipherPassword(const char *pass);       // Set password to be used in case of encrypted data found
 
 #endif // RRES_RAYLIB_H
 
 /***********************************************************************************
 *
-*   RRES IMPLEMENTATION
+*   RRES RAYLIB IMPLEMENTATION
 *
 ************************************************************************************/
 
@@ -117,20 +119,20 @@ static const char *password = NULL;
 //----------------------------------------------------------------------------------
 
 // Load simple data chunks that are later required by multi-chunk resources
-static void *rresLoadDataChunkRaw(rresDataChunk chunk);         // Load chunk: RRES_DATA_RAW
-static char *rresLoadDataChunkText(rresDataChunk chunk);        // Load chunk: RRES_DATA_TEXT
-static Image rresLoadDataChunkImage(rresDataChunk chunk);       // Load chunk: RRES_DATA_IMAGE
+static void *rresLoadDataChunkRaw(rresResourceChunk chunk);         // Load chunk: RRES_DATA_RAW
+static char *rresLoadDataChunkText(rresResourceChunk chunk);        // Load chunk: RRES_DATA_TEXT
+static Image rresLoadDataChunkImage(rresResourceChunk chunk);       // Load chunk: RRES_DATA_IMAGE
 
 // Unpack compressed/encrypted data from chunk
 // NOTE: Function return 0 on success or other value on failure
-static int rresUnpackDataChunk(rresDataChunk *chunk);
+static int rresUnpackDataChunk(rresResourceChunk *chunk);
 
 //----------------------------------------------------------------------------------
 // Module Functions Definition
 //----------------------------------------------------------------------------------
 
 // Load raw data from rres resource
-void *rresLoadRaw(rresData rres, int *size)
+void *rresLoadRaw(rresResource rres, int *size)
 {
     void *data = NULL;
 
@@ -144,7 +146,7 @@ void *rresLoadRaw(rresData rres, int *size)
 
 // Load text data from rres resource
 // NOTE: Text must be NULL terminated
-char *rresLoadText(rresData rres)
+char *rresLoadText(rresResource rres)
 {
     char *text = NULL;
 
@@ -157,7 +159,7 @@ char *rresLoadText(rresData rres)
 }
 
 // Load Image data from rres resource
-Image rresLoadImage(rresData rres)
+Image rresLoadImage(rresResource rres)
 {
     Image image = { 0 };
 
@@ -170,7 +172,7 @@ Image rresLoadImage(rresData rres)
 }
 
 // Load Wave data from rres resource
-Wave rresLoadWave(rresData rres)
+Wave rresLoadWave(rresResource rres)
 {
     Wave wave = { 0 };
 
@@ -192,16 +194,16 @@ Wave rresLoadWave(rresData rres)
 }
 
 // Load Font data from rres resource
-Font rresLoadFont(rresData rres)
+Font rresLoadFont(rresResource rres)
 {
     Font font = { 0 };
 
     // Font resource consist of (2) chunks:
-    //  - RRES_DATA_FONT_INFO: Basic font and glyphs properties/data
+    //  - RRES_DATA_GLYPH_INFO: Basic font and glyphs properties/data
     //  - RRES_DATA_IMAGE: Image atlas for the font characters
     if (rres.count >= 2)
     {
-        if (rres.chunks[0].type == RRES_DATA_FONT_INFO)
+        if (rres.chunks[0].type == RRES_DATA_GLYPH_INFO)
         {
             if ((chunk.compType > 0) || (chunk.cipherType > 0)) rresUnpackDataChunk(&rres.chunks[0]);
 
@@ -243,7 +245,7 @@ Font rresLoadFont(rresData rres)
 }
 
 // Load Mesh data from rres resource
-Mesh rresLoadMesh(rresData rres)
+Mesh rresLoadMesh(rresResource rres)
 {
     Mesh mesh = { 0 };
 
@@ -281,7 +283,7 @@ Mesh rresLoadMesh(rresData rres)
 
 // Load data chunk: RRES_DATA_RAW
 // NOTE: This chunk can be used raw files embedding or other binary blobs
-static void *rresLoadDataChunkRaw(rresDataChunk chunk)
+static void *rresLoadDataChunkRaw(rresResourceChunk chunk)
 {
     void *rawData = NULL;
 
@@ -298,7 +300,7 @@ static void *rresLoadDataChunkRaw(rresDataChunk chunk)
 
 // Load data chunk: RRES_DATA_TEXT
 // NOTE: This chunk can be used for shaders or other text data elements (materials?)
-static char *rresLoadDataChunkText(rresDataChunk chunk)
+static char *rresLoadDataChunkText(rresResourceChunk chunk)
 {
     void *text = NULL;
 
@@ -315,7 +317,7 @@ static char *rresLoadDataChunkText(rresDataChunk chunk)
 
 // Load data chunk: RRES_DATA_IMAGE
 // NOTE: Many data types use images data in some way (font, material...)
-static Image rresLoadDataChunkImage(rresDataChunk chunk)
+static Image rresLoadDataChunkImage(rresResourceChunk chunk)
 {
     Image image = { 0 };
 
@@ -343,7 +345,7 @@ static Image rresLoadDataChunkImage(rresDataChunk chunk)
 
 // Unpack compressed/encrypted data from chunk
 // NOTE: Function return 0 on success or other value on failure
-static int rresUnpackDataChunk(rresDataChunk *chunk)
+static int rresUnpackDataChunk(rresResourceChunk *chunk)
 {
     int result = 0;
 
@@ -387,6 +389,12 @@ static int rresUnpackDataChunk(rresDataChunk *chunk)
     else result = 3;
 
     return result;
+}
+
+// Set password to be used in case of encrypted data found
+void rresSetCipherPassword(const char *pass)
+{
+    password = pass;
 }
 
 #endif // RRES_RAYLIB_IMPLEMENTATION

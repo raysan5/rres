@@ -18,49 +18,61 @@
 *   of all the files processed into the rres file.
 * 
 *   NOTE: Chunks count could not match files count, some processed files (i.e Font, Mesh) 
-*   generate multiple chunks with the same id related by the rresInfoHeader.nextOffset and 
+*   generate multiple chunks with the same id related by the rresResourceInfoHeader.nextOffset and 
 *   loaded together when resource is loaded
 *
-*   rresFileHeader             (16 bytes)
-*       Signature Id            (4 bytes)   // File signature id: 'rres'
-*       Version                 (2 bytes)   // Format version
-*       Chunk Count             (2 bytes)   // Number of resource chunks contained
-*       CD Offset               (4 bytes)   // Central Directory offset (if available)
-*       reserved                (4 bytes)   // reserved for the future
+*   rresFileHeader               (16 bytes)
+*       Signature Id              (4 bytes)     // File signature id: 'rres'
+*       Version                   (2 bytes)     // Format version
+*       Chunk Count               (2 bytes)     // Number of resource chunks contained
+*       CD Offset                 (4 bytes)     // Central Directory offset (if available)
+*       reserved                  (4 bytes)     // reserved for the future
 *
-*   rres resource chunk[]
+*   rresResourceChunk[]
 *   {
-*       rresInfoHeader         (32 bytes)
-*           Type                (4 bytes)   // Resource type (FOURCC)
-*           Id                  (4 bytes)   // Resource identifier (CRC32 filename hash)
-*           Compressor          (1 byte)    // Data compression algorithm
-*           Cipher              (1 byte)    // Data encryption algorithm
-*           Flags               (2 bytes)   // Data flags (if required)
-*           Packed data Size    (4 bytes)   // Packed data chunk size, it can be compressed or 
-*                                              include additional data appended (i.e. encryption MAC)
-*           Base data Size      (4 bytes)   // Base data size (uncompressed/decrypted)
-*           Next Offset         (4 bytes)   // Next resource offset (if required)
-*           Reserved            (4 bytes)   // <reserved>
-*           CRC32               (4 bytes)   // Data Chunk CRC32
-*
-*       rres Data Chunk         (n bytes)   // Packed data: propertyCount + props[propertyCount] + data (+ additionalData)
+*       rresResourceInfoHeader   (32 bytes)
+*           Type                  (4 bytes)     // Resource type (FOURCC)
+*           Id                    (4 bytes)     // Resource identifier (CRC32 filename hash)
+*           Compressor            (1 byte)      // Data compression algorithm
+*           Cipher                (1 byte)      // Data encryption algorithm
+*           Flags                 (2 bytes)     // Data flags (if required)
+*           Packed data Size      (4 bytes)     // Packed data chunk size, it can be compressed or include additional data appended (i.e. encryption MAC)
+*           Base data Size        (4 bytes)     // Base data size (uncompressed/decrypted)
+*           Next Offset           (4 bytes)     // Next resource offset (if required)
+*           Reserved              (4 bytes)     // <reserved>
+*           CRC32                 (4 bytes)     // Data Chunk CRC32
+*                                
+*       rresResourceDataChunk     (n bytes)     // Packed data: propertyCount + props[propertyCount] + data (+ additionalData)
 *   }
 *
 *   rres resource chunk: CENTRAL DIRECTORY
 *   {
-*       rresInfoHeader         (32 bytes)
+*       rresResourceInfoHeader   (32 bytes)
 *
-*       rresCentralDir          (n bytes)
-*           Entries Count       (4 bytes)   // Central directory entries count (files)
+*       rresCentralDir            (n bytes)     // rresResourceDataChunk
+*           Entries Count         (4 bytes)     // Central directory entries count (files)
 *           rresDirEntry[]
 *           {
-*               Id              (4 bytes)   // Resource id
-*               Offset          (4 bytes)   // Resource global offset in file
-*               reserved        (4 bytes)   // reserved
-*               FileName Size   (4 bytes)   // Resource fileName size (NULL terminator and 4-bytes align padding considered)
-*               FileName        (m bytes)   // Resource original fileName (NULL terminated and padded to 4-byte alignment)
+*               Id                (4 bytes)     // Resource id
+*               Offset            (4 bytes)     // Resource global offset in file
+*               reserved          (4 bytes)     // reserved
+*               FileName Size     (4 bytes)     // Resource fileName size (NULL terminator and 4-bytes align padding considered)
+*               FileName          (m bytes)     // Resource original fileName (NULL terminated and padded to 4-byte alignment)
 *           }
 *    }
+*
+*   DEPENDENCIES:
+*
+*   This file dependencies has been keep to the minimum. It depends only some libc functionality:
+*
+*     - stdlib.h: Required for memory allocation: malloc(), calloc(), free()
+*                 NOTE: Allocators can be redefined with macros RRES_MALLOC, RRES_CALLOC, RRES_FREE
+*     - stdio.h:  Required for file access functionality: FILE, fopen(), fseek(), fread(), fclose()
+*     - string.h: Required for memory data mamagement: memcpy(), strcmp() 
+*
+*   VERSIONS HISTORY:
+*
+*     - 1.0 (28-Apr-2022): Official release of rres 1.0
 *
 *
 *   DESIGN DECISIONS / LIMITATIONS:
@@ -69,7 +81,7 @@
 *     - rres file maximum size: 4GB (chunk offset and Central Directory Offset is 32bit, so it can not address more than 4GB
 *     - Chunk search by ID is done one by one, starting at first chunk and accessed with fread() function
 *     - Endianness: rres does not care about endianness, data is stored as desired by the host platform (most probably Little Endian)
-*       Endianness won't affect chunk data but it will affect rresFileHeader and rresInfoHeader
+*       Endianness won't affect chunk data but it will affect rresFileHeader and rresResourceInfoHeader
 *     - CRC32 hash is used to to generate the rres file identifier from filename
 *       There is a "small" probability of random collision (1 in 2^32 approx.) but considering 
 *       the chance of collision is related to the number of data inputs, not the size of the inputs, we assume that probablility
@@ -77,10 +89,10 @@
 *     - CRC32 hash is also used to detect chunk data corruption. CRC32 is smaller and computationally much less complex than MD5 or SHA1.
 *       Using a hash function like MD5 is probably overkill for random error detection
 *     - Central Directory rresDirEntry.fileName is NULL terminated and padded to 4-byte, rresDirEntry.fileNameSize considers full byte size
-*     - Compression and encryption. rres supports chunks data compression and encryption, it provides to fields in the rresInfoHeader to
+*     - Compression and encryption. rres supports chunks data compression and encryption, it provides to fields in the rresResourceInfoHeader to
 *       note it, but in those cases is up to the user to implement the desired compressor/uncompressor and encryption/decription mechanisms
 *       In case of data encryption, it's recommended that any additional resource data (i.e. MAC) to be appended to data chunk and properly
-*       noted in the data size in the rresInfoHeader.
+*       noted in the data size in the rresResourceInfoHeader.
 *       Data compression should be applied before encryption
 *
 *
@@ -159,11 +171,11 @@
 // Types and Structures Definition
 //----------------------------------------------------------------------------------
 
-// rres resource data chunk
+// rres resource chunk
 // WARNING: This is the resource type returned to the user after
 // reading and processing data from file, it's not aligned with
-// internal resource data types: rresInfoHeader + dataChunk
-typedef struct rresDataChunk {
+// internal resource data types: rresResourceInfoHeader + dataChunk
+typedef struct rresResourceChunk {
     unsigned int type;              // Resource chunk data type
     unsigned short compType;        // Resource compression algorithm
     unsigned short cipherType;      // Resource cipher algorythm
@@ -172,13 +184,14 @@ typedef struct rresDataChunk {
     unsigned int propCount;         // Resource chunk properties count
     int *props;                     // Resource chunk properties
     void *data;                     // Resource chunk data
-} rresDataChunk;
+} rresResourceChunk;
 
-// rres resource data
-typedef struct rresData {
+// rres resource
+// NOTE: It could consist of multiple chunks
+typedef struct rresResource {
     unsigned int count;             // Resource chunks count
-    rresDataChunk *chunks;          // Resource chunks
-} rresData;
+    rresResourceChunk *chunks;      // Resource chunks
+} rresResource;
 
 // Specific data for some chunk types
 //----------------------------------------------------------------------
@@ -192,6 +205,7 @@ typedef struct rresDirEntry {
 } rresDirEntry;
 
 // rres central directory
+// NOTE: This data represents the rresResourceDataChunk
 typedef struct rresCentralDir {
     unsigned int count;             // Central directory entries count
     rresDirEntry *entries;          // Central directory entries
@@ -207,23 +221,23 @@ typedef struct rresFontGlyphInfo {
 
 // rres resource chunk data type
 // NOTE: Data type determines the proporties and the data included in every chunk
-typedef enum {
+typedef enum rresResourceChunkType {
     // Basic data (one chunk)
     //-----------------------------------------------------
-    RRES_DATA_NULL      = 0,        // [NULL] Reserved for empty chunks (if required)
-    RRES_DATA_RAW       = 1,        // [RAWD] props[0]:size | data: raw bytes
-    RRES_DATA_TEXT      = 2,        // [TEXT] props[0]:size, props[1]:cultureCode | data: text
-    RRES_DATA_IMAGE     = 3,        // [IMGE] props[0]:width, props[1]:height, props[2]:mipmaps, props[3]:rresPixelFormat | data: pixels
-    RRES_DATA_WAVE      = 4,        // [WAVE] props[0]:sampleCount, props[1]:sampleRate, props[2]:sampleSize, props[3]:channels | data: samples
-    RRES_DATA_VERTEX    = 5,        // [VRTX] props[0]:vertexCount, props[1]:rresVertexAttribute, props[2]:rresVertexFormat | data: vertex
-    RRES_DATA_FONT_INFO = 6,        // [FONT] props[0]:baseSize, props[1]:glyphsCount, props[2]:glyphsPadding | data: rresFontGlyphInfo[0..glyphsCount]
-    RRES_DATA_LINK      = 99,       // [LINK] props[0]:size | data: path (relative to .rres file)
-    RRES_DATA_DIRECTORY = 100,      // [CDIR] props[0]:entryCount | data: rresDirEntry[0..entryCount]
+    RRES_DATA_NULL         = 0,     // [NULL] Reserved for empty chunks (if required)
+    RRES_DATA_RAW          = 1,     // [RAWD] props[0]:size | data: raw bytes
+    RRES_DATA_TEXT         = 2,     // [TEXT] props[0]:size, props[1]:cultureCode | data: text
+    RRES_DATA_IMAGE        = 3,     // [IMGE] props[0]:width, props[1]:height, props[2]:mipmaps, props[3]:rresPixelFormat | data: pixels
+    RRES_DATA_WAVE         = 4,     // [WAVE] props[0]:sampleCount, props[1]:sampleRate, props[2]:sampleSize, props[3]:channels | data: samples
+    RRES_DATA_VERTEX       = 5,     // [VRTX] props[0]:vertexCount, props[1]:rresVertexAttribute, props[2]:rresVertexFormat | data: vertex
+    RRES_DATA_GLYPH_INFO   = 6,     // [FNTG] props[0]:baseSize, props[1]:glyphsCount, props[2]:glyphsPadding | data: rresFontGlyphInfo[0..glyphsCount]
+    RRES_DATA_LINK         = 99,    // [LINK] props[0]:size | data: path (relative to .rres file)
+    RRES_DATA_DIRECTORY    = 100,   // [CDIR] props[0]:entryCount | data: rresDirEntry[0..entryCount]
 
     // Complex data (multiple chunks)
     //-----------------------------------------------------
     // Font consists of (2) chunks:
-    //  - [FONT] rres[0]: RRES_DATA_FONT_INFO
+    //  - [FNTG] rres[0]: RRES_DATA_GLYPH_INFO
     //  - [IMGE] rres[1]: RRES_DATA_IMAGE
     //
     // Mesh consists of (n) chunks:
@@ -233,11 +247,11 @@ typedef enum {
 
     // NOTE: New rres data types can be added here with custom props|data
 
-} rresDataType;
+} rresResourceChunkType;
 
 // TODO: rres error codes
 // NOTE: Error codes when processing rres files
-typedef enum {
+typedef enum rresErrorType {
     RRES_SUCCESS = 0,               // rres file loaded/saved successfully
     RRES_ERROR_FILE_NOT_FOUND,      // rres file can not be opened (spelling issues, file actually does not exist...)
     RRES_ERROR_FILE_FORMAT,         // rres file format not a supported (wrong header, wrong identifier)
@@ -258,13 +272,13 @@ extern "C" {            // Prevents name mangling of functions
 #endif
 
 // Load all data chunks for specified rresId
-RRESAPI rresData rresLoadData(const char *fileName, int rresId);
-RRESAPI void rresUnloadData(rresData data);
+RRESAPI rresResource rresLoadResource(const char *fileName, int rresId);
+RRESAPI void rresUnloadResource(rresResource rres);
 
 RRESAPI rresCentralDir rresLoadCentralDirectory(const char *fileName);
 RRESAPI void rresUnloadCentralDirectory(rresCentralDir dir);
-RRESAPI int rresGetIdFromFileName(rresCentralDir dir, const char *fileName);
 
+RRESAPI int rresGetIdFromFileName(rresCentralDir dir, const char *fileName);
 RRESAPI unsigned int rresComputeCRC32(unsigned char *buffer, int len);
 
 #ifdef __cplusplus
@@ -283,7 +297,7 @@ RRESAPI unsigned int rresComputeCRC32(unsigned char *buffer, int len);
 #if defined(RRES_IMPLEMENTATION)
 
 #include <stdlib.h>                 // Required for: malloc(), free()
-#include <stdio.h>                  // Required for: FILE, fopen(), fclose()
+#include <stdio.h>                  // Required for: FILE, fopen(), fseek(), fread(), fclose()
 #include <string.h>                 // Required for: memcpy(), strcmp()
 
 //----------------------------------------------------------------------------------
@@ -298,25 +312,25 @@ RRESAPI unsigned int rresComputeCRC32(unsigned char *buffer, int len);
 // rres file header (16 bytes)
 typedef struct rresFileHeader {
     unsigned char id[4];            // File identifier: rres
-    unsigned short version;         // File version and subversion
+    unsigned short version;         // File version
     unsigned short chunkCount;      // Number of resource chunks in this file (total) -> MAX: 65535
     unsigned int cdOffset;          // Central Directory offset in file (0 if not available)
     unsigned int reserved;          // reserved
 } rresFileHeader;
 
 // rres resource chunk info header (32 bytes)
-typedef struct rresInfoHeader {
+typedef struct rresResourceInfoHeader {
     unsigned char type[4];          // Resource chunk type (FOURCC)
     unsigned int id;                // Resource chunk identifier (generated from filename CRC32 hash)
     unsigned char compType;         // Data compression algorithm
     unsigned char cipherType;       // Data encription algorithm
     unsigned short flags;           // Data flags (if required)
-    unsigned int packedSize;              // Data chunk size (data can be compressed or include additional data appended)
+    unsigned int packedSize;        // Data chunk size (data can be compressed or include additional data appended)
     unsigned int baseSize;          // Data base size (uncompressed and not considering additional data appended)
     unsigned int nextOffset;        // Next resource chunk global offset (if resource has multiple chunks)
     unsigned int reserved;          // reserved
     unsigned int crc32;             // Data chunk CRC32 (propCount + props[] + data)
-} rresInfoHeader;
+} rresResourceInfoHeader;
 
 //----------------------------------------------------------------------------------
 // Enums Definition
@@ -325,93 +339,94 @@ typedef struct rresInfoHeader {
 // Compression algorithms
 // NOTE 1: This enum just list some common data compression algorithms for convenience,
 // The rres packer tool and the engine-specific library are responsible to implement the desired ones,
-// Feel free to add other used algorithms to this list and send a PR
-// NOTE 2: rresInfoHeader.compType is a byte-size value, limited to [0..255]
-typedef enum {
-    RRES_COMP_NONE          = 0,        // No data compression
-    RRES_COMP_RLE           = 1,        // RLE compression
-    RRES_COMP_DEFLATE       = 10,       // DEFLATE compression
-    RRES_COMP_LZ4           = 20,       // LZ4 compression
-    RRES_COMP_LZMA2         = 30,       // LZMA2 compression
-    RRES_COMP_QOI           = 40,       // QOI compression, useful for RGB(A) image data
-    // gzip, brotli, lzo, zstd...       // TODO: Add other compression algorithms to enum
+// NOTE 2: rresResourceInfoHeader.compType is a byte-size value, limited to [0..255]
+typedef enum rresCompressionType {
+    RRES_COMP_NONE          = 0,            // No data compression
+    RRES_COMP_RLE           = 1,            // RLE compression
+    RRES_COMP_DEFLATE       = 10,           // DEFLATE compression
+    RRES_COMP_LZ4           = 20,           // LZ4 compression
+    RRES_COMP_LZMA2         = 30,           // LZMA2 compression
+    RRES_COMP_QOI           = 40,           // QOI compression, useful for RGB(A) image data
+    // gzip, brotli, lzo, zstd...           // TODO: Add other compression algorithms to enum
 } rresCompressionType;
 
 // Encryption algoritms
 // NOTE 1: This enum just lists some common data encryption algorithms for convenience,
 // The rres packer tool and the engine-specific library are responsible to implement the desired ones,
-// Feel free to add other used algorithms to this list and send a PR
 // NOTE 2: Some encryption algorithm could require/generate additional data (seed, salt, nonce, MAC...)
 // in those cases, that extra data must be appended to the original encrypted message and added to the resource data chunk
-// NOTE 3: rresInfoHeader.cipherType is a byte-size value, limited to [0..255]
-typedef enum {
-    RRES_CIPHER_NONE        = 0,        // No data encryption
-    RRES_CIPHER_XOR         = 1,        // XOR encryption, generic using 128bit key in blocks
-    RRES_CIPHER_DES         = 10,       // DES encryption
-    RRES_CIPHER_TDES        = 11,       // Triple DES encryption
-    RRES_CIPHER_IDEA        = 20,       // IDEA encryption
-    RRES_CIPHER_AES         = 30,       // AES (128bit or 256bit) encryption
-    RRES_CIPHER_AES_GCM     = 31,       // AES Galois/Counter Mode (Galois Message Authentification Code - GMAC)
-    RRES_CIPHER_XTEA        = 40,       // XTEA encryption
-    RRES_CIPHER_BLOWFISH    = 50,       // BLOWFISH encryption
-    RRES_CIPHER_RSA         = 60,       // RSA asymmetric encryption
-    RRES_CIPHER_SALSA20     = 70,       // SALSA20 encryption
-    RRES_CIPHER_CHACHA20    = 71,       // CHACHA20 encryption
-    RRES_CIPHER_XCHACHA20   = 72,       // XCHACHA20 encryption
+// NOTE 3: rresResourceInfoHeader.cipherType is a byte-size value, limited to [0..255]
+typedef enum rresEncryptionType {
+    RRES_CIPHER_NONE        = 0,            // No data encryption
+    RRES_CIPHER_XOR         = 1,            // XOR encryption, generic using 128bit key in blocks
+    RRES_CIPHER_DES         = 10,           // DES encryption
+    RRES_CIPHER_TDES        = 11,           // Triple DES encryption
+    RRES_CIPHER_IDEA        = 20,           // IDEA encryption
+    RRES_CIPHER_AES         = 30,           // AES (128bit or 256bit) encryption
+    RRES_CIPHER_AES_GCM     = 31,           // AES Galois/Counter Mode (Galois Message Authentification Code - GMAC)
+    RRES_CIPHER_XTEA        = 40,           // XTEA encryption
+    RRES_CIPHER_BLOWFISH    = 50,           // BLOWFISH encryption
+    RRES_CIPHER_RSA         = 60,           // RSA asymmetric encryption
+    RRES_CIPHER_SALSA20     = 70,           // SALSA20 encryption
+    RRES_CIPHER_CHACHA20    = 71,           // CHACHA20 encryption
+    RRES_CIPHER_XCHACHA20   = 72,           // XCHACHA20 encryption
     RRES_CIPHER_XCHACHA20_POLY1305 = 73,    // XCHACHA20 with POLY1305 for message authentification (MAC) 
-    // twofish, RC4, RC5, RC6           // TODO: Other encryption algorithm...
+    // twofish, RC4, RC5, RC6               // TODO: Other encryption algorithm...
 } rresEncryptionType;
 
 // Image/Texture pixel formats
-// NOTE: This enum list several compressed/uncompressed pixel formats but there are actually MANY more,
-// Feel free to add other used algorithms to this list and send a PR
-typedef enum {
-    RRES_PIXELFORMAT_UNCOMP_GRAYSCALE = 1,      // 8 bit per pixel (no alpha)
-    RRES_PIXELFORMAT_UNCOMP_GRAY_ALPHA,         // 16 bpp (2 channels)
-    RRES_PIXELFORMAT_UNCOMP_R5G6B5,             // 16 bpp
-    RRES_PIXELFORMAT_UNCOMP_R8G8B8,             // 24 bpp
-    RRES_PIXELFORMAT_UNCOMP_R5G5B5A1,           // 16 bpp (1 bit alpha)
-    RRES_PIXELFORMAT_UNCOMP_R4G4B4A4,           // 16 bpp (4 bit alpha)
-    RRES_PIXELFORMAT_UNCOMP_R8G8B8A8,           // 32 bpp
-    RRES_PIXELFORMAT_UNCOMP_R32,                // 32 bpp (1 channel - float)
-    RRES_PIXELFORMAT_UNCOMP_R32G32B32,          // 32*3 bpp (3 channels - float)
-    RRES_PIXELFORMAT_UNCOMP_R32G32B32A32,       // 32*4 bpp (4 channels - float)
-    RRES_PIXELFORMAT_COMP_DXT1_RGB,             // 4 bpp (no alpha)
-    RRES_PIXELFORMAT_COMP_DXT1_RGBA,            // 4 bpp (1 bit alpha)
-    RRES_PIXELFORMAT_COMP_DXT3_RGBA,            // 8 bpp
-    RRES_PIXELFORMAT_COMP_DXT5_RGBA,            // 8 bpp
-    RRES_PIXELFORMAT_COMP_ETC1_RGB,             // 4 bpp
-    RRES_PIXELFORMAT_COMP_ETC2_RGB,             // 4 bpp
-    RRES_PIXELFORMAT_COMP_ETC2_EAC_RGBA,        // 8 bpp
-    RRES_PIXELFORMAT_COMP_PVRT_RGB,             // 4 bpp
-    RRES_PIXELFORMAT_COMP_PVRT_RGBA,            // 4 bpp
-    RRES_PIXELFORMAT_COMP_ASTC_4x4_RGBA,        // 8 bpp
-    RRES_PIXELFORMAT_COMP_ASTC_8x8_RGBA         // 2 bpp
-    //...
+// NOTE: This enum list several common compressed/uncompressed pixel formats but there are actually MANY more
+typedef enum rresPixelFormat {
+    RRES_PIXELFORMAT_UNCOMP_GRAYSCALE = 1,  // 8 bit per pixel (no alpha)
+    RRES_PIXELFORMAT_UNCOMP_GRAY_ALPHA,     // 16 bpp (2 channels)
+    RRES_PIXELFORMAT_UNCOMP_R5G6B5,         // 16 bpp
+    RRES_PIXELFORMAT_UNCOMP_R8G8B8,         // 24 bpp
+    RRES_PIXELFORMAT_UNCOMP_R5G5B5A1,       // 16 bpp (1 bit alpha)
+    RRES_PIXELFORMAT_UNCOMP_R4G4B4A4,       // 16 bpp (4 bit alpha)
+    RRES_PIXELFORMAT_UNCOMP_R8G8B8A8,       // 32 bpp
+    RRES_PIXELFORMAT_UNCOMP_R32,            // 32 bpp (1 channel - float)
+    RRES_PIXELFORMAT_UNCOMP_R32G32B32,      // 32*3 bpp (3 channels - float)
+    RRES_PIXELFORMAT_UNCOMP_R32G32B32A32,   // 32*4 bpp (4 channels - float)
+    RRES_PIXELFORMAT_COMP_DXT1_RGB,         // 4 bpp (no alpha)
+    RRES_PIXELFORMAT_COMP_DXT1_RGBA,        // 4 bpp (1 bit alpha)
+    RRES_PIXELFORMAT_COMP_DXT3_RGBA,        // 8 bpp
+    RRES_PIXELFORMAT_COMP_DXT5_RGBA,        // 8 bpp
+    RRES_PIXELFORMAT_COMP_ETC1_RGB,         // 4 bpp
+    RRES_PIXELFORMAT_COMP_ETC2_RGB,         // 4 bpp
+    RRES_PIXELFORMAT_COMP_ETC2_EAC_RGBA,    // 8 bpp
+    RRES_PIXELFORMAT_COMP_PVRT_RGB,         // 4 bpp
+    RRES_PIXELFORMAT_COMP_PVRT_RGBA,        // 4 bpp
+    RRES_PIXELFORMAT_COMP_ASTC_4x4_RGBA,    // 8 bpp
+    RRES_PIXELFORMAT_COMP_ASTC_8x8_RGBA     // 2 bpp
+    // TOO: Add additional pixel formats as required
 } rresPixelFormat;
 
 // Vertex data attribute
-typedef enum {
-    RRES_VERTEX_ATTRIBUTE_POSITION = 0,
-    RRES_VERTEX_ATTRIBUTE_TEXCOORD1,
-    RRES_VERTEX_ATTRIBUTE_TEXCOORD2,
-    RRES_VERTEX_ATTRIBUTE_TEXCOORD3,
-    RRES_VERTEX_ATTRIBUTE_TEXCOORD4,
-    RRES_VERTEX_ATTRIBUTE_NORMAL,
-    RRES_VERTEX_ATTRIBUTE_TANGENT,
-    RRES_VERTEX_ATTRIBUTE_COLOR,
-    RRES_VERTEX_ATTRIBUTE_INDEX,
-    //...
+// NOTE: The expected number of components for every vertex attributes are the specified ones
+typedef enum rresVertexAttribute {
+    RRES_VERTEX_ATTRIBUTE_POSITION   = 0,   // Vertex position attribute: [x, y, z]
+    RRES_VERTEX_ATTRIBUTE_TEXCOORD1  = 10,  // Vertex texture coordinates attribute: [u, v]
+    RRES_VERTEX_ATTRIBUTE_TEXCOORD2  = 11,  // Vertex texture coordinates attribute: [u, v]
+    RRES_VERTEX_ATTRIBUTE_TEXCOORD3  = 12,  // Vertex texture coordinates attribute: [u, v]
+    RRES_VERTEX_ATTRIBUTE_TEXCOORD4  = 13,  // Vertex texture coordinates attribute: [u, v]
+    RRES_VERTEX_ATTRIBUTE_NORMAL     = 20,  // Vertex normal attribute: [x, y, z]
+    RRES_VERTEX_ATTRIBUTE_TANGENT    = 30,  // Vertex tangent attribute: [x, y, z, w]
+    RRES_VERTEX_ATTRIBUTE_COLOR      = 40,  // Vertex color attribute: [r, g, b, a]
+    RRES_VERTEX_ATTRIBUTE_INDEX      = 100, // Vertex index attribute: [i]
+    // TODO: Add additional required attributes or attributes with different component count  
 } rresVertexAttribute;
 
 // Vertex data format type
-typedef enum {
-    RRES_VERTEX_FORMAT_BYTE = 0,
-    RRES_VERTEX_FORMAT_SHORT,
-    RRES_VERTEX_FORMAT_INT,
-    RRES_VERTEX_FORMAT_HFLOAT,
-    RRES_VERTEX_FORMAT_FLOAT,
-    //...
+typedef enum rresVertexFormat {
+    RRES_VERTEX_FORMAT_UBYTE = 0,           // 8 bit unsigned integer data
+    RRES_VERTEX_FORMAT_BYTE,                // 8 bit signed integer data
+    RRES_VERTEX_FORMAT_USHORT,              // 16 bit unsigned integer data
+    RRES_VERTEX_FORMAT_SHORT,               // 16 bit signed integer data
+    RRES_VERTEX_FORMAT_UINT,                // 32 bit unsigned integer data
+    RRES_VERTEX_FORMAT_INT,                 // 32 bit integer data
+    RRES_VERTEX_FORMAT_HFLOAT,              // 16 bit float data
+    RRES_VERTEX_FORMAT_FLOAT,               // 32 bit float data
+    // TODO: Add additional required vertex formats (i.e. normalized data)
 } rresVertexFormat;
 
 //----------------------------------------------------------------------------------
@@ -422,17 +437,17 @@ typedef enum {
 //----------------------------------------------------------------------------------
 // Module Internal Functions Declaration
 //----------------------------------------------------------------------------------
-static rresDataChunk rresLoadDataChunk(rresInfoHeader info, void *data);
-static void rresUnloadDataChunk(rresDataChunk chunk);
+static rresResourceChunk rresLoadResourceChunk(rresResourceInfoHeader info, void *data);
+static void rresUnloadResourceChunk(rresResourceChunk chunk);
 
 //----------------------------------------------------------------------------------
 // Module Functions Definition
 //----------------------------------------------------------------------------------
 // Load resource from file by id
 // NOTE: All resources conected to base id are loaded
-rresData rresLoadData(const char *fileName, int rresId)
+rresResource rresLoadResource(const char *fileName, int rresId)
 {
-    rresData rres = { 0 };
+    rresResource rres = { 0 };
 
     FILE *rresFile = fopen(fileName, "rb");
 
@@ -452,33 +467,33 @@ rresData rresLoadData(const char *fileName, int rresId)
         {
             for (int i = 0; i < header.chunkCount; i++)
             {
-                rresInfoHeader info = { 0 };
+                rresResourceInfoHeader info = { 0 };
 
                 // Read resource info header
-                fread(&info, sizeof(rresInfoHeader), 1, rresFile);
+                fread(&info, sizeof(rresResourceInfoHeader), 1, rresFile);
 
                 if (info.id == rresId)
                 {
                     rres.count = 1;
 
                     long currentFileOffset = ftell(rresFile);   // Store current file position
-                    rresInfoHeader temp = info;                 // Temp info header to scan resource chunks
+                    rresResourceInfoHeader temp = info;                 // Temp info header to scan resource chunks
 
                     // Scan all resource chunks checking temp.nextOffset
                     while (temp.nextOffset != 0)
                     {
                         fseek(rresFile, temp.nextOffset, SEEK_SET);         // Jump to next resource
-                        fread(&temp, sizeof(rresInfoHeader), 1, rresFile);  // Read next resource info header
+                        fread(&temp, sizeof(rresResourceInfoHeader), 1, rresFile);  // Read next resource info header
                         rres.count++;
                     }
 
-                    rres.chunks = (rresDataChunk *)RRES_CALLOC(rres.count, sizeof(rresDataChunk));   // Load as many rres slots as required
+                    rres.chunks = (rresResourceChunk *)RRES_CALLOC(rres.count, sizeof(rresResourceChunk));   // Load as many rres slots as required
                     fseek(rresFile, currentFileOffset, SEEK_SET);           // Get to first resource chunk position
 
                     // Read and load data chunk from file data
                     void *data = RRES_MALLOC(info.packedSize);
                     fread(data, info.packedSize, 1, rresFile);
-                    rres.chunks[0] = rresLoadDataChunk(info, data);
+                    rres.chunks[0] = rresLoadResourceChunk(info, data);
                     RRES_FREE(data);
 
                     // Check if there are more chunks to read
@@ -495,11 +510,11 @@ rresData rresLoadData(const char *fileName, int rresId)
                         // Load chunk data from raw file data
                         // NOTE: Raw data can be compressed and encrypted,
                         // it can also contain data properties at the beginning
-                        rres.chunks[i] = rresLoadDataChunk(info, data);
+                        rres.chunks[i] = rresLoadResourceChunk(info, data);
                         RRES_FREE(data);
 
                         fseek(rresFile, temp.nextOffset, SEEK_SET);             // Jump to next resource
-                        fread(&info, sizeof(rresInfoHeader), 1, rresFile);      // Read next resource info header
+                        fread(&info, sizeof(rresResourceInfoHeader), 1, rresFile);      // Read next resource info header
 
                         i++;
                     }
@@ -521,9 +536,9 @@ rresData rresLoadData(const char *fileName, int rresId)
 }
 
 // Unload resource data
-void rresUnloadData(rresData rres)
+void rresUnloadResource(rresResource rres)
 {
-    for (unsigned int i = 0; i < rres.count; i++) rresUnloadDataChunk(rres.chunks[i]);
+    for (unsigned int i = 0; i < rres.count; i++) rresUnloadResourceChunk(rres.chunks[i]);
 
     RRES_FREE(rres.chunks);
 }
@@ -549,10 +564,10 @@ rresCentralDir rresLoadCentralDirectory(const char *fileName)
         {
             RRES_LOG("WARNING: CDIR: Found at offset: %08x\n", header.cdOffset);
 
-            rresInfoHeader info = { 0 };
+            rresResourceInfoHeader info = { 0 };
 
             fseek(rresFile, header.cdOffset, SEEK_CUR);         // Move to central directory position
-            fread(&info, sizeof(rresInfoHeader), 1, rresFile);  // Read resource info
+            fread(&info, sizeof(rresResourceInfoHeader), 1, rresFile);  // Read resource info
 
             if ((info.type[0] == 'C') &&
                 (info.type[1] == 'D') &&
@@ -564,7 +579,7 @@ rresCentralDir rresLoadCentralDirectory(const char *fileName)
                 void *data = RRES_MALLOC(info.packedSize);
                 fread(data, info.packedSize, 1, rresFile);
 
-                rresDataChunk chunk = rresLoadDataChunk(info, data);    // TODO: Review: Only works for uncompressed/not-ecrypted data
+                rresResourceChunk chunk = rresLoadResourceChunk(info, data);    // TODO: Review: Only works for uncompressed/not-ecrypted data
                 RRES_FREE(data);
 
                 dir.count = chunk.props[0];     // Files count
@@ -584,7 +599,7 @@ rresCentralDir rresLoadCentralDirectory(const char *fileName)
                     ptr += (16 + dir.entries[i].fileNameSize);      // Move pointer for next entry
                 }
 
-                rresUnloadDataChunk(chunk);
+                rresUnloadResourceChunk(chunk);
             }
         }
 
@@ -594,11 +609,14 @@ rresCentralDir rresLoadCentralDirectory(const char *fileName)
     return dir;
 }
 
+// Unload central directory data
 void rresUnloadCentralDirectory(rresCentralDir dir)
 {
     RRES_FREE(dir.entries);
 }
 
+// Get resource identifier from filename
+// WARNING: It requires the central directory previously loaded
 int rresGetIdFromFileName(rresCentralDir dir, const char *fileName)
 {
     int id = 0;
@@ -617,7 +635,8 @@ int rresGetIdFromFileName(rresCentralDir dir, const char *fileName)
     return id;
 }
 
-// Compute CRC32
+// Compute CRC32 hash
+// NOTE: CRC32 is used as rres id, generated from original filename
 unsigned int rresComputeCRC32(unsigned char *buffer, int len)
 {
     static unsigned int crcTable[256] = {
@@ -667,9 +686,9 @@ unsigned int rresComputeCRC32(unsigned char *buffer, int len)
 //----------------------------------------------------------------------------------
 // Load data chunk from raw resource data as contained in file
 // WARNING: Raw data can be compressed and/or encrypted, in those cases is up to the users to load it
-static rresDataChunk rresLoadDataChunk(rresInfoHeader info, void *data)
+static rresResourceChunk rresLoadResourceChunk(rresResourceInfoHeader info, void *data)
 {
-    rresDataChunk chunk = { 0 };
+    rresResourceChunk chunk = { 0 };
 
     // Assign rres.type (int) from info.type (FOURCC)
     if ((info.type[0] == 'N') && (info.type[1] == 'U') && (info.type[2] == 'L') && (info.type[3] == 'L')) chunk.type = RRES_DATA_NULL;            // NULL
@@ -678,7 +697,7 @@ static rresDataChunk rresLoadDataChunk(rresInfoHeader info, void *data)
     else if ((info.type[0] == 'I') && (info.type[1] == 'M') && (info.type[2] == 'G') && (info.type[3] == 'E')) chunk.type = RRES_DATA_IMAGE;      // IMGE
     else if ((info.type[0] == 'W') && (info.type[1] == 'A') && (info.type[2] == 'V') && (info.type[3] == 'E')) chunk.type = RRES_DATA_WAVE;       // WAVE
     else if ((info.type[0] == 'V') && (info.type[1] == 'R') && (info.type[2] == 'T') && (info.type[3] == 'X')) chunk.type = RRES_DATA_VERTEX;     // VRTX
-    else if ((info.type[0] == 'F') && (info.type[1] == 'O') && (info.type[2] == 'N') && (info.type[3] == 'T')) chunk.type = RRES_DATA_FONT_INFO;  // FONT
+    else if ((info.type[0] == 'F') && (info.type[1] == 'N') && (info.type[2] == 'T') && (info.type[3] == 'G')) chunk.type = RRES_DATA_GLYPH_INFO; // FNTG
     else if ((info.type[0] == 'L') && (info.type[1] == 'I') && (info.type[2] == 'N') && (info.type[3] == 'K')) chunk.type = RRES_DATA_LINK;       // LINK
     else if ((info.type[0] == 'C') && (info.type[1] == 'D') && (info.type[2] == 'I') && (info.type[3] == 'R')) chunk.type = RRES_DATA_DIRECTORY;  // CDIR
 
@@ -720,7 +739,7 @@ static rresDataChunk rresLoadDataChunk(rresInfoHeader info, void *data)
 }
 
 // Unload data chunk
-static void rresUnloadDataChunk(rresDataChunk chunk)
+static void rresUnloadResourceChunk(rresResourceChunk chunk)
 {
     RRES_FREE(chunk.props);   // Resource chunk properties
     RRES_FREE(chunk.data);    // Resource chunk data
