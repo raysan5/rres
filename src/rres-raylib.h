@@ -119,9 +119,9 @@ static const char *password = NULL;
 //----------------------------------------------------------------------------------
 
 // Load simple data chunks that are later required by multi-chunk resources
-static void *rresLoadDataChunkRaw(rresResourceChunk chunk);         // Load chunk: RRES_DATA_RAW
-static char *rresLoadDataChunkText(rresResourceChunk chunk);        // Load chunk: RRES_DATA_TEXT
-static Image rresLoadDataChunkImage(rresResourceChunk chunk);       // Load chunk: RRES_DATA_IMAGE
+static void *rresLoadDataChunkRaw(rresResourceChunk chunk, int *size);  // Load chunk: RRES_DATA_RAW
+static char *rresLoadDataChunkText(rresResourceChunk chunk);            // Load chunk: RRES_DATA_TEXT
+static Image rresLoadDataChunkImage(rresResourceChunk chunk);           // Load chunk: RRES_DATA_IMAGE
 
 // Unpack compressed/encrypted data from chunk
 // NOTE: Function return 0 on success or other value on failure
@@ -138,7 +138,7 @@ void *rresLoadRaw(rresResource rres, int *size)
 
     if ((rres.count >= 1) && (rres.chunks[0].type == RRES_DATA_RAW))
     {
-        data = rresLoadDataChunkRaw(rres.chunks[0]);
+        data = rresLoadDataChunkRaw(rres.chunks[0], size);
     }
 
     return data;
@@ -283,7 +283,7 @@ Mesh rresLoadMesh(rresResource rres)
 
 // Load data chunk: RRES_DATA_RAW
 // NOTE: This chunk can be used raw files embedding or other binary blobs
-static void *rresLoadDataChunkRaw(rresResourceChunk chunk)
+static void *rresLoadDataChunkRaw(rresResourceChunk chunk, int *size);
 {
     void *rawData = NULL;
 
@@ -293,6 +293,7 @@ static void *rresLoadDataChunkRaw(rresResourceChunk chunk)
 
         rawData = RL_CALLOC(chunk.props[0], 1);
         memcpy(rawData, chunk.data, chunk.props[0]);
+        *size = chunk.props[0];
     }
 
     return rawData;
