@@ -219,7 +219,7 @@ The current data types and its properties are:
    - Data: vertex_data
  - `RRES_DATA_GLYPH_INFO`:`FNTG`: Font glyphs info, generated from an input font file
    - Properties Count: 4
-   - Properties: `props[0]`:baseSize, `props[1]`:glyphCount, `props[2]`:glyphPadding, `props[3]`:glyphFormat
+   - Properties: `props[0]`:baseSize, `props[1]`:glyphCount, `props[2]`:glyphPadding, `props[3]`:rresFontStyle
    - Data: glyph_data: `rresFontGlyphInfo[0..glyphCount]`
  - `RRES_DATA_LINK`:`LINK`: Filepath link to an external file, as provided on file input
    - Properties Count: 1
