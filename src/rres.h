@@ -32,7 +32,7 @@
 *   {
 *       rresResourceInfoHeader   (32 bytes)
 *           Type                  (4 bytes)     // Resource type (FourCC)
-*           Id                    (4 bytes)     // Resource identifier (CRC32 filename hash)
+*           Id                    (4 bytes)     // Resource identifier (CRC32 filename hash or custom)
 *           Compressor            (1 byte)      // Data compression algorithm
 *           Cipher                (1 byte)      // Data encryption algorithm
 *           Flags                 (2 bytes)     // Data flags (if required)
@@ -266,7 +266,7 @@ typedef enum rresResourceDataType {
                                     //    props[2]:sampleSize
                                     //    props[3]:channels 
                                     //    data: samples
-    RRES_DATA_VERTEX       = 5,     // FourCC: VRTX - Mesh file data, 4 properties
+    RRES_DATA_VERTEX       = 5,     // FourCC: VRTX - Vertex file data, 4 properties
                                     //    props[0]:vertexCount
                                     //    props[1]:rresVertexAttribute
                                     //    props[2]:componentCount
@@ -285,7 +285,7 @@ typedef enum rresResourceDataType {
                                     //    props[0]:entryCount, 1 property
                                     //    data: rresDirEntry[0..entryCount]
 
-    // TODO: Add new basic resource data types if required (define props + data)
+    // TODO: Add additional resource data types if required (define props + data)
 
 } rresResourceDataType;
 
