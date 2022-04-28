@@ -4,7 +4,7 @@
 
 **rres is a simple and easy-to-use file-format to package resources**
 
-`rres` has been designed to package game assets (images, fonts, text, audio, models...) data into a simple self-contained comprehensive format, easy to read and write, prepared to load data in a fast and efficient way.
+`rres` has been designed to package game assets (images, fonts, text, audio, models...) into a simple self-contained comprehensive format, easy to read and write, prepared to load data in a fast and efficient way.
 
 `rres` is inspired by [XNB](http://xbox.create.msdn.com/en-US/sample/xnb_format) file-format (used by XNA/MonoGame), [RIFF](https://en.wikipedia.org/wiki/Resource_Interchange_File_Format), [PNG](https://en.wikipedia.org/wiki/Portable_Network_Graphics) and [ZIP](https://en.wikipedia.org/wiki/Zip_(file_format)) file-formats.
 
@@ -13,33 +13,47 @@
 
 ## rres history
 
-rres has been in development **since 2014**. I started this project with the aim to create a packaging file-format similar to [XNB](http://xbox.create.msdn.com/en-US/sample/xnb_format) but for raylib. In the last **8 years** the project has suffered multiple redesigns and improvements along a file-formats learning process. In that time I implemented loaders/writers for **+20 different file formats** and also created **+12 custom file formats** for multiple [raylibtech custom tools](https://raylibtech.itch.io/).
+rres has been in development **since 2014**. I started this project with the aim to create a packaging file-format similar to [XNB](http://xbox.create.msdn.com/en-US/sample/xnb_format) for raylib. In the last **8 years** the project has suffered multiple redesigns and improvements along a file-formats learning process. In that time I implemented loaders/writers for **+20 different file formats** and also created **+12 custom file formats** for multiple [raylibtech custom tools](https://raylibtech.itch.io/).
 
 rres file-format has gone through _at least_ **4 big redesigns**:
 
- - First design of the format was limited to packaging one resource after another, every resource consisted of one _resource info header_ followed by a fixed set of four possible parameters and the resource data. Along the `.rres` file, a `.h` header file was generated mapping with defines the `rresId` with a resource filename (usually the original filename of the un-processed data). This model was pretty simple and intuitive but it has some important downsides: it did not consider complex pieces of data that could require multiple chunks and there was no way to extract/retrieve original source files (or similar ones).
+ - **First design** of the format was limited to packaging one resource after another, every resource consisted of one _resource info header_ followed by a fixed set of four possible parameters and the resource data. Along the `.rres` file, a `.h` header file was generated mapping with defines the `rresId` with a resource filename (usually the original filename of the un-processed data). This model was pretty simple and intuitive but it has some important downsides: it did not consider complex pieces of data that could require multiple chunks and there was no way to extract/retrieve original source files (or similar ones).
 
- - Second design was way more complex and tried to address first design shortcomings. In second design every resource could include multiple chunks of data in a kind of tree structure. Actually, that design was similar to [RIFF](https://en.wikipedia.org/wiki/Resource_Interchange_File_Format) file-format: every resource in the package could be threatened as a separate file on its own. Some additional resource options were also added but the format become quite complex to understand and manage. Finally the testing implementation was discarded and a simpler alternative was investigated.
+ - **Second design** was way more complex and tried to address first design shortcomings. In second design every resource could include multiple chunks of data in a kind of tree structure. Actually, that design was similar to [RIFF](https://en.wikipedia.org/wiki/Resource_Interchange_File_Format) file-format: every resource in the package could be threatened as a separate file on its own. Some additional resource options were also added but the format become quite complex to understand and manage. Finally the testing implementation was discarded and a simpler alternative was investigated.
 
- - Third design was a return to first design: simplicity but keeping some of the options for the individual resources. The problem of multiple resources generated from a single input file was solved using a simple offset field in the _resource info header_ pointing to next linked resource when required. Resources were loaded as an array of resource chunks. An optional Central Directory resource chunk was added to keep references for the input files. Format was good but it still required implementation and further investigation, it needed to be engine-agnostic and it was still dependant on raylib structures and functionality.
+ - **Third design** was a return to first design: simplicity but keeping some of the options for the individual resources. The problem of multiple resources generated from a single input file was solved using a simple offset field in the _resource info header_ pointing to next linked resource when required. Resources were loaded as an array of resource chunks. An optional Central Directory resource chunk was added to keep references for the input files. Format was good but it still required implementation and further investigation, it needed to be engine-agnostic and it was still dependant on raylib structures and functionality.
 
- - Fourth design has been done along the implementation, almost all structures and fields have been reviewed and renamed for consistency and simplicity. A separare library has been created (`rres-raylib.h`) to map the loaded resources data into a custom library/engine data types, any depndency to raylib has been removed, making it a completely engine-agnostic file-format. Several usage examples for raylib has been implemented to illustrate the library-engine connection of `rres` and multiple types of resource loading have been implemented. `rrespacker` tool has been created from scratch to generate `rres` files, it supports a nive GUI interface with drag and drop support but also a powerful command-line for batch processing. Compression and encryption implementation has been moved to the user library implementation to be aligned with the packaging tool and keep the `rres` file-format cleaner and simpler.
+ - **Fourth design** has been done along the implementation, almost all structures and fields have been reviewed and renamed for consistency and simplicity. A separare library has been created (`rres-raylib.h`) to map the loaded resources data into a custom library/engine data types, any depndency to raylib has been removed, making it a completely engine-agnostic file-format. Several usage examples for raylib has been implemented to illustrate the library-engine connection of `rres` and multiple types of resource loading have been implemented. `rrespacker` tool has been created from scratch to generate `rres` files, it supports a nive GUI interface with drag and drop support but also a powerful command-line for batch processing. Compression and encryption implementation has been moved to the user library implementation to be aligned with the packaging tool and keep the `rres` file-format cleaner and simpler.
 
 It's been an **8 years project**, working on it on-and-off, with many redesigns and revisions but I'm personally very happy with the final result. rres is a resource packaging file-format at the level of any professional engine package format BUT free and open-source, available to any game developer that wants to use it, implement it or create a custom version.
 
-## rres selling points
+## rres design goals
 
-rres file-format is a great option to package game resources/assets for several reasons:
+- **Simplicity**: rres structure is simple, one file header and multiple resources one after the other. Still, every resource has a small (32 bytes) resource info header with multiple options available.
 
- - Free and open source: In comparison to other engines that use custom private packaging file-formats, rres is a free and open-source alternative. It can be used with the provided tools or custom packager/laoder implementations could be created for any engine. It can also be used as a learning material to create custom resource packaging alternative format if desired.
+- **Ease-of-use**: rres library to read rres files is small with only the minimum required functions to read resource data from it's id. It only uses a small set of functions from the standard C library. An `rrespacker` tool with GUI/CLI is provided to easily create and view .rres files.
 
- - Organization: All the game files data could be organized in a single or a few rres files. It keeps the game directory clean and well structured. 
+- **Flexibility**: rres format support any kind of input file, if data is not classified as a basic data type it can be just packed as raw file data.
 
- - Performance: Keeping all required files for a level/map into a single rres file reduces the need of file handles to access multiple files; file handles are an OS resources, and the cost of opening a file is not insignificant and may cause a delay in the game. Data access times inside the rres file is also important and depending how the files are organized inside the rres it could also improve the loading times.
+- **Portability**: rres file format is not tied to an specific engine, the base library just reads the resource data as packed and that data can be mapped to any engine structures. An usage example has been provided with the auxiliar library `rres-raylib.h` that maps rres data to raylib structures.
 
- - Security: Data is packed in a custom rres fileformat, for most users it's very difficult to access that data so the copyrighted materials are protected. rres also supports per-resource data compression and encryption, adding an extra level of security to game assets when required. 
+- **Security**: rres support per-resource compression and encryption if required. Still, despite the support provided by the file format is up to the user to implement it in the rres packer tool and the engine mapping library. rres does not force any specific compression/encryption algorithm by design
 
- - Downloading times: On platforms like HTML5 or server data access, downloading the assets packed into a single file improves download times, in comparison to downloading each file individually.
+- **Extensibility**: rres file format is scalable, supporting new data types, new features and custom data if required.
+
+- **Free and open source**: rres is distributed as an open spec and a free and open source library. It can be used with the provided tool (`rrespacker`) or custom packer/loader implementations could be created for **any engine**. It can also be used as a learning material for anyone willing to create its own data packaging file format.
+
+## rres usage benefits
+
+There are some important reasons to package game assets data into a format like `rres`, here some good reasons to do it.
+
+ - **Organization**: Avoid thousands of files distributed in hundreds of directories in the final game build. All the game files data could be organized in a single or a few `.rres` files. It keeps the game directory clean and well structured.
+
+ - **Performance**: Keeping all required files for a level/map into a single `.rres` file reduces the need of file handles to access multiple files; file handles are an OS resource and the cost of opening a file is not insignificant, it may cause delays in the game. Data access times inside the `.rres` file are also important and depending how the files are organized it could also improve the loading times.
+
+ - **Security**: Avoid exposing all the game assets directly to the user for easy copy or modification. Data packed into a `.rres` file will be more difficult to extract and modify for most users; protect your game copyrighted assets. `rres` also supports per-resource data compression and encryption, adding an extra level of security when required. 
+
+ - **Downloading times**: If data needs to be accessed from a server and downloaded, the assets packed into a single or a few `.rres` files improves download times, in comparison to downloading each file individually.
 
 ## rres file structure
 
@@ -49,35 +63,35 @@ _NOTE: Resource chunks are usually generated from input files. It's important to
 
 
 ```c
-*   rresFileHeader               (16 bytes)
-*       Signature Id              (4 bytes)     // File signature id: 'rres'
-*       Version                   (2 bytes)     // Format version
-*       Resource Count            (2 bytes)     // Number of resource chunks contained
-*       CD Offset                 (4 bytes)     // Central Directory offset (if available)
-*       Reserved                  (4 bytes)     // <reserved>
-*
-*   rresResourceChunk[]
-*   {
-*       rresResourceInfoHeader   (32 bytes)
-*           Type                  (4 bytes)     // Resource type (FourCC)
-*           Id                    (4 bytes)     // Resource identifier (CRC32 filename hash)
-*           Compressor            (1 byte)      // Data compression algorithm
-*           Cipher                (1 byte)      // Data encryption algorithm
-*           Flags                 (2 bytes)     // Data flags (if required)
-*           Packed data Size      (4 bytes)     // Packed data size (compressed/encrypted + custom data appended)
-*           Base data Size        (4 bytes)     // Base data size (uncompressed/decrypted)
-*           Next Offset           (4 bytes)     // Next resource chunk offset (if required)
-*           Reserved              (4 bytes)     // <reserved>
-*           CRC32                 (4 bytes)     // Resource Data Chunk CRC32
-*                                
-*       rresResourceDataChunk     (n bytes)     // Packed data
-*           Property Count        (4 bytes)     // Number of properties contained
-*           Properties[]          (4*i bytes)   // Resource data required properties, depend on Type
-*           Data                  (m bytes)     // Resource data
-*   }
+rresFileHeader               (16 bytes)
+    Signature Id              (4 bytes)     // File signature id: 'rres'
+    Version                   (2 bytes)     // Format version
+    Resource Count            (2 bytes)     // Number of resource chunks contained
+    CD Offset                 (4 bytes)     // Central Directory offset (if available)
+    Reserved                  (4 bytes)     // <reserved>
+
+rresResourceChunk[]
+{
+    rresResourceInfoHeader   (32 bytes)
+        Type                  (4 bytes)     // Resource type (FourCC)
+        Id                    (4 bytes)     // Resource identifier (CRC32 filename hash)
+        Compressor            (1 byte)      // Data compression algorithm
+        Cipher                (1 byte)      // Data encryption algorithm
+        Flags                 (2 bytes)     // Data flags (if required)
+        Packed data Size      (4 bytes)     // Packed data size (compressed/encrypted + custom data appended)
+        Base data Size        (4 bytes)     // Base data size (uncompressed/decrypted)
+        Next Offset           (4 bytes)     // Next resource chunk offset (if required)
+        Reserved              (4 bytes)     // <reserved>
+        CRC32                 (4 bytes)     // Resource Data Chunk CRC32
+                             
+    rresResourceDataChunk     (n bytes)     // Packed data
+        Property Count        (4 bytes)     // Number of properties contained
+        Properties[]          (4*i bytes)   // Resource data required properties, depend on Type
+        Data                  (m bytes)     // Resource data
+}
 ```
 
-## rres file header
+## rres file header: `rresFileHeader`
 
 The following C struct defines the `rresFileHeader`:
 
@@ -283,6 +297,6 @@ A similar mapping library can be created for any other engine/framework.
 
 ## rres library and specs license
 
-`rres` file-format is licensed under MIT license. Check [LICENSE](LICENSE) for further details.
+`rres` file-format specs and `rres.h` library are licensed under MIT license. Check [LICENSE](LICENSE) for further details.
 
 *Copyright (c) 2014-2022 Ramon Santamaria ([@raysan5](https://twitter.com/raysan5))*
