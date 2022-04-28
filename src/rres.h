@@ -244,46 +244,46 @@ typedef struct rresFontGlyphInfo {
 //   ...
 //   - [VRTX] rres[n]: RRES_DATA_VERTEX
 typedef enum rresResourceDataType {
-    RRES_DATA_NULL         = 0,     // FourCC: NULL - Reserved for empty chunks, no props/data
-    RRES_DATA_RAW          = 1,     // FourCC: RAWD - Raw file data, 1 property
-                                    //    props[0]:size (bytes)
-                                    //    data: raw bytes
-    RRES_DATA_TEXT         = 2,     // FourCC: TEXT - Text file data, 4 properties
-                                    //    props[0]:size (bytes)
-                                    //    props[1]:encoding 
-                                    //    props[2]:codeLang 
-                                    //    props[3]:cultureCode
-                                    //    data: text
-    RRES_DATA_IMAGE        = 3,     // FourCC: IMGE - Image file data, 4 properties
-                                    //    props[0]:width 
-                                    //    props[1]:height 
-                                    //    props[2]:rresPixelFormat 
-                                    //    props[3]:mipmaps
-                                    //    data: pixels
-    RRES_DATA_WAVE         = 4,     // FourCC: WAVE - Audio file data, 4 properties
-                                    //    props[0]:sampleCount
-                                    //    props[1]:sampleRate
-                                    //    props[2]:sampleSize
-                                    //    props[3]:channels 
-                                    //    data: samples
-    RRES_DATA_VERTEX       = 5,     // FourCC: VRTX - Vertex file data, 4 properties
-                                    //    props[0]:vertexCount
-                                    //    props[1]:rresVertexAttribute
-                                    //    props[2]:componentCount
-                                    //    props[3]:rresVertexFormat
-                                    //    data: vertex
-    RRES_DATA_GLYPH_INFO   = 6,     // FourCC: FNTG - Font file processed, glyphs data, 4 properties
-                                    //    props[0]:baseSize
-                                    //    props[1]:glyphCount
-                                    //    props[2]:glyphPadding
-                                    //    props[3]:rresFontStyle
-                                    //    data: rresFontGlyphInfo[0..glyphCount]
-    RRES_DATA_LINK         = 99,    // FourCC: LINK - External linked file, 1 property
-                                    //    props[0]:size (bytes)
-                                    //    data: filepath (as provided on input)
-    RRES_DATA_DIRECTORY    = 100,   // FourCC: CDIR - Central directory for input files
-                                    //    props[0]:entryCount, 1 property
-                                    //    data: rresDirEntry[0..entryCount]
+    RRES_DATA_NULL         = 0,             // FourCC: NULL - Reserved for empty chunks, no props/data
+    RRES_DATA_RAW          = 1,             // FourCC: RAWD - Raw file data, 1 property
+                                            //    props[0]:size (bytes)
+                                            //    data: raw bytes
+    RRES_DATA_TEXT         = 2,             // FourCC: TEXT - Text file data, 4 properties
+                                            //    props[0]:size (bytes)
+                                            //    props[1]:encoding 
+                                            //    props[2]:codeLang 
+                                            //    props[3]:cultureCode
+                                            //    data: text
+    RRES_DATA_IMAGE        = 3,             // FourCC: IMGE - Image file data, 4 properties
+                                            //    props[0]:width 
+                                            //    props[1]:height 
+                                            //    props[2]:rresPixelFormat 
+                                            //    props[3]:mipmaps
+                                            //    data: pixels
+    RRES_DATA_WAVE         = 4,             // FourCC: WAVE - Audio file data, 4 properties
+                                            //    props[0]:sampleCount
+                                            //    props[1]:sampleRate
+                                            //    props[2]:sampleSize
+                                            //    props[3]:channels 
+                                            //    data: samples
+    RRES_DATA_VERTEX       = 5,             // FourCC: VRTX - Vertex file data, 4 properties
+                                            //    props[0]:vertexCount
+                                            //    props[1]:rresVertexAttribute
+                                            //    props[2]:componentCount
+                                            //    props[3]:rresVertexFormat
+                                            //    data: vertex
+    RRES_DATA_GLYPH_INFO   = 6,             // FourCC: FNTG - Font file processed, glyphs data, 4 properties
+                                            //    props[0]:baseSize
+                                            //    props[1]:glyphCount
+                                            //    props[2]:glyphPadding
+                                            //    props[3]:rresFontStyle
+                                            //    data: rresFontGlyphInfo[0..glyphCount]
+    RRES_DATA_LINK         = 99,            // FourCC: LINK - External linked file, 1 property
+                                            //    props[0]:size (bytes)
+                                            //    data: filepath (as provided on input)
+    RRES_DATA_DIRECTORY    = 100,           // FourCC: CDIR - Central directory for input files
+                                            //    props[0]:entryCount, 1 property
+                                            //    data: rresDirEntry[0..entryCount]
 
     // TODO: Add additional resource data types if required (define props + data)
 
