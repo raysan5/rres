@@ -59,6 +59,10 @@ There are some important reasons to package game assets data into a format like 
 
 rres file format consists of a file header (`rresFileHeader`) followed by a number of resource chunks (`rresResourceChunk`). Every resource chunk has a resource info header (`rresResourceInfoHeader`) that includes a `FOURCC` data type code and resource data information. The resource data (`rresResourceDataChunk`) contains a small set of properties to identify data, depending on the type and could contain some additional data at the end.
 
+![rres v1.0](https://raw.githubusercontent.com/raysan5/rres/master/design/rres_file_format_REV5.png)
+
+_rres v1.0 file structure._
+
 _NOTE: Resource chunks are usually generated from input files. It's important to note that resources could not be mapped to files 1:1, one input file could generate multiple resource chunks. For example, a .ttf input file could generate an image resource chunk (`RRES_DATA_IMAGE`) plus a font glyph info resource chunk (`RRES_DATA_GLYPH_INFO`)._
 
 
@@ -152,18 +156,19 @@ Considerations:
  - `nextOffset` defines the global file position address for the next _related_ resource chunk, it's useful for input files that generate multiple resources, like fonts or meshes.
  - `crc32` is useful for a quick check of data corruption, by default it considers the `rresResourceData` chunk.
 
-### rres resource chunk data: `rresResourceData`
+### rres resource data chunk: `rresResourceDataChunk`
 
-`rresResourceData` contains the following data:
+`rresResourceDataChunk` contains the following data:
 
  - `Property Count`: Number of properties contained, depends on resource `type`
- - `Properties[]`: Resource data required properties, depend on `type`
- - `Data`: Resource data
+ - `Properties[]`: Resource data required properties, depend on resource `type`
+ - `Data`: Resource data, depend on resource `type`
  
 Considerations:
  
- - `baseSize` defines the base size (uncompressed/unencrypted) of `rresResourceData`. 
- - `packedSize` defines the compressed/encrypted size of `rresResourceData`. It could also consider any extra data appended to `rresResourceData` (i.e. encryption MAC) but it is implementation dependant.
+ - `rresResourceInfoHeader.type` defines the type of resource, one of the types contained in enum `rresResourceDataType`.
+ - `rresResourceInfoHeader.baseSize` defines the base size (uncompressed/unencrypted) of `rresResourceDataChunk`. 
+ - `rresResourceInfoHeader.packedSize` defines the compressed/encrypted size of `rresResourceDataChunk`. It could also consider any extra data appended to `rresResourceData` (i.e. encryption MAC) but it is implementation dependant.
  
 ### rres resource data types: `rresResourceDataType`
 
@@ -295,7 +300,7 @@ typedef struct rresResourceChunk {
 
 A similar mapping library can be created for any other engine/framework.
 
-## rres library and specs license
+## rres specs and library license
 
 `rres` file-format specs and `rres.h` library are licensed under MIT license. Check [LICENSE](LICENSE) for further details.
 
