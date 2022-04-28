@@ -256,9 +256,9 @@ In case a `rres` file is generated with no `Central Directory`, a secondary head
 
 ## rres implementation for a custom engine
 
-`rres` is designed as a engine-agnostic file format, data is mostly threated as generic data, common to any game engine. `rres` users can implement simple abstraction layers to map `rres` generic data to their own engines data structures. 
+`rres` is designed as an **engine-agnostic file format**, processed data is mostly threated as generic data, common to any game engine. Developers can implement a custom abstraction layers to **map `rres` generic data to their own engines data structures**. 
 
-`rres-raylib.h` is an example of a `rres` implementation for [`raylib`](https://github.com/raysan5/raylib). It maps the different `rres` data types to `raylib` data structures. The API provided is simple and intuitive:
+`rres-raylib.h` is a sample implementation of `rres` generic data mappint to [`raylib`](https://github.com/raysan5/raylib) library data types. It maps the different `rres` data types to `raylib` data structures. The API provided is simple and intuitive:
 
 ```c
 RRESAPI void *rresLoadRaw(rresResource rres, int *size);    // Load raw data from rres resource
@@ -283,9 +283,21 @@ typedef struct rresResourceChunk {
     int *props;                     // Resource chunk properties
     void *data;                     // Resource chunk data
 } rresResourceChunk;
+
+// rres resource
+typedef struct rresResource {
+    unsigned int count;             // Resource chunks count
+    rresResourceChunk *chunks;      // Resource chunks
+} rresResource;
 ```
 
-A similar mapping library can be created for any other engine/framework.
+A `rresResource` could be loaded from the `.rres` file with the provided function: **`rresLoadResource()`**.
+
+After data has been copied to the destination structure it can be unloaded with function: **`rresUnloadResource()`**.
+
+Note that data decompression/decryption should be implemented in the custom abstraction library, `rres` only provides the identifiers for convenience.
+
+An `rres` mapping library can be created for any engine/framework to support the `rres` file format.
 
 ## rres specs and library license
 
