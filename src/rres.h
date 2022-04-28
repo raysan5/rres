@@ -36,8 +36,8 @@
 *           Compressor            (1 byte)      // Data compression algorithm
 *           Cipher                (1 byte)      // Data encryption algorithm
 *           Flags                 (2 bytes)     // Data flags (if required)
-*           Packed data Size      (4 bytes)     // Packed data size (compressed/encrypted + custom data appended)
-*           Base data Size        (4 bytes)     // Base data size (uncompressed/decrypted)
+*           Data Packed Size      (4 bytes)     // Data packed size (compressed/encrypted + custom data appended)
+*           Data Base Size        (4 bytes)     // Dat base size (uncompressed/decrypted)
 *           Next Offset           (4 bytes)     // Next resource chunk offset (if required)
 *           Reserved              (4 bytes)     // <reserved>
 *           CRC32                 (4 bytes)     // Resource Data Chunk CRC32
@@ -198,9 +198,9 @@ typedef struct rresResource {
     rresResourceChunk *chunks;      // Resource chunks
 } rresResource;
 
-// Specific data for some chunk types
+// Useful data types for specific chunk types
 //----------------------------------------------------------------------
-// rres central directory entry
+// CDIR: rres central directory entry
 typedef struct rresDirEntry {
     unsigned int id;                // Resource id
     unsigned int offset;            // Resource global offset in file
@@ -209,20 +209,27 @@ typedef struct rresDirEntry {
     char fileName[RRES_MAX_CDIR_FILENAME_LENGTH];  // Resource original fileName (NULL terminated and padded to 4-byte alignment)
 } rresDirEntry;
 
-// rres central directory
-// NOTE: This data represents the rresResourceDataChunk
+// CDIR: rres central directory
+// NOTE: This data conforms the rresResourceDataChunk
 typedef struct rresCentralDir {
     unsigned int count;             // Central directory entries count
     rresDirEntry *entries;          // Central directory entries
 } rresCentralDir;
 
-// rres font glyphs info (32 bytes)
+// FNTG: rres font glyphs info (32 bytes)
+// NOTE: And array of this type conforms the rresResourceDataChunk
 typedef struct rresFontGlyphInfo {
     int x, y, width, height;        // Glyph rectangle in the atlas image
     int value;                      // Glyph codepoint value
     int offsetX, offsetY;           // Glyph drawing offset (from base line)
     int advanceX;                   // Glyph advance X for next character
 } rresFontGlyphInfo;
+
+//----------------------------------------------------------------------------------
+// Enums Definition
+// The following enums are useful to fill some fields of the rresResourceInfoHeader
+// and also some fields of the different data types properties
+//----------------------------------------------------------------------------------
 
 // rres resource chunk data type
 // NOTE 1: Data type determines the properties and the data included in every chunk
@@ -250,8 +257,8 @@ typedef enum rresResourceDataType {
     RRES_DATA_IMAGE        = 3,     // FourCC: IMGE - Image file data, 4 properties
                                     //    props[0]:width 
                                     //    props[1]:height 
-                                    //    props[2]:mipmaps 
-                                    //    props[3]:rresPixelFormat
+                                    //    props[2]:rresPixelFormat 
+                                    //    props[3]:mipmaps
                                     //    data: pixels
     RRES_DATA_WAVE         = 4,     // FourCC: WAVE - Audio file data, 4 properties
                                     //    props[0]:sampleCount
@@ -269,7 +276,7 @@ typedef enum rresResourceDataType {
                                     //    props[0]:baseSize
                                     //    props[1]:glyphCount
                                     //    props[2]:glyphPadding
-                                    //    props[3]:glyphFormat
+                                    //    props[3]:rresFontStyle
                                     //    data: rresFontGlyphInfo[0..glyphCount]
     RRES_DATA_LINK         = 99,    // FourCC: LINK - External linked file, 1 property
                                     //    props[0]:size (bytes)
@@ -282,14 +289,148 @@ typedef enum rresResourceDataType {
 
 } rresResourceDataType;
 
-// TODO: rres error codes
+// Compression algorithms
+// Value required by rresResourceInfoHeader.compType
+// NOTE 1: This enum just list some common data compression algorithms for convenience,
+// The rres packer tool and the engine-specific library are responsible to implement the desired ones,
+// NOTE 2: rresResourceInfoHeader.compType is a byte-size value, limited to [0..255]
+typedef enum rresCompressionType {
+    RRES_COMP_NONE          = 0,            // No data compression
+    RRES_COMP_RLE           = 1,            // RLE compression
+    RRES_COMP_DEFLATE       = 10,           // DEFLATE compression
+    RRES_COMP_LZ4           = 20,           // LZ4 compression
+    RRES_COMP_LZMA2         = 30,           // LZMA2 compression
+    RRES_COMP_QOI           = 40,           // QOI compression, useful for RGB(A) image data
+    // gzip, brotli, lzo, zstd...           // TODO: Add other compression algorithms to enum
+} rresCompressionType;
+
+// Encryption algoritms
+// Value required by rresResourceInfoHeader.cipherType
+// NOTE 1: This enum just lists some common data encryption algorithms for convenience,
+// The rres packer tool and the engine-specific library are responsible to implement the desired ones,
+// NOTE 2: Some encryption algorithm could require/generate additional data (seed, salt, nonce, MAC...)
+// in those cases, that extra data must be appended to the original encrypted message and added to the resource data chunk
+// NOTE 3: rresResourceInfoHeader.cipherType is a byte-size value, limited to [0..255]
+typedef enum rresEncryptionType {
+    RRES_CIPHER_NONE        = 0,            // No data encryption
+    RRES_CIPHER_XOR         = 1,            // XOR encryption, generic using 128bit key in blocks
+    RRES_CIPHER_DES         = 10,           // DES encryption
+    RRES_CIPHER_TDES        = 11,           // Triple DES encryption
+    RRES_CIPHER_IDEA        = 20,           // IDEA encryption
+    RRES_CIPHER_AES         = 30,           // AES (128bit or 256bit) encryption
+    RRES_CIPHER_AES_GCM     = 31,           // AES Galois/Counter Mode (Galois Message Authentification Code - GMAC)
+    RRES_CIPHER_XTEA        = 40,           // XTEA encryption
+    RRES_CIPHER_BLOWFISH    = 50,           // BLOWFISH encryption
+    RRES_CIPHER_RSA         = 60,           // RSA asymmetric encryption
+    RRES_CIPHER_SALSA20     = 70,           // SALSA20 encryption
+    RRES_CIPHER_CHACHA20    = 71,           // CHACHA20 encryption
+    RRES_CIPHER_XCHACHA20   = 72,           // XCHACHA20 encryption
+    RRES_CIPHER_XCHACHA20_POLY1305 = 73,    // XCHACHA20 with POLY1305 for message authentification (MAC) 
+    // twofish, RC4, RC5, RC6               // TODO: Other encryption algorithm...
+} rresEncryptionType;
+
+// TODO: rres error codes (not used at this moment)
 // NOTE: Error codes when processing rres files
 typedef enum rresErrorType {
-    RRES_SUCCESS = 0,               // rres file loaded/saved successfully
-    RRES_ERROR_FILE_NOT_FOUND,      // rres file can not be opened (spelling issues, file actually does not exist...)
-    RRES_ERROR_FILE_FORMAT,         // rres file format not a supported (wrong header, wrong identifier)
-    RRES_ERROR_MEMORY_ALLOC,        // Memory could not be allocated for operation.
+    RRES_SUCCESS = 0,                       // rres file loaded/saved successfully
+    RRES_ERROR_FILE_NOT_FOUND,              // rres file can not be opened (spelling issues, file actually does not exist...)
+    RRES_ERROR_FILE_FORMAT,                 // rres file format not a supported (wrong header, wrong identifier)
+    RRES_ERROR_MEMORY_ALLOC,                // Memory could not be allocated for operation.
 } rresErrorType;
+
+// Enums required by specific resource types for its properties
+//----------------------------------------------------------------------------------
+// TEXT: Text encoding property values
+typedef enum rresTextEncoding {
+    RRES_TEXT_ENCODING_UTF8 = 0,            // Default text encoding
+    RRES_TEXT_ENCODING_UTF8_BOM = 1,        // UTF-8 text encoding with Byte-Order-Mark
+    RRES_TEXT_ENCODING_UTF16 = 2,           // UTF-16 text encoding (with Byte-Order-Mark)
+    RRES_TEXT_ENCODING_UCS2_LE = 10,        // UCS-2 Little Endian text encoding
+    RRES_TEXT_ENCODING_UCS2_BE = 11,        // UCS-2 Big Endian text encoding
+    // TODO: Add additional encodings if required
+} rresTextEncoding;
+
+// TEXT: Text code language
+// NOTE: It could be useful for code script resources
+typedef enum rresCodeLang {
+    RRES_CODE_LANG_PLAIN_TEXT = 0,          // Text contains plain text, not a specific code language
+    RRES_CODE_LANG_C,                       // Text contains C code
+    RRES_CODE_LANG_CPP,                     // Text contains C++ code
+    RRES_CODE_LANG_CS,                      // Text contains C# code
+    RRES_CODE_LANG_LUA,                     // Text contains Lua code
+    RRES_CODE_LANG_JS,                      // Text contains JavaScript code
+    RRES_CODE_LANG_PYTHON,                  // Text contains Python code
+    RRES_CODE_LANG_RUST,                    // Text contains Rust code
+    RRES_CODE_LANG_ZIG,                     // Text contains Zig code
+    RRES_CODE_LANG_ODING,                   // Text contains Odin code
+    RRES_CODE_LANG_GDSCRIPT,                // Text contains GDScript (Godot) code
+    // TODO: Add additional code languages if required
+}
+
+// IMGE: Image/Texture pixel formats
+typedef enum rresPixelFormat {
+    RRES_PIXELFORMAT_UNDEFINED = 0,
+    RRES_PIXELFORMAT_UNCOMP_GRAYSCALE = 1,  // 8 bit per pixel (no alpha)
+    RRES_PIXELFORMAT_UNCOMP_GRAY_ALPHA,     // 16 bpp (2 channels)
+    RRES_PIXELFORMAT_UNCOMP_R5G6B5,         // 16 bpp
+    RRES_PIXELFORMAT_UNCOMP_R8G8B8,         // 24 bpp
+    RRES_PIXELFORMAT_UNCOMP_R5G5B5A1,       // 16 bpp (1 bit alpha)
+    RRES_PIXELFORMAT_UNCOMP_R4G4B4A4,       // 16 bpp (4 bit alpha)
+    RRES_PIXELFORMAT_UNCOMP_R8G8B8A8,       // 32 bpp
+    RRES_PIXELFORMAT_UNCOMP_R32,            // 32 bpp (1 channel - float)
+    RRES_PIXELFORMAT_UNCOMP_R32G32B32,      // 32*3 bpp (3 channels - float)
+    RRES_PIXELFORMAT_UNCOMP_R32G32B32A32,   // 32*4 bpp (4 channels - float)
+    RRES_PIXELFORMAT_COMP_DXT1_RGB,         // 4 bpp (no alpha)
+    RRES_PIXELFORMAT_COMP_DXT1_RGBA,        // 4 bpp (1 bit alpha)
+    RRES_PIXELFORMAT_COMP_DXT3_RGBA,        // 8 bpp
+    RRES_PIXELFORMAT_COMP_DXT5_RGBA,        // 8 bpp
+    RRES_PIXELFORMAT_COMP_ETC1_RGB,         // 4 bpp
+    RRES_PIXELFORMAT_COMP_ETC2_RGB,         // 4 bpp
+    RRES_PIXELFORMAT_COMP_ETC2_EAC_RGBA,    // 8 bpp
+    RRES_PIXELFORMAT_COMP_PVRT_RGB,         // 4 bpp
+    RRES_PIXELFORMAT_COMP_PVRT_RGBA,        // 4 bpp
+    RRES_PIXELFORMAT_COMP_ASTC_4x4_RGBA,    // 8 bpp
+    RRES_PIXELFORMAT_COMP_ASTC_8x8_RGBA     // 2 bpp
+    // TOO: Add additional pixel formats if required
+} rresPixelFormat;
+
+// VRTX: Vertex data attribute
+// NOTE: The expected number of components for every vertex attributes is provided as a property to data,
+// the listed components count are the expected/default ones
+typedef enum rresVertexAttribute {
+    RRES_VERTEX_ATTRIBUTE_POSITION   = 0,   // Vertex position attribute: [x, y, z]
+    RRES_VERTEX_ATTRIBUTE_TEXCOORD1  = 10,  // Vertex texture coordinates attribute: [u, v]
+    RRES_VERTEX_ATTRIBUTE_TEXCOORD2  = 11,  // Vertex texture coordinates attribute: [u, v]
+    RRES_VERTEX_ATTRIBUTE_TEXCOORD3  = 12,  // Vertex texture coordinates attribute: [u, v]
+    RRES_VERTEX_ATTRIBUTE_TEXCOORD4  = 13,  // Vertex texture coordinates attribute: [u, v]
+    RRES_VERTEX_ATTRIBUTE_NORMAL     = 20,  // Vertex normal attribute: [x, y, z]
+    RRES_VERTEX_ATTRIBUTE_TANGENT    = 30,  // Vertex tangent attribute: [x, y, z, w]
+    RRES_VERTEX_ATTRIBUTE_COLOR      = 40,  // Vertex color attribute: [r, g, b, a]
+    RRES_VERTEX_ATTRIBUTE_INDEX      = 100, // Vertex index attribute: [i]
+    // TODO: Add additional attributes if required
+} rresVertexAttribute;
+
+// VRTX: Vertex data format type
+typedef enum rresVertexFormat {
+    RRES_VERTEX_FORMAT_UBYTE = 0,           // 8 bit unsigned integer data
+    RRES_VERTEX_FORMAT_BYTE,                // 8 bit signed integer data
+    RRES_VERTEX_FORMAT_USHORT,              // 16 bit unsigned integer data
+    RRES_VERTEX_FORMAT_SHORT,               // 16 bit signed integer data
+    RRES_VERTEX_FORMAT_UINT,                // 32 bit unsigned integer data
+    RRES_VERTEX_FORMAT_INT,                 // 32 bit integer data
+    RRES_VERTEX_FORMAT_HFLOAT,              // 16 bit float data
+    RRES_VERTEX_FORMAT_FLOAT,               // 32 bit float data
+    // TODO: Add additional required vertex formats (i.e. normalized data)
+} rresVertexFormat;
+
+// FNTG: Font style
+typedef enum rresFontStyle {
+    RRES_FONT_STYLE_DEFAULT = 0,            // Default font style (not defined)
+    RRES_FONT_STYLE_REGULAR,                // Regular font style
+    RRES_FONT_STYLE_BOLD,                   // Bold font style
+    RRES_FONT_STYLE_ITALIC,                 // Italic font style
+    // TODO: Add additional font styles if required
+} rresFontStyle;
 
 //----------------------------------------------------------------------------------
 // Global variables
@@ -364,104 +505,6 @@ typedef struct rresResourceInfoHeader {
     unsigned int reserved;          // <reserved>
     unsigned int crc32;             // Data chunk CRC32 (propCount + props[] + data)
 } rresResourceInfoHeader;
-
-//----------------------------------------------------------------------------------
-// Enums Definition
-//----------------------------------------------------------------------------------
-
-// Compression algorithms
-// NOTE 1: This enum just list some common data compression algorithms for convenience,
-// The rres packer tool and the engine-specific library are responsible to implement the desired ones,
-// NOTE 2: rresResourceInfoHeader.compType is a byte-size value, limited to [0..255]
-typedef enum rresCompressionType {
-    RRES_COMP_NONE          = 0,            // No data compression
-    RRES_COMP_RLE           = 1,            // RLE compression
-    RRES_COMP_DEFLATE       = 10,           // DEFLATE compression
-    RRES_COMP_LZ4           = 20,           // LZ4 compression
-    RRES_COMP_LZMA2         = 30,           // LZMA2 compression
-    RRES_COMP_QOI           = 40,           // QOI compression, useful for RGB(A) image data
-    // gzip, brotli, lzo, zstd...           // TODO: Add other compression algorithms to enum
-} rresCompressionType;
-
-// Encryption algoritms
-// NOTE 1: This enum just lists some common data encryption algorithms for convenience,
-// The rres packer tool and the engine-specific library are responsible to implement the desired ones,
-// NOTE 2: Some encryption algorithm could require/generate additional data (seed, salt, nonce, MAC...)
-// in those cases, that extra data must be appended to the original encrypted message and added to the resource data chunk
-// NOTE 3: rresResourceInfoHeader.cipherType is a byte-size value, limited to [0..255]
-typedef enum rresEncryptionType {
-    RRES_CIPHER_NONE        = 0,            // No data encryption
-    RRES_CIPHER_XOR         = 1,            // XOR encryption, generic using 128bit key in blocks
-    RRES_CIPHER_DES         = 10,           // DES encryption
-    RRES_CIPHER_TDES        = 11,           // Triple DES encryption
-    RRES_CIPHER_IDEA        = 20,           // IDEA encryption
-    RRES_CIPHER_AES         = 30,           // AES (128bit or 256bit) encryption
-    RRES_CIPHER_AES_GCM     = 31,           // AES Galois/Counter Mode (Galois Message Authentification Code - GMAC)
-    RRES_CIPHER_XTEA        = 40,           // XTEA encryption
-    RRES_CIPHER_BLOWFISH    = 50,           // BLOWFISH encryption
-    RRES_CIPHER_RSA         = 60,           // RSA asymmetric encryption
-    RRES_CIPHER_SALSA20     = 70,           // SALSA20 encryption
-    RRES_CIPHER_CHACHA20    = 71,           // CHACHA20 encryption
-    RRES_CIPHER_XCHACHA20   = 72,           // XCHACHA20 encryption
-    RRES_CIPHER_XCHACHA20_POLY1305 = 73,    // XCHACHA20 with POLY1305 for message authentification (MAC) 
-    // twofish, RC4, RC5, RC6               // TODO: Other encryption algorithm...
-} rresEncryptionType;
-
-// Image/Texture pixel formats
-// NOTE: This enum list several common compressed/uncompressed pixel formats but there are actually MANY more
-typedef enum rresPixelFormat {
-    RRES_PIXELFORMAT_UNCOMP_GRAYSCALE = 1,  // 8 bit per pixel (no alpha)
-    RRES_PIXELFORMAT_UNCOMP_GRAY_ALPHA,     // 16 bpp (2 channels)
-    RRES_PIXELFORMAT_UNCOMP_R5G6B5,         // 16 bpp
-    RRES_PIXELFORMAT_UNCOMP_R8G8B8,         // 24 bpp
-    RRES_PIXELFORMAT_UNCOMP_R5G5B5A1,       // 16 bpp (1 bit alpha)
-    RRES_PIXELFORMAT_UNCOMP_R4G4B4A4,       // 16 bpp (4 bit alpha)
-    RRES_PIXELFORMAT_UNCOMP_R8G8B8A8,       // 32 bpp
-    RRES_PIXELFORMAT_UNCOMP_R32,            // 32 bpp (1 channel - float)
-    RRES_PIXELFORMAT_UNCOMP_R32G32B32,      // 32*3 bpp (3 channels - float)
-    RRES_PIXELFORMAT_UNCOMP_R32G32B32A32,   // 32*4 bpp (4 channels - float)
-    RRES_PIXELFORMAT_COMP_DXT1_RGB,         // 4 bpp (no alpha)
-    RRES_PIXELFORMAT_COMP_DXT1_RGBA,        // 4 bpp (1 bit alpha)
-    RRES_PIXELFORMAT_COMP_DXT3_RGBA,        // 8 bpp
-    RRES_PIXELFORMAT_COMP_DXT5_RGBA,        // 8 bpp
-    RRES_PIXELFORMAT_COMP_ETC1_RGB,         // 4 bpp
-    RRES_PIXELFORMAT_COMP_ETC2_RGB,         // 4 bpp
-    RRES_PIXELFORMAT_COMP_ETC2_EAC_RGBA,    // 8 bpp
-    RRES_PIXELFORMAT_COMP_PVRT_RGB,         // 4 bpp
-    RRES_PIXELFORMAT_COMP_PVRT_RGBA,        // 4 bpp
-    RRES_PIXELFORMAT_COMP_ASTC_4x4_RGBA,    // 8 bpp
-    RRES_PIXELFORMAT_COMP_ASTC_8x8_RGBA     // 2 bpp
-    // TOO: Add additional pixel formats as required
-} rresPixelFormat;
-
-// Vertex data attribute
-// NOTE: The expected number of components for every vertex attributes is provided as a property to data,
-// the listed components count are the expected/default ones
-typedef enum rresVertexAttribute {
-    RRES_VERTEX_ATTRIBUTE_POSITION   = 0,   // Vertex position attribute: [x, y, z]
-    RRES_VERTEX_ATTRIBUTE_TEXCOORD1  = 10,  // Vertex texture coordinates attribute: [u, v]
-    RRES_VERTEX_ATTRIBUTE_TEXCOORD2  = 11,  // Vertex texture coordinates attribute: [u, v]
-    RRES_VERTEX_ATTRIBUTE_TEXCOORD3  = 12,  // Vertex texture coordinates attribute: [u, v]
-    RRES_VERTEX_ATTRIBUTE_TEXCOORD4  = 13,  // Vertex texture coordinates attribute: [u, v]
-    RRES_VERTEX_ATTRIBUTE_NORMAL     = 20,  // Vertex normal attribute: [x, y, z]
-    RRES_VERTEX_ATTRIBUTE_TANGENT    = 30,  // Vertex tangent attribute: [x, y, z, w]
-    RRES_VERTEX_ATTRIBUTE_COLOR      = 40,  // Vertex color attribute: [r, g, b, a]
-    RRES_VERTEX_ATTRIBUTE_INDEX      = 100, // Vertex index attribute: [i]
-    // TODO: Add additional required attributes
-} rresVertexAttribute;
-
-// Vertex data format type
-typedef enum rresVertexDataFormat {
-    RRES_VERTEX_FORMAT_UBYTE = 0,           // 8 bit unsigned integer data
-    RRES_VERTEX_FORMAT_BYTE,                // 8 bit signed integer data
-    RRES_VERTEX_FORMAT_USHORT,              // 16 bit unsigned integer data
-    RRES_VERTEX_FORMAT_SHORT,               // 16 bit signed integer data
-    RRES_VERTEX_FORMAT_UINT,                // 32 bit unsigned integer data
-    RRES_VERTEX_FORMAT_INT,                 // 32 bit integer data
-    RRES_VERTEX_FORMAT_HFLOAT,              // 16 bit float data
-    RRES_VERTEX_FORMAT_FLOAT,               // 32 bit float data
-    // TODO: Add additional required vertex formats (i.e. normalized data)
-} rresVertexDataFormat;
 
 //----------------------------------------------------------------------------------
 // Global Variables Definition
