@@ -342,11 +342,11 @@ typedef enum rresErrorType {
 //----------------------------------------------------------------------------------
 // TEXT: Text encoding property values
 typedef enum rresTextEncoding {
-    RRES_TEXT_ENCODING_UTF8 = 0,            // Default text encoding
+    RRES_TEXT_ENCODING_UTF8     = 0,        // Default text encoding
     RRES_TEXT_ENCODING_UTF8_BOM = 1,        // UTF-8 text encoding with Byte-Order-Mark
-    RRES_TEXT_ENCODING_UTF16 = 2,           // UTF-16 text encoding (with Byte-Order-Mark)
-    RRES_TEXT_ENCODING_UCS2_LE = 10,        // UCS-2 Little Endian text encoding
-    RRES_TEXT_ENCODING_UCS2_BE = 11,        // UCS-2 Big Endian text encoding
+    RRES_TEXT_ENCODING_UTF16    = 2,        // UTF-16 text encoding (with Byte-Order-Mark)
+    RRES_TEXT_ENCODING_UCS2_LE  = 10,       // UCS-2 Little Endian text encoding
+    RRES_TEXT_ENCODING_UCS2_BE  = 11,       // UCS-2 Big Endian text encoding
     // TODO: Add additional encodings if required
 } rresTextEncoding;
 
@@ -363,6 +363,7 @@ typedef enum rresCodeLang {
     RRES_CODE_LANG_RUST,                    // Text contains Rust code
     RRES_CODE_LANG_ZIG,                     // Text contains Zig code
     RRES_CODE_LANG_ODING,                   // Text contains Odin code
+    RRES_CODE_LANG_JAI,                     // Text contains Jai code
     RRES_CODE_LANG_GDSCRIPT,                // Text contains GDScript (Godot) code
     // TODO: Add additional code languages if required
 }
