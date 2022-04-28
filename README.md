@@ -25,7 +25,7 @@ rres file-format has gone through _at least_ **4 big redesigns**:
 
  - **Fourth design** has been done along the implementation, almost all structures and fields have been reviewed and renamed for consistency and simplicity. A separare library has been created (`rres-raylib.h`) to map the loaded resources data into a custom library/engine data types, any depndency to raylib has been removed, making it a completely engine-agnostic file-format. Several usage examples for raylib has been implemented to illustrate the library-engine connection of `rres` and multiple types of resource loading have been implemented. `rrespacker` tool has been created from scratch to generate `rres` files, it supports a nive GUI interface with drag and drop support but also a powerful command-line for batch processing. Compression and encryption implementation has been moved to the user library implementation to be aligned with the packaging tool and keep the `rres` file-format cleaner and simpler.
 
-It's been an **8 years project**, working on it on-and-off, with many redesigns and revisions but I'm personally very happy with the final result. rres is a resource packaging file-format at the level of any professional engine package format BUT free and open-source, available to any game developer that wants to use it, implement it or create a custom version.
+It's been an **8 years project**, working on it on-and-off, with many redesigns and revisions but I'm personally very happy with the final result. `rres` is a resource packaging file-format at the level of any professional engine package format _BUT free and open-source_, available to any game developer that wants to use it, implement it or create a custom version.
 
 ## rres design goals
 
@@ -203,11 +203,11 @@ The current data types and its properties are:
    - Data: raw_data
  - `RRES_DATA_TEXT`:`TEXT`: Text data, byte data extracted from text file
    - Properties Count: 4
-   - Properties: `props[0]`:size, `props[1]`:encoding, `props[2]`:code_lang, `props[1]`:cultureCode
+   - Properties: `props[0]`:size, `props[1]`:rresTextEncoding, `props[2]`:rresCodeLang, `props[1]`:cultureCode
    - Data: text_data
  - `RRES_DATA_IMAGE`:`IMGE`: Image data, pixel data extracted from image file
    - Properties Count: 4
-   - Properties: `props[0]`:width, `props[1]`:height, `props[2]:mipmaps`, `props[3]`:`rresPixelFormat`
+   - Properties: `props[0]`:width, `props[1]`:height, `props[2]`:`rresPixelFormat`, `props[3]`:mipmaps 
    - Data: pixel_data
  - `RRES_DATA_WAVE`:`WAVE`: Wave audio data, samples data extracted from audio file
    - Properties Count: 4
