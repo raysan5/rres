@@ -445,7 +445,7 @@ typedef enum rresFontStyle {
 extern "C" {            // Prevents name mangling of functions
 #endif
 
-// Load all data chunks for specified rresId
+// Load all resource chunks for a specified rresId
 RRESAPI rresResource rresLoadResource(const char *fileName, int rresId);
 RRESAPI void rresUnloadResource(rresResource rres);
 
