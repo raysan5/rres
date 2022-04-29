@@ -178,16 +178,19 @@ Wave rresLoadWave(rresResource rres)
 
     if ((rres.count >= 1) && (rres.chunks[0].type == RRES_DATA_WAVE))
     {
-        if ((chunk.compType > 0) || (chunk.cipherType > 0)) rresUnpackDataChunk(&rres.chunks[0]);
+        int result = rresUnpackDataChunk(&rres.chunks[0]);
 
-        wave.frameCount = rres.chunks[0].props[0];
-        wave.sampleRate = rres.chunks[0].props[1];
-        wave.sampleSize = rres.chunks[0].props[2];
-        wave.channels = rres.chunks[0].props[3];
+        if (result == 0)    // Data was successfully decompressed/decrypted
+        {
+            wave.frameCount = rres.chunks[0].props[0];
+            wave.sampleRate = rres.chunks[0].props[1];
+            wave.sampleSize = rres.chunks[0].props[2];
+            wave.channels = rres.chunks[0].props[3];
 
-        unsigned int size = wave.frameCount*wave.sampleSize/8;
-        wave.data = RL_CALLOC(size);
-        memcpy(wave.data, rres.chunks[0].data, size);
+            unsigned int size = wave.frameCount*wave.sampleSize/8;
+            wave.data = RL_CALLOC(size);
+            memcpy(wave.data, rres.chunks[0].data, size);
+        }
     }
 
     return wave;
@@ -205,30 +208,33 @@ Font rresLoadFont(rresResource rres)
     {
         if (rres.chunks[0].type == RRES_DATA_GLYPH_INFO)
         {
-            if ((chunk.compType > 0) || (chunk.cipherType > 0)) rresUnpackDataChunk(&rres.chunks[0]);
+            int result = rresUnpackDataChunk(&rres.chunks[0]);
 
-            // Load font basic properties from chunk[0]
-            font.baseSize = rres.chunks[0].props[0];           // Base size (default chars height)
-            font.glyphCount = rres.chunks[0].props[1];         // Number of characters (glyphs)
-            font.glyphPadding = rres.chunks[0].props[2];      // Padding around the chars
-
-            font.recs = (Rectangle *)RL_CALLOC(font.glyphCount*sizeof(Rectangle));
-            font.glyphs = (GlyphInfo *)RL_CALLOC(font.glyphCount*sizeof(GlyphInfo));
-
-            for (int i = 0; i < font.glyphCount; i++)
+            if (result == 0)    // Data was successfully decompressed/decrypted
             {
-                // Font glyphs info comes as a data blob
-                font.recs[i].x = (float)((rresFontGlyphInfo *)rres.chunks[0].data)[i].x;
-                font.recs[i].y = (float)((rresFontGlyphInfo *)rres.chunks[0].data)[i].y;
-                font.recs[i].width = (float)((rresFontGlyphInfo *)rres.chunks[0].data)[i].width;
-                font.recs[i].height = (float)((rresFontGlyphInfo *)rres.chunks[0].data)[i].height;
+                // Load font basic properties from chunk[0]
+                font.baseSize = rres.chunks[0].props[0];           // Base size (default chars height)
+                font.glyphCount = rres.chunks[0].props[1];         // Number of characters (glyphs)
+                font.glyphPadding = rres.chunks[0].props[2];      // Padding around the chars
 
-                font.glyphs[i].value = ((rresFontGlyphInfo *)rres.chunks[0].data)[i].value;
-                font.glyphs[i].offsetX = ((rresFontGlyphInfo *)rres.chunks[0].data)[i].offsetX;
-                font.glyphs[i].offsetY = ((rresFontGlyphInfo *)rres.chunks[0].data)[i].offsetY;
-                font.glyphs[i].advanceX = ((rresFontGlyphInfo *)rres.chunks[0].data)[i].advanceX;
+                font.recs = (Rectangle *)RL_CALLOC(font.glyphCount*sizeof(Rectangle));
+                font.glyphs = (GlyphInfo *)RL_CALLOC(font.glyphCount*sizeof(GlyphInfo));
 
-                // NOTE: font.glyphs[i].image is not loaded
+                for (int i = 0; i < font.glyphCount; i++)
+                {
+                    // Font glyphs info comes as a data blob
+                    font.recs[i].x = (float)((rresFontGlyphInfo *)rres.chunks[0].data)[i].x;
+                    font.recs[i].y = (float)((rresFontGlyphInfo *)rres.chunks[0].data)[i].y;
+                    font.recs[i].width = (float)((rresFontGlyphInfo *)rres.chunks[0].data)[i].width;
+                    font.recs[i].height = (float)((rresFontGlyphInfo *)rres.chunks[0].data)[i].height;
+
+                    font.glyphs[i].value = ((rresFontGlyphInfo *)rres.chunks[0].data)[i].value;
+                    font.glyphs[i].offsetX = ((rresFontGlyphInfo *)rres.chunks[0].data)[i].offsetX;
+                    font.glyphs[i].offsetY = ((rresFontGlyphInfo *)rres.chunks[0].data)[i].offsetY;
+                    font.glyphs[i].advanceX = ((rresFontGlyphInfo *)rres.chunks[0].data)[i].advanceX;
+
+                    // NOTE: font.glyphs[i].image is not loaded
+                }
             }
         }
 
@@ -289,11 +295,14 @@ static void *rresLoadDataChunkRaw(rresResourceChunk chunk, int *size);
 
     if (chunk.type == RRES_DATA_RAW)
     {
-        if ((chunk.compType > 0) || (chunk.cipherType > 0)) rresUnpackDataChunk(&chunk);
+        int result = rresUnpackDataChunk(&rres.chunks[0]);
 
-        rawData = RL_CALLOC(chunk.props[0], 1);
-        memcpy(rawData, chunk.data, chunk.props[0]);
-        *size = chunk.props[0];
+        if (result == 0)    // Data was successfully decompressed/decrypted
+        {
+            rawData = RL_CALLOC(chunk.props[0], 1);
+            memcpy(rawData, chunk.data, chunk.props[0]);
+            *size = chunk.props[0];
+        }
     }
 
     return rawData;
@@ -307,10 +316,16 @@ static char *rresLoadDataChunkText(rresResourceChunk chunk)
 
     if (chunk.type == RRES_DATA_TEXT)
     {
-        if ((chunk.compType > 0) || (chunk.cipherType > 0)) rresUnpackDataChunk(&chunk);
+        int result = rresUnpackDataChunk(&rres.chunks[0]);
 
-        text = (char *)RL_CALLOC(chunk.props[0] + 1, 1);    // We add NULL terminator, just in case
-        memcpy(text, chunk.data, chunk.props[0]);
+        if (result == 0)    // Data was successfully decompressed/decrypted
+        {
+            text = (char *)RL_CALLOC(chunk.props[0] + 1, 1);    // We add NULL terminator, just in case
+            memcpy(text, chunk.data, chunk.props[0]);
+            
+            // TODO: We got some extra text properties, in case they could be useful for users:
+            // chunk.props[1]:rresTextEncoding, chunk.props[2]:rresCodeLang, chunk. props[3]:cultureCode
+        }
     }
 
     return text;
@@ -324,22 +339,56 @@ static Image rresLoadDataChunkImage(rresResourceChunk chunk)
 
     if (chunk.type == RRES_DATA_IMAGE)
     {
-        if ((chunk.compType > 0) || (chunk.cipherType > 0)) rresUnpackDataChunk(&chunk);
+        int result = rresUnpackDataChunk(&rres.chunks[0]);
 
-        image.width = chunk.props[0];
-        image.height = chunk.props[1];
-        image.mipmaps = chunk.props[3];
+        if (result == 0)    // Data was successfully decompressed/decrypted
+        {
+            image.width = chunk.props[0];
+            image.height = chunk.props[1];
+            int format = chunk.props[2];
+            
+            // Assign equivalent pixel formats for our engine
+            // NOTE: In this case rresPixelFormat define values match raylib PixelFormat values
+            switch (format)
+            {
+                case RRES_PIXELFORMAT_UNCOMP_GRAYSCALE: image.format = PIXELFORMAT_UNCOMPRESSED_GRAYSCALE; break;
+                case RRES_PIXELFORMAT_UNCOMP_GRAY_ALPHA: image.format = PIXELFORMAT_UNCOMPRESSED_GRAY_ALPHA; break;
+                case RRES_PIXELFORMAT_UNCOMP_R5G6B5: image.format = PIXELFORMAT_UNCOMPRESSED_R5G5B5A1; break;
+                case RRES_PIXELFORMAT_UNCOMP_R8G8B8: image.format = PIXELFORMAT_UNCOMPRESSED_R5G6B5; break;
+                case RRES_PIXELFORMAT_UNCOMP_R5G5B5A1: image.format = PIXELFORMAT_UNCOMPRESSED_R4G4B4A4; break;
+                case RRES_PIXELFORMAT_UNCOMP_R4G4B4A4: image.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8; break;
+                case RRES_PIXELFORMAT_UNCOMP_R8G8B8A8: image.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8; break;
+                case RRES_PIXELFORMAT_UNCOMP_R32: image.format = PIXELFORMAT_UNCOMPRESSED_R32; break;
+                case RRES_PIXELFORMAT_UNCOMP_R32G32B32: image.format = PIXELFORMAT_UNCOMPRESSED_R32G32B32; break;
+                case RRES_PIXELFORMAT_UNCOMP_R32G32B32A32: image.format = PIXELFORMAT_UNCOMPRESSED_R32G32B32A32; break;
+                case RRES_PIXELFORMAT_COMP_DXT1_RGB: image.format = PIXELFORMAT_COMPRESSED_DXT1_RGB; break;  
+                case RRES_PIXELFORMAT_COMP_DXT1_RGBA: image.format = PIXELFORMAT_COMPRESSED_DXT1_RGBA; break;
+                case RRES_PIXELFORMAT_COMP_DXT3_RGBA: image.format = PIXELFORMAT_COMPRESSED_DXT3_RGBA; break;
+                case RRES_PIXELFORMAT_COMP_DXT5_RGBA: image.format = PIXELFORMAT_COMPRESSED_DXT5_RGBA; break;
+                case RRES_PIXELFORMAT_COMP_ETC1_RGB: image.format = PIXELFORMAT_COMPRESSED_ETC1_RGB; break;
+                case RRES_PIXELFORMAT_COMP_ETC2_RGB: image.format = PIXELFORMAT_COMPRESSED_ETC2_RGB; break;
+                case RRES_PIXELFORMAT_COMP_ETC2_EAC_RGBA: image.format = PIXELFORMAT_COMPRESSED_ETC2_EAC_RGBA; break;
+                case RRES_PIXELFORMAT_COMP_PVRT_RGB: image.format = PIXELFORMAT_COMPRESSED_PVRT_RGB; break;
+                case RRES_PIXELFORMAT_COMP_PVRT_RGBA: image.format = PIXELFORMAT_COMPRESSED_PVRT_RGBA; break;
+                case RRES_PIXELFORMAT_COMP_ASTC_4x4_RGBA: image.format = PIXELFORMAT_COMPRESSED_ASTC_4x4_RGBA; break;
+                case RRES_PIXELFORMAT_COMP_ASTC_8x8_RGBA: image.format = PIXELFORMAT_COMPRESSED_ASTC_8x8_RGBA; break;
+                default: break;
+            }
+            
+            // TODO: Consider mipmaps data
+            image.mipmaps = chunk.props[3];
 
-        // WARNING: rresPixelFormat enum matches raylib PixelFormat enum values but
-        // this could require some format assignment -> TODO
-        image.format = chunk.props[2];
-
-        // NOTE: Image data size can be computed from image properties
-        unsigned int size = GetPixelDataSize(image.width, image.height, image.format);
-        image.data = RL_CALLOC(size);
-        memcpy(image.data, chunk.data, size);
-
-        // TODO: Consider mipmaps data!
+            // Image data size can be computed from image properties
+            unsigned int size = GetPixelDataSize(image.width, image.height, image.format);
+            
+            // NOTE: Computed image data must match the data size of the chunk processed (minus props size)
+            if (size == (chunk.baseSize - 20))
+            {
+                image.data = RL_CALLOC(size);
+                memcpy(image.data, chunk.data, size);
+            }
+            else RRES_LOG("WARNING: IMGE: Chunk data size do not match expected image data size");
+        }
     }
 
     return image;
@@ -359,36 +408,46 @@ static int rresUnpackDataChunk(rresResourceChunk *chunk)
     //  4 - Error on data decompression
 
     // TODO: Decompress and decrypt data as required (only rrespacker supported formats)
+    
+    // If data is compressed/encrypted the properties are not loaded by rres.h because
+    // it's up to the user to process the data; *chunk must be properly updated by this function
 
     // STEP 1. Decrypt message if encrypted
-    if (chunk->cipherType == RRES_CIPHER_XCHACHA20_POLY1305)    // rrespacker supported encryption
+    if (chunk->cipherType != RRES_CIPHER_NONE)
     {
+        if (chunk->cipherType == RRES_CIPHER_XCHACHA20_POLY1305)    // rrespacker supported encryption
+        {
 #if defined(RRES_SUPPORT_ENCRYPTION_MONOCYPHER)
-        // TODO.
+            // TODO.
 #else
-        result = 1;
+            result = 1;
 #endif
+        }
+        else result = 1;
     }
-    else result = 1;
 
-    // STEP 2: Decompress data if compressed
-    if (chunk->compType == RRES_COMP_DEFLATE)
+    // STEP 2: If decryption was successful, try to decompress data
+    if (result == 0) && (chunk->compType != RRES_COMP_NONE)
     {
-        // TODO.
-    }
-    else if (chunk->compType == RRES_COMP_LZ4)
-    {
+        // Decompress data
+        if (chunk->compType == RRES_COMP_DEFLATE)
+        {
+            // TODO.
+        }
+        else if (chunk->compType == RRES_COMP_LZ4)
+        {
 #if defined(RRES_SUPPORT_COMPRESSION_LZ4)
-        // TODO.
+            // TODO.
 #else
-        result = 3;
+            result = 3;
 #endif
+        }
+        else if (chunk->compType == RRES_COMP_QOI)
+        {
+            // TODO.
+        }
+        else result = 3;
     }
-    else if (chunk->compType == RRES_COMP_QOI)
-    {
-        // TODO.
-    }
-    else result = 3;
 
     return result;
 }
