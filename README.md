@@ -14,8 +14,20 @@
 
 # Index
 
-1. [Design Goals](design-goals)
+1. [Design Goals](#design-goals)
+2. [Usage Benefits](#usage-benefits)
+3. [Design History](#design-history)
+4. [File Structure](#file-structure)
+5. [File Header: `rresFileHeader`](#file-header-rresfileheader)
+6. [Resource Chunk: `rresResourceChunk`](#resource-chunk-rresresourcechunk)
+    1. [Resource Info Header: `rresResourceInfoHeader`](#resource-info-header-rresresourceinfoheader)
+    2. [Resource Data Chunk: `rresResourceDataChunk`](#resource-data-chunk-rresresourcedatachunk)
+    3. [Resource Data Type: `rresResourceDataType`](#resource-data-type-rresresourcedatatype)
+    4. [Resource Chunk: Central Directory: `rresCentralDir`](#resource-chunk-central-directory-rrescentraldir)
+7. [Custom Engine Implementation](#custom-engine-implementation)
+8. [License](#license)
 
+------------------------------------------
 
 ## Design Goals
 
@@ -33,7 +45,7 @@
 
 - **Free and open source**: `rres` is an open spec and a free and open source library. It can be used with the provided tool (`rrespacker`) or a custom packer/loader can be implemented for **any engine**. The format description can also be used as a learning material for anyone willing to create its own data packaging file format.
 
-## rres usage benefits
+## Usage Benefits
 
 There are some important reasons to package game assets data into a format like `rres`, here some good reasons to do it.
 
@@ -45,7 +57,7 @@ There are some important reasons to package game assets data into a format like 
 
  - **Downloading times**: If data needs to be accessed from a server and downloaded, the assets packed into a single or a few `.rres` files improves download times, in comparison to downloading each file individually.
 
-## rres history
+## Design History
 
 `rres` has been in development **since 2014**. I started this project with the aim to create a packaging file-format similar to [XNB](http://xbox.create.msdn.com/en-US/sample/xnb_format) for raylib. In the last **8 years** the project has suffered multiple redesigns and improvements along a file-formats learning process. In that time I implemented loaders/writers for **+20 different file formats** and also created **+12 custom file formats** for multiple [raylibtech custom tools](https://raylibtech.itch.io/).
 
@@ -61,7 +73,7 @@ There are some important reasons to package game assets data into a format like 
 
 It's been an **8 years project**, working on it on-and-off, with many redesigns and revisions but I'm personally very happy with the final result. `rres` is a resource packaging file-format at the level of any professional engine package format _BUT free and open-source_, available to any game developer that wants to use it, implement it or create a custom version.
 
-## rres file structure
+## File Structure
 
 rres file format consists of a file header (`rresFileHeader`) followed by a number of resource chunks (`rresResourceChunk`). Every resource chunk has a resource info header (`rresResourceInfoHeader`) that includes a `FOURCC` data type code and resource data information. The resource data (`rresResourceDataChunk`) contains a small set of properties to identify data, depending on the type and could contain some additional data at the end.
 
@@ -101,7 +113,7 @@ rresResourceChunk[]
 }
 ```
 
-## rres file header: `rresFileHeader`
+## File Header: `rresFileHeader`
 
 The following C struct defines the `rresFileHeader`:
 
@@ -122,7 +134,7 @@ Considerations:
  - `rres` files use 32 bit offsets to address the different resource chunks, consequently, **no more than ~4GB of data can be addressed**, please keep the `rres` files smaller than **4GB**. In case of more space required to package resources, create multiple `rres` files.
  - Central Directory is just another resource chunk, **Central Directory can be present in the file or not**. It's recommended to be placed as the last chunk in the file if a custom `rres` packer is implemented. More info on `rresCentralDir` section.
 
-## rres resource chunk: `rresResourceChunk`
+## Resource Chunk: `rresResourceChunk`
 
 `rres` file contains a number of resource chunks. Every resource chunk represents a self-contained pack of data. Resource chunks are generated from input files on `rres` file creation by the `rres` packer tool; depending on the file extension, the `rres` packer tool extracts the required data from the file and generates one or more resource chunks. For example, for an image file, a resource chunk of `type` `RRES_DATA_IMAGE` is generated containing only the pixel data of the image and the required properties to read that data back from the resource file.
 
@@ -132,7 +144,7 @@ On `rres` creation, `rres` packer could create an additional resource chunk of t
 
 Every resource chunk is divided in two part: `rresResourceInfoHeader` + `rresResourceData`.
 
-### rres resource chunk info header: `rresResourceInfoHeader`
+### Resource Info Header: `rresResourceInfoHeader`
 
 The following C struct defines the `rresResourceInfoHeader`:
 
@@ -162,7 +174,7 @@ Considerations:
  - `nextOffset` defines the global file position address for the next _related_ resource chunk, it's useful for input files that generate multiple resources, like fonts or meshes.
  - `crc32` is useful for a quick check of data corruption, by default it considers the `rresResourceData` chunk.
 
-### rres resource data chunk: `rresResourceDataChunk`
+### Resource Data Chunk: `rresResourceDataChunk`
 
 `rresResourceDataChunk` contains the following data:
 
@@ -176,7 +188,7 @@ Considerations:
  - `rresResourceInfoHeader.baseSize` defines the base size (uncompressed/unencrypted) of `rresResourceDataChunk`. 
  - `rresResourceInfoHeader.packedSize` defines the compressed/encrypted size of `rresResourceDataChunk`. It could also consider any extra data appended to `rresResourceData` (i.e. encryption MAC) but it is implementation dependant.
  
-### rres resource data types: `rresResourceDataType`
+### Resource Data Type: `rresResourceDataType`
 
 The resource `type` specified in the `rresResourceInfoHeader` defines the type of data and the number of properties contained in the resource chunk.
 
@@ -226,7 +238,7 @@ The currently defined data `types` consist of the following properties and data:
  - `rresVertexFormat`: Defines several data formats for vertex data
  - `rresFontStyle`: Defines several font styles (Regular, Bold, Italic...), default value is 0 (`RRES_FONT_STYLE_DEFAULT`) 
 
-### rres central directory resource chunk: `rresCentralDir`
+### Resource Chunk: Central Directory: `rresCentralDir`
 
 The `Central Directory` resource chunk is a special chunk that **could be present or not** in the `rres` file, it stores information about the input files processed to generate the multiple resource chunks and could be useful to:
 
@@ -260,7 +272,7 @@ _NOTE: Central Directory filename entries are aligned to 4-byte padding to impro
 
 In case a `rres` file is generated with no `Central Directory`, a secondary header file (`.h`) should be provided with the id references for all resources, to be used in user code.
 
-## rres implementation for a custom engine
+## Custom Engine Implementation
 
 `rres` is designed as an **engine-agnostic file format**, processed data is mostly threated as generic data, common to any game engine. Developers can implement a custom abstraction layers to **map `rres` generic data to their own engines data structures**. 
 
@@ -305,7 +317,7 @@ Note that data decompression/decryption should be implemented in the custom abst
 
 An `rres` mapping library can be created for any engine/framework to support the `rres` file format.
 
-## rres specs and library license
+## License
 
 `rres` file-format specs and `rres.h` library are licensed under MIT license. Check [LICENSE](LICENSE) for further details.
 
