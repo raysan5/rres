@@ -250,8 +250,8 @@ typedef enum rresResourceDataType {
                                             //    data: raw bytes
     RRES_DATA_TEXT         = 2,             // FourCC: TEXT - Text file data, 4 properties
                                             //    props[0]:size (bytes)
-                                            //    props[1]:encoding 
-                                            //    props[2]:codeLang 
+                                            //    props[1]:rresTextEncoding 
+                                            //    props[2]:rresCodeLang 
                                             //    props[3]:cultureCode
                                             //    data: text
     RRES_DATA_IMAGE        = 3,             // FourCC: IMGE - Image file data, 4 properties
@@ -366,7 +366,7 @@ typedef enum rresCodeLang {
     RRES_CODE_LANG_JAI,                     // Text contains Jai code
     RRES_CODE_LANG_GDSCRIPT,                // Text contains GDScript (Godot) code
     // TODO: Add additional code languages if required
-}
+} rresCodeLang;
 
 // IMGE: Image/Texture pixel formats
 typedef enum rresPixelFormat {
