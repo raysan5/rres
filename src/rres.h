@@ -603,7 +603,7 @@ rresResource rresLoadResource(const char *fileName, int rresId)
                 }
             }
         }
-        else RRES_LOG("WARNING: The provided file is not a valid rres file, file signature or version not valid");
+        else RRES_LOG("WARNING: The provided file is not a valid rres file, file signature or version not valid\n");
 
         fclose(rresFile);
     }
@@ -636,7 +636,7 @@ rresCentralDir rresLoadCentralDirectory(const char *fileName)
         if (((header.id[0] == 'r') && (header.id[1] == 'r') && (header.id[2] == 'e') && (header.id[3] == 's')) && (header.version == 100))
         {
             // Check if there is a Central Directory available
-            if (header.cdOffset == 0) RRES_LOG("WARNING: CDIR: No central directory found");
+            if (header.cdOffset == 0) RRES_LOG("WARNING: CDIR: No central directory found\n");
             else
             {
                 RRES_LOG("INFO: CDIR: Expected to be found at offset: %08x\n", header.cdOffset);
@@ -682,7 +682,7 @@ rresCentralDir rresLoadCentralDirectory(const char *fileName)
                 }
             }
         }
-        else RRES_LOG("WARNING: The provided file is not a valid rres file, file signature or version not valid");
+        else RRES_LOG("WARNING: The provided file is not a valid rres file, file signature or version not valid\n");
 
         fclose(rresFile);
     }
