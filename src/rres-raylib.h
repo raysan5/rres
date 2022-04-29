@@ -127,6 +127,8 @@ static Image rresLoadDataChunkImage(rresResourceChunk chunk);           // Load 
 // NOTE: Function return 0 on success or other value on failure
 static int rresUnpackDataChunk(rresResourceChunk *chunk);
 
+static const char *rresGetFourCCFromType(unsigned int type)             // Return FourCC from resource type, useful for log info
+
 //----------------------------------------------------------------------------------
 // Module Functions Definition
 //----------------------------------------------------------------------------------
@@ -452,10 +454,22 @@ static int rresUnpackDataChunk(rresResourceChunk *chunk)
     return result;
 }
 
-// Set password to be used in case of encrypted data found
-void rresSetCipherPassword(const char *pass)
+// Return FourCC from resource type, useful for log info
+static const char *rresGetFourCCFromType(unsigned int type)
 {
-    password = pass;
+    switch (type)
+    {
+        case RRES_DATA_NULL: return "NULL";         // Reserved for empty chunks, no props/data
+        case RRES_DATA_RAW: return "RAWD";          // Raw file data, input file is not processed, just packed as is
+        case RRES_DATA_TEXT: return "TEXT";         // Text file data, byte data extracted from text file
+        case RRES_DATA_IMAGE: return "IMGE";        // Image file data, pixel data extracted from image file
+        case RRES_DATA_WAVE: return "WAVE";         // Audio file data, samples data extracted from audio file
+        case RRES_DATA_VERTEX: return "VRTX";       // Vertex file data, extracted from a mesh file
+        case RRES_DATA_GLYPH_INFO: return "FNTG";   // Font glyphs info, generated from an input font file
+        case RRES_DATA_LINK: return "LINK";         // External linked file, filepath as provided on file input
+        case RRES_DATA_DIRECTORY: return "CDIR";    // Central directory for input files relation to resource chunks
+        default: break;
+    }
 }
 
 #endif // RRES_RAYLIB_IMPLEMENTATION
