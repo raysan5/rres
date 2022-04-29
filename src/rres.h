@@ -169,7 +169,7 @@
     #define RRES_LOG(...)
 #endif
 
-#define RRES_MAX_CDIR_FILENAME_LENGTH  512
+#define RRES_MAX_CDIR_FILENAME_LENGTH  1024
 
 //----------------------------------------------------------------------------------
 // Types and Structures Definition
@@ -536,12 +536,10 @@ rresResource rresLoadResource(const char *fileName, int rresId)
         // Read rres file header
         fread(&header, sizeof(rresFileHeader), 1, rresFile);
 
-        // Verify "rres" identifier
-        if ((header.id[0] == 'r') &&
-            (header.id[1] == 'R') &&
-            (header.id[2] == 'E') &&
-            (header.id[3] == 'S'))
+        // Verify file signature: "rres" and file version: 100
+        if (((header.id[0] == 'r') && (header.id[1] == 'r') && (header.id[2] == 'e') && (header.id[3] == 's')) && (header.version == 100))
         {
+            // Check all available chunks looking for the requested id
             for (int i = 0; i < header.chunkCount; i++)
             {
                 rresResourceInfoHeader info = { 0 };
@@ -549,62 +547,64 @@ rresResource rresLoadResource(const char *fileName, int rresId)
                 // Read resource info header
                 fread(&info, sizeof(rresResourceInfoHeader), 1, rresFile);
 
+                // Check if resource id is the requested one
                 if (info.id == rresId)
                 {
                     rres.count = 1;
 
                     long currentFileOffset = ftell(rresFile);   // Store current file position
-                    rresResourceInfoHeader temp = info;                 // Temp info header to scan resource chunks
+                    rresResourceInfoHeader temp = info;         // Temp info header to scan resource chunks
 
-                    // Scan all resource chunks checking temp.nextOffset
+                    // Count all linked resource chunks checking temp.nextOffset
                     while (temp.nextOffset != 0)
                     {
-                        fseek(rresFile, temp.nextOffset, SEEK_SET);         // Jump to next resource
+                        fseek(rresFile, temp.nextOffset, SEEK_SET);         // Jump to next linked resource
                         fread(&temp, sizeof(rresResourceInfoHeader), 1, rresFile);  // Read next resource info header
                         rres.count++;
                     }
 
                     rres.chunks = (rresResourceChunk *)RRES_CALLOC(rres.count, sizeof(rresResourceChunk));   // Load as many rres slots as required
-                    fseek(rresFile, currentFileOffset, SEEK_SET);           // Get to first resource chunk position
+                    fseek(rresFile, currentFileOffset, SEEK_SET);           // Return to first resource chunk position
 
                     // Read and load data chunk from file data
-                    void *data = RRES_MALLOC(info.packedSize);
-                    fread(data, info.packedSize, 1, rresFile);
-                    rres.chunks[0] = rresLoadResourceChunk(info, data);
+                    // NOTE: Read data can be compressed/encrypted, 
+                    // it's up to the user library to manage decompression/decryption
+                    void *data = RRES_MALLOC(info.packedSize);              // Allocate enough memory to store resource data chunk
+                    fread(data, info.packedSize, 1, rresFile);              // Read data: propsCount + props[] + data (+additional_data)
+                    rres.chunks[0] = rresLoadResourceChunk(info, data);     // Load user data (rresResourceChunk) from info (rresResourceInfoHeader) and resource data
                     RRES_FREE(data);
 
                     // Check if there are more chunks to read
                     if (rres.count > 1) RRES_LOG("INFO: [%s][ID %i] Multiple resource chunks detected: %i chunks\n", fileName, (int)info.id, rres.count);
 
-                    int i = 0;
+                    int i = 1;
 
-                    // Load all required resource chunks
+                    // Load all linked resource chunks
                     while (info.nextOffset != 0)
                     {
-                        void *data = RRES_MALLOC(info.packedSize);
-                        fread(data, info.packedSize, 1, rresFile);
-
-                        // Load chunk data from raw file data
-                        // NOTE: Raw data can be compressed and encrypted,
-                        // it can also contain data properties at the beginning
-                        rres.chunks[i] = rresLoadResourceChunk(info, data);
+                        fseek(rresFile, info.nextOffset, SEEK_SET);         // Jump to next resource
+                        fread(&info, sizeof(rresResourceInfoHeader), 1, rresFile);  // Read next resource info header
+                        
+                        // TODO: For security, linked resource chunk could be checked to verify it's the same than original resource
+                        
+                        void *data = RRES_MALLOC(info.packedSize);          // Allocate enough memory to store resource data chunk
+                        fread(data, info.packedSize, 1, rresFile);          // Read data: propsCount + props[] + data (+additional_data)
+                        rres.chunks[i] = rresLoadResourceChunk(info, data); // Load user data from info and resource data
                         RRES_FREE(data);
-
-                        fseek(rresFile, temp.nextOffset, SEEK_SET);             // Jump to next resource
-                        fread(&info, sizeof(rresResourceInfoHeader), 1, rresFile);      // Read next resource info header
 
                         i++;
                     }
 
-                    break;      // Resource id found, stop checking the file
+                    break;      // Resource id found and loaded, stop checking the file
                 }
                 else
                 {
-                    // Skip required data size to read next resource infoHeader
+                    // Skip required data size to read next resource info header
                     fseek(rresFile, info.packedSize, SEEK_CUR);
                 }
             }
         }
+        else RRES_LOG("WARNING: The provided file is not a valid rres file, file signature or version not valid");
 
         fclose(rresFile);
     }
@@ -633,52 +633,57 @@ rresCentralDir rresLoadCentralDirectory(const char *fileName)
 
         fread(&header, sizeof(rresFileHeader), 1, rresFile);
 
-        if ((header.id[0] == 'r') &&
-            (header.id[1] == 'R') &&
-            (header.id[2] == 'E') &&
-            (header.id[3] == 'S') &&
-            (header.cdOffset != 0))
+        // Verify file signature: "rres", file version: 100
+        if (((header.id[0] == 'r') && (header.id[1] == 'r') && (header.id[2] == 'e') && (header.id[3] == 's')) && (header.version == 100))
         {
-            RRES_LOG("WARNING: CDIR: Found at offset: %08x\n", header.cdOffset);
-
-            rresResourceInfoHeader info = { 0 };
-
-            fseek(rresFile, header.cdOffset, SEEK_CUR);         // Move to central directory position
-            fread(&info, sizeof(rresResourceInfoHeader), 1, rresFile);  // Read resource info
-
-            if ((info.type[0] == 'C') &&
-                (info.type[1] == 'D') &&
-                (info.type[2] == 'I') &&
-                (info.type[3] == 'R'))
+            // Check if there is a Central Directory available
+            if (header.cdOffset == 0) RRES_LOG("WARNING: CDIR: No central directory found");
+            else
             {
-                RRES_LOG("WARNING: CDIR: Found! Comp.Size: %i\n", info.packedSize);
+                RRES_LOG("INFO: CDIR: Expected to be found at offset: %08x\n", header.cdOffset);
 
-                void *data = RRES_MALLOC(info.packedSize);
-                fread(data, info.packedSize, 1, rresFile);
+                rresResourceInfoHeader info = { 0 };
 
-                rresResourceChunk chunk = rresLoadResourceChunk(info, data);    // TODO: Review: Only works for uncompressed/not-ecrypted data
-                RRES_FREE(data);
+                fseek(rresFile, header.cdOffset, SEEK_CUR);         // Move to central directory position
+                fread(&info, sizeof(rresResourceInfoHeader), 1, rresFile);  // Read resource info
 
-                dir.count = chunk.props[0];     // Files count
-
-                unsigned char *ptr = chunk.data;
-                dir.entries = (rresDirEntry *)RRES_CALLOC(dir.count, sizeof(rresDirEntry));
-
-                for (unsigned int i = 0; i < dir.count; i++)
+                // Verify resource type is CDIR
+                if ((info.type[0] == 'C') && (info.type[1] == 'D') && (info.type[2] == 'I') && (info.type[3] == 'R'))
                 {
-                    dir.entries[i].id = ((int *)ptr)[0];            // Resource id
-                    dir.entries[i].offset = ((int*)ptr)[1];         // Resource offset in file
-                    dir.entries[i].fileNameSize = ((int*)ptr)[2];   // Resource fileName size
+                    RRES_LOG("INFO: CDIR: Valid Central Directory found. Size: %i bytes\n", info.packedSize);
 
-                    // Resource fileName, NULL terminated, size considers that extra byte
-                    memcpy(dir.entries[i].fileName, ptr + 16, dir.entries[i].fileNameSize);
+                    void *data = RRES_MALLOC(info.packedSize);
+                    fread(data, info.packedSize, 1, rresFile);
+                    
+                    // Load resource chunk with Central Directory data,
+                    // data is uncompressed/unencrypted by default
+                    rresResourceChunk chunk = rresLoadResourceChunk(info, data);
+                    RRES_FREE(data);
 
-                    ptr += (16 + dir.entries[i].fileNameSize);      // Move pointer for next entry
+                    dir.count = chunk.props[0];     // File entries count
+
+                    unsigned char *ptr = chunk.data;
+                    dir.entries = (rresDirEntry *)RRES_CALLOC(dir.count, sizeof(rresDirEntry));
+
+                    for (unsigned int i = 0; i < dir.count; i++)
+                    {
+                        dir.entries[i].id = ((int *)ptr)[0];            // Resource id
+                        dir.entries[i].offset = ((int *)ptr)[1];        // Resource offset in file
+                        // NOTE: There is a reserved integer value before fileNameSize
+                        dir.entries[i].fileNameSize = ((int *)ptr)[3];  // Resource fileName size
+
+                        // Resource fileName, NULL terminated and 0-padded to 4-byte, 
+                        // fileNameSize considers NULL and padding
+                        memcpy(dir.entries[i].fileName, ptr + 16, dir.entries[i].fileNameSize);
+
+                        ptr += (16 + dir.entries[i].fileNameSize);      // Move pointer for next entry
+                    }
+
+                    rresUnloadResourceChunk(chunk);
                 }
-
-                rresUnloadResourceChunk(chunk);
             }
         }
+        else RRES_LOG("WARNING: The provided file is not a valid rres file, file signature or version not valid");
 
         fclose(rresFile);
     }
@@ -700,9 +705,8 @@ int rresGetIdFromFileName(rresCentralDir dir, const char *fileName)
 
     for (unsigned int i = 0; i < dir.count; i++)
     {
-        // NOTE: entries[i].fileName is NULL terminated
-
-        if (strcmp((const char *)dir.entries[i].fileName, fileName) == 0)
+        // NOTE: entries[i].fileName is NULL terminated and padded to 4-bytes
+        if (strncmp((const char *)dir.entries[i].fileName, fileName, sizeof(fileName)) == 0)
         {
             id = dir.entries[i].id;
             break;
@@ -766,6 +770,12 @@ unsigned int rresComputeCRC32(unsigned char *buffer, int len)
 static rresResourceChunk rresLoadResourceChunk(rresResourceInfoHeader info, void *data)
 {
     rresResourceChunk chunk = { 0 };
+    
+    // Register required info for user
+    chunk.baseSize = info.baseSize;
+    chunk.packedSize = info.packedSize;
+    chunk.compType = info.compType;
+    chunk.cipherType = info.cipherType;
 
     // Assign rres.type (int) from info.type (FourCC)
     if ((info.type[0] == 'N') && (info.type[1] == 'U') && (info.type[2] == 'L') && (info.type[3] == 'L')) chunk.type = RRES_DATA_NULL;            // NULL
@@ -777,40 +787,38 @@ static rresResourceChunk rresLoadResourceChunk(rresResourceInfoHeader info, void
     else if ((info.type[0] == 'F') && (info.type[1] == 'N') && (info.type[2] == 'T') && (info.type[3] == 'G')) chunk.type = RRES_DATA_GLYPH_INFO; // FNTG
     else if ((info.type[0] == 'L') && (info.type[1] == 'I') && (info.type[2] == 'N') && (info.type[3] == 'K')) chunk.type = RRES_DATA_LINK;       // LINK
     else if ((info.type[0] == 'C') && (info.type[1] == 'D') && (info.type[2] == 'I') && (info.type[3] == 'R')) chunk.type = RRES_DATA_DIRECTORY;  // CDIR
+    
+    // CRC32 data validation, verify packed data is not corrupted
+    unsigned int crc32 = rresComputeCRC32(data, info.packedSize);
 
-    if (chunk.type != RRES_DATA_NULL)   // Make sure chunk contains data (or is supposed to)
+    if ((chunk.type != RRES_DATA_NULL) && (crc32 == info.crc32))   // Make sure chunk contains data and data is not corrupted
     {
-        // Check that data chunk is not compressed or encrypted to retrieve [properties + data]
+        // Check if data chunk is compressed/encrypted to retrieve properties + data
+        // If data is compressed/encrypted we just return the loaded chunk and user must manage decompression/decryption on user library
         if ((info.compType == RRES_COMP_NONE) && (info.cipherType == RRES_CIPHER_NONE))
         {
-            // NOTE: If data is not compressed/encrypted info.size = info.baseSize
+            // Data is not compressed/encrypted (info.packedSize = info.baseSize)
+            chunk.propCount = ((int *)data)[0];
 
-            unsigned int crc32 = rresComputeCRC32(data, info.packedSize);   // CRC32 data validation
-
-            if (crc32 == info.crc32)    // Check CRC32
+            if (chunk.propCount > 0)
             {
-                chunk.propCount = ((int *)data)[0];
-
-                if (chunk.propCount > 0)
-                {
-                    chunk.props = (int *)RRES_CALLOC(chunk.propCount, sizeof(int));
-                    for (unsigned int i = 0; i < chunk.propCount; i++) chunk.props[i] = ((int *)data)[1 + i];
-                }
-
-                chunk.data = RRES_MALLOC(info.baseSize);
-                memcpy(chunk.data, ((unsigned char *)data) + sizeof(int) + (chunk.propCount*sizeof(int)), info.baseSize);
+                chunk.props = (int *)RRES_CALLOC(chunk.propCount, sizeof(int));
+                for (unsigned int i = 0; i < chunk.propCount; i++) chunk.props[i] = ((int *)data)[1 + i];
             }
-            else
-            {
-                RRES_LOG("WARNING: [ID %i] CRC32 does not match, data can be corrupted\n", info.id);
-            }
+
+            chunk.data = RRES_MALLOC(info.baseSize);
+            memcpy(chunk.data, ((unsigned char *)data) + sizeof(int) + (chunk.propCount*sizeof(int)), info.baseSize);
         }
-        else
+        else    
         {
-            chunk.compType = info.compType;
-            chunk.cipherType = info.cipherType;
+            // Data is compressed/encrypted
+            // We can not retrieve properties, it must be processed by user library
+            chunk.data = RRES_MALLOC(info.packedSize);
+            memcpy(chunk.data, (unsigned char *)data, info.packedSize);
         }
     }
+    
+    if (crc32 != info.crc32) RRES_LOG("WARNING: [ID %i] CRC32 does not match, data can be corrupted\n", info.id);
 
     return chunk;
 }
