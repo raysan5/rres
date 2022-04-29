@@ -4,7 +4,7 @@
 
 **rres is a simple and easy-to-use file-format to package resources**
 
-`rres` has been designed to package game assets (images, fonts, text, audio, models...) into a simple self-contained comprehensive format, easy to read and write, prepared to load data in a fast and efficient way.
+`rres` has been designed to package game assets (images, fonts, text, audio, models...) into a simple self-contained comprehensive format, easy to read and write, designed to load data in a fast and efficient way.
 
 `rres` is inspired by [XNB](http://xbox.create.msdn.com/en-US/sample/xnb_format) file-format (used by XNA/MonoGame), [RIFF](https://en.wikipedia.org/wiki/Resource_Interchange_File_Format), [PNG](https://en.wikipedia.org/wiki/Portable_Network_Graphics) and [ZIP](https://en.wikipedia.org/wiki/Zip_(file_format)) file-formats.
 
