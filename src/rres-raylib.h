@@ -507,9 +507,41 @@ static int rresUnpackResourceChunk(rresResourceChunk *chunk)
         if (chunk->cipherType == RRES_CIPHER_XCHACHA20_POLY1305)    // rrespacker supported encryption
         {
 #if defined(RRES_SUPPORT_ENCRYPTION_MONOCYPHER)
-            // TODO.
+            // Get some memory for the possible message output
+            unsigned char *decryptedData = (unsigned char *)RL_CALLOC(MAX_MESSAGE_SIZE, 1);
+
+            // Required variables for key stretching
+            uint8_t key[32] = { 0 };                    // Encryption key
+            const uint32_t blocks = 16384;              // Key stretching blocks: 16 megabytes
+            const uint32_t iterations = 3;              // Key stretching iterations: 3 iterations
+            void *workArea = RL_MALLOC(blocks*1024);    // Key stretching work area
+            uint8_t salt[16] = { 0 };                   // TODO: Key stretching salt
+
+            // Encryption key, generated from user password, using Argon2i algorythm for key stretching (256 bit)
+            crypto_argon2i(key, 32, workArea, blocks, iterations, (uint8_t *)password, 16, salt, 16);
+
+            // Wipe key generation secrets, they are no longer needed
+            crypto_wipe(salt, 16);
+            RL_FREE(workArea);
             
-            result = 2;     // Wrong password
+            // Required variables for decryption and message authentication
+            uint8_t nonce[24] = { 0 };                  // TODO: nonce
+            uint8_t mac[16] = { 0 };                    // TODO: Message Authentication Code
+
+            // Message decryption requires key, nonce and MAC
+            int decryptResult = crypto_unlock(decryptedData, key, nonce, mac, chunk->data, (chunk->packedSize - 16);
+
+            // Wipe secrets if they are no longer needed
+            crypto_wipe(nonce, 24);
+            crypto_wipe(key, 32);
+
+            if (decryptResult == 0)    // Decrypted successfully!
+            {
+                RRES_FREE(chunk->data);
+                chunk->data = decryptedData;
+                chunk->packedSize = chunk->packedSize - 16;     // We remove MAC additional data size from packed size
+            }
+            else if (decryptResult == -1) result = 2;   // Wrong password or message corrupted
 #else
             result = 1;     // Decryption algorithm not supported
 #endif
