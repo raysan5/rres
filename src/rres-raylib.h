@@ -368,6 +368,12 @@ Mesh rresLoadMesh(rresResource rres)
     return mesh;
 }
 
+// Set password to be used in case of encrypted data found
+void rresSetCipherPassword(const char *pass)
+{
+    password = pass;
+}
+
 //----------------------------------------------------------------------------------
 // Module specific Functions Definition
 //----------------------------------------------------------------------------------
@@ -433,7 +439,7 @@ static Image rresLoadDataChunkImage(rresResourceChunk chunk)
             int format = chunk.props[2];
             
             // Assign equivalent pixel formats for our engine
-            // NOTE: In this case rresPixelFormat define values match raylib PixelFormat values
+            // NOTE: In this case rresPixelFormat defined values match raylib PixelFormat values
             switch (format)
             {
                 case RRES_PIXELFORMAT_UNCOMP_GRAYSCALE: image.format = PIXELFORMAT_UNCOMPRESSED_GRAYSCALE; break;
@@ -460,7 +466,6 @@ static Image rresLoadDataChunkImage(rresResourceChunk chunk)
                 default: break;
             }
             
-            // TODO: Consider mipmaps data
             image.mipmaps = chunk.props[3];
 
             // Image data size can be computed from image properties
