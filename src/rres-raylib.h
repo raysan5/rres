@@ -523,12 +523,40 @@ static int rresUnpackResourceChunk(rresResourceChunk *chunk)
         // Decompress data
         if (chunk->compType == RRES_COMP_DEFLATE)
         {
-            // TODO.
+            int uncompDataSize = 0;
+            unsigned char *uncompData = (unsigned char *)RL_MALLOC(chunk->baseSize);
+            uncompData = DecompressData(chunk->data, chunk->packedSize, &uncompDataSize);
+            
+            if (uncompDataSize > 0)     // Decompression successful
+            {
+                RRES_FREE(chunk->data);
+                chunk->data = uncompData;
+                chunk->packedSize = uncompDataSize;
+            }
+            else result = 4;            // Decompression process failed
+
+            // Security check, uncompDataSize must match the provided chunk->baseSize
+            if (uncompDataSize != chunk->baseSize) RRES_LOG("WARNING: Decompressed data could be corrupted, unexpected size\n");
+
+            RL_FREE(compData);
         }
         else if (chunk->compType == RRES_COMP_LZ4)
         {
 #if defined(RRES_SUPPORT_COMPRESSION_LZ4)
-            // TODO.
+            int uncompDataSize = 0;
+            unsigned char *uncompData = (unsigned char *)RL_MALLOC(chunk->baseSize);
+            uncompDataSize = LZ4_decompress_safe(chunk->data, uncompData, chunk->packedSize, chunk->baseSize);
+
+            if (uncompDataSize > 0)     // Decompression successful
+            {
+                RRES_FREE(chunk->data);
+                chunk->data = uncompData;
+                chunk->packedSize = uncompDataSize;
+            }
+            else result = 4;            // Decompression process failed
+            
+            // WARNING: Decompression could be successful but not the original message size returned
+            if (uncompDataSize != chunk->baseSize) RRES_LOG("WARNING: Decompressed data could be corrupted, unexpected size\n");
 #else
             result = 3;     // Compression algorithm not supported
 #endif
