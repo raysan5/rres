@@ -119,13 +119,13 @@ static const char *password = NULL;
 //----------------------------------------------------------------------------------
 
 // Load simple data chunks that are later required by multi-chunk resources
-static void *rresLoadDataChunkRaw(rresResourceChunk chunk, int *size);  // Load chunk: RRES_DATA_RAW
-static char *rresLoadDataChunkText(rresResourceChunk chunk);            // Load chunk: RRES_DATA_TEXT
-static Image rresLoadDataChunkImage(rresResourceChunk chunk);           // Load chunk: RRES_DATA_IMAGE
+static void *rresLoadResourceChunkRaw(rresResourceChunk chunk, int *size);  // Load chunk: RRES_DATA_RAW
+static char *rresLoadResourceChunkText(rresResourceChunk chunk);            // Load chunk: RRES_DATA_TEXT
+static Image rresLoadResourceChunkImage(rresResourceChunk chunk);           // Load chunk: RRES_DATA_IMAGE
 
 // Unpack compressed/encrypted data from chunk
 // NOTE: Function return 0 on success or other value on failure
-static int rresUnpackDataChunk(rresResourceChunk *chunk);
+static int rresUnpackResourceChunk(rresResourceChunk *chunk);
 
 static const char *rresGetFourCCFromType(unsigned int type)             // Return FourCC from resource type, useful for log info
 
@@ -140,7 +140,7 @@ void *rresLoadRaw(rresResource rres, int *size)
 
     if ((rres.count >= 1) && (rres.chunks[0].type == RRES_DATA_RAW))
     {
-        data = rresLoadDataChunkRaw(rres.chunks[0], size);
+        data = rresLoadResourceChunkRaw(rres.chunks[0], size);
     }
 
     return data;
@@ -154,7 +154,7 @@ char *rresLoadText(rresResource rres)
 
     if ((rres.count >= 1) && (rres.chunks[0].type == RRES_DATA_TEXT))
     {
-        text = rresLoadDataChunkText(rres.chunks[0]);
+        text = rresLoadResourceChunkText(rres.chunks[0]);
     }
 
     return text;
@@ -167,7 +167,7 @@ Image rresLoadImage(rresResource rres)
 
     if ((rres.count >= 1) && (rres.chunks[0].type == RRES_DATA_IMAGE))
     {
-        image = rresLoadDataChunkImage(rres.chunks[0]);
+        image = rresLoadResourceChunkImage(rres.chunks[0]);
     }
 
     return image;
@@ -180,7 +180,7 @@ Wave rresLoadWave(rresResource rres)
 
     if ((rres.count >= 1) && (rres.chunks[0].type == RRES_DATA_WAVE))
     {
-        int result = rresUnpackDataChunk(&rres.chunks[0]);
+        int result = rresUnpackResourceChunk(&rres.chunks[0]);
 
         if (result == 0)    // Data was successfully decompressed/decrypted
         {
@@ -210,7 +210,7 @@ Font rresLoadFont(rresResource rres)
     {
         if (rres.chunks[0].type == RRES_DATA_GLYPH_INFO)
         {
-            int result = rresUnpackDataChunk(&rres.chunks[0]);
+            int result = rresUnpackResourceChunk(&rres.chunks[0]);
 
             if (result == 0)    // Data was successfully decompressed/decrypted
             {
@@ -243,7 +243,7 @@ Font rresLoadFont(rresResource rres)
         // Load font image chunk
         if (rres.chunks[1].type == RRES_DATA_IMAGE)
         {
-            Image image = rresLoadDataChunkImage(rres.chunks[1]);
+            Image image = rresLoadResourceChunkImage(rres.chunks[1]);
             font.texture = LoadTextureFromImage(image);
             UnloadImage(image);
         }
@@ -380,13 +380,13 @@ void rresSetCipherPassword(const char *pass)
 
 // Load data chunk: RRES_DATA_RAW
 // NOTE: This chunk can be used raw files embedding or other binary blobs
-static void *rresLoadDataChunkRaw(rresResourceChunk chunk, int *size);
+static void *rresLoadResourceChunkRaw(rresResourceChunk chunk, int *size);
 {
     void *rawData = NULL;
 
     if (chunk.type == RRES_DATA_RAW)
     {
-        int result = rresUnpackDataChunk(&rres.chunks[0]);
+        int result = rresUnpackResourceChunk(&rres.chunks[0]);
 
         if (result == 0)    // Data was successfully decompressed/decrypted
         {
@@ -401,13 +401,13 @@ static void *rresLoadDataChunkRaw(rresResourceChunk chunk, int *size);
 
 // Load data chunk: RRES_DATA_TEXT
 // NOTE: This chunk can be used for shaders or other text data elements (materials?)
-static char *rresLoadDataChunkText(rresResourceChunk chunk)
+static char *rresLoadResourceChunkText(rresResourceChunk chunk)
 {
     void *text = NULL;
 
     if (chunk.type == RRES_DATA_TEXT)
     {
-        int result = rresUnpackDataChunk(&rres.chunks[0]);
+        int result = rresUnpackResourceChunk(&rres.chunks[0]);
 
         if (result == 0)    // Data was successfully decompressed/decrypted
         {
@@ -424,13 +424,13 @@ static char *rresLoadDataChunkText(rresResourceChunk chunk)
 
 // Load data chunk: RRES_DATA_IMAGE
 // NOTE: Many data types use images data in some way (font, material...)
-static Image rresLoadDataChunkImage(rresResourceChunk chunk)
+static Image rresLoadResourceChunkImage(rresResourceChunk chunk)
 {
     Image image = { 0 };
 
     if (chunk.type == RRES_DATA_IMAGE)
     {
-        int result = rresUnpackDataChunk(&rres.chunks[0]);
+        int result = rresUnpackResourceChunk(&rres.chunks[0]);
 
         if (result == 0)    // Data was successfully decompressed/decrypted
         {
@@ -484,9 +484,9 @@ static Image rresLoadDataChunkImage(rresResourceChunk chunk)
     return image;
 }
 
-// Unpack compressed/encrypted data from chunk
+// Unpack compressed/encrypted data from resource chunk
 // NOTE: Function return 0 on success or other value on failure
-static int rresUnpackDataChunk(rresResourceChunk *chunk)
+static int rresUnpackResourceChunk(rresResourceChunk *chunk)
 {
     int result = 0;
 
@@ -497,10 +497,9 @@ static int rresUnpackDataChunk(rresResourceChunk *chunk)
     //  3 - Compression algorithm not supported
     //  4 - Error on data decompression
 
-    // TODO: Decompress and decrypt data as required (only rrespacker supported formats)
-    
-    // If data is compressed/encrypted the properties are not loaded by rres.h because
+    // NOTE 1: If data is compressed/encrypted the properties are not loaded by rres.h because
     // it's up to the user to process the data; *chunk must be properly updated by this function
+    // NOTE 2: rres-raylib should support the same algorithms and libraries used by rrespacker tool
 
     // STEP 1. Decrypt message if encrypted
     if (chunk->cipherType != RRES_CIPHER_NONE)
@@ -509,11 +508,13 @@ static int rresUnpackDataChunk(rresResourceChunk *chunk)
         {
 #if defined(RRES_SUPPORT_ENCRYPTION_MONOCYPHER)
             // TODO.
+            
+            result = 2;     // Wrong password
 #else
-            result = 1;
+            result = 1;     // Decryption algorithm not supported
 #endif
         }
-        else result = 1;
+        else result = 1;    // Decryption algorithm not supported
     }
 
     // STEP 2: If decryption was successful, try to decompress data
@@ -529,15 +530,30 @@ static int rresUnpackDataChunk(rresResourceChunk *chunk)
 #if defined(RRES_SUPPORT_COMPRESSION_LZ4)
             // TODO.
 #else
-            result = 3;
+            result = 3;     // Compression algorithm not supported
 #endif
         }
         else if (chunk->compType == RRES_COMP_QOI)
         {
             // TODO.
         }
-        else result = 3;
+        else result = 3;    // Compression algorithm not supported
     }
+    
+    // Show some log info about the decompression/decryption process
+    if ((chunk->cipherType != RRES_CIPHER_NONE) || (chunk->compType != RRES_COMP_NONE))
+    {
+        switch (result)
+        {
+            case 0: RRES_LOG("INFO: %s: Chunk data decompressed/decrypted successfully", rresGetFourCCFromType(chunk.type)); break;
+            case 1: RRES_LOG("WARNING: %s: Chunk data encryption algorithm not supported", rresGetFourCCFromType(chunk.type)); break;
+            case 2: RRES_LOG("WARNING: %s: Chunk data decryption failed, wrong password provided", rresGetFourCCFromType(chunk.type)); break;
+            case 3: RRES_LOG("WARNING: %s: Chunk data compression algorithm not supported", rresGetFourCCFromType(chunk.type)); break;
+            case 4: RRES_LOG("WARNING: %s: Chunk data decompression failed", rresGetFourCCFromType(chunk.type)); break;
+            default: break;
+        }
+    }
+    else RRES_LOG("INFO: %s: Chunk does not require data decompression/decryption", rresGetFourCCFromType(chunk.type));
 
     return result;
 }
