@@ -11,7 +11,13 @@
 <br>
 <br>
 
-## rres design goals
+
+# Index
+
+1. [Design Goals](design-goals)
+
+
+## Design Goals
 
 - **Simplicity**: `rres` structure is simple, one file header and multiple resources one after the other. Still, every resource has a small (32 bytes) resource info header with multiple options available.
 
