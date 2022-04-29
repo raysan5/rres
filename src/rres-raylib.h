@@ -257,26 +257,109 @@ Mesh rresLoadMesh(rresResource rres)
 {
     Mesh mesh = { 0 };
 
+    // NOTE: raylib only supports vertex arrays with same vertex count,
+    // The only possible exception is the mesh.indices array
     mesh.vertexCount = rres.chunks[0].props[0];
-
-    // TODO: Make sure all rres.chunks[i] vertexCount are the same?
 
     // Mesh resource consist of (n) chunks:
     for (int i = 0; i < rres.count; i++)
     {
+        // Verify chunk type and vertex count
         if (rres.chunks[i].type == RRES_DATA_VERTEX)
         {
-            switch (rres.chunks[i].props[1])
+            // In case vertex count do not match we skip that resource chunk
+            if ((rres.chunks[i].props[1] != RRES_VERTEX_ATTRIBUTE_INDEX) && (rres.chunks[i].props[0] != mesh.vertexCount)) continue;
+            
+            // NOTE: We are only loading raylib supported rresVertexFormat and raylib expected components count
+            switch (rres.chunks[i].props[1])    // Check rresVertexAttribute value
             {
-                case RRES_VERTEX_ATTRIBUTE_POSITION: if (rres.chunks[i].props[2] == RRES_VERTEX_FORMAT_FLOAT) mesh.vertices = (float *)rres.chunks[i].data; break;
-                case RRES_VERTEX_ATTRIBUTE_TEXCOORD1: if (rres.chunks[i].props[2] == RRES_VERTEX_FORMAT_FLOAT) mesh.texcoords = (float *)rres.chunks[i].data; break;
-                case RRES_VERTEX_ATTRIBUTE_TEXCOORD2: if (rres.chunks[i].props[2] == RRES_VERTEX_FORMAT_FLOAT) mesh.texcoords2 = (float *)rres.chunks[i].data; break;
-                case RRES_VERTEX_ATTRIBUTE_TEXCOORD3: break;    // Not supported by raylib mesh format
-                case RRES_VERTEX_ATTRIBUTE_TEXCOORD4: break;    // Not supported by raylib mesh format
-                case RRES_VERTEX_ATTRIBUTE_NORMAL: if (rres.chunks[i].props[2] == RRES_VERTEX_FORMAT_FLOAT) mesh.normals = (float *)rres.chunks[i].data; break;
-                case RRES_VERTEX_ATTRIBUTE_TANGENT: if (rres.chunks[i].props[2] == RRES_VERTEX_FORMAT_FLOAT) mesh.tangents = (float *)rres.chunks[i].data; break;
-                case RRES_VERTEX_ATTRIBUTE_COLOR: if (rres.chunks[i].props[2] == RRES_VERTEX_FORMAT_BYTE) mesh.colors = (unsigned char *)rres.chunks[i].data; break;
-                case RRES_VERTEX_ATTRIBUTE_INDEX: if (rres.chunks[i].props[2] == RRES_VERTEX_FORMAT_SHORT) mesh.indices = (unsigned short *)rres.chunks[i].data; break;
+                case RRES_VERTEX_ATTRIBUTE_POSITION: 
+                {
+                    // raylib expects 3 components per vertex and float vertex format
+                    if ((rres.chunks[i].props[2] == 3) && (rres.chunks[i].props[3] == RRES_VERTEX_FORMAT_FLOAT)) 
+                    {
+                        mesh.vertices = (float *)RL_CALLOC(mesh.vertexCount*3*sizeof(float));
+                        memcpy(mesh.vertices, rres.chunks[i].data, mesh.vertexCount*3*sizeof(float));
+                    }
+                    else RRES_LOG("WARNING: MESH: Vertex attribute position not valid, componentCount/vertexFormat do not fit");
+                    
+                } break;
+                case RRES_VERTEX_ATTRIBUTE_TEXCOORD1: 
+                {
+                    // raylib expects 2 components per vertex and float vertex format
+                    if ((rres.chunks[i].props[2] == 2) && (rres.chunks[i].props[3] == RRES_VERTEX_FORMAT_FLOAT) 
+                    {
+                        mesh.texcoords = (float *)RL_CALLOC(mesh.vertexCount*2*sizeof(float));
+                        memcpy(mesh.texcoords, rres.chunks[i].data, mesh.vertexCount*2*sizeof(float));
+                    }
+                    else RRES_LOG("WARNING: MESH: Vertex attribute texcoord1 not valid, componentCount/vertexFormat do not fit");
+                    
+                } break;
+                case RRES_VERTEX_ATTRIBUTE_TEXCOORD2: 
+                {
+                    // raylib expects 2 components per vertex and float vertex format
+                    if ((rres.chunks[i].props[2] == 2) && (rres.chunks[i].props[3] == RRES_VERTEX_FORMAT_FLOAT) 
+                    {
+                        mesh.texcoords2 = (float *)RL_CALLOC(mesh.vertexCount*2*sizeof(float));
+                        memcpy(mesh.texcoords2, rres.chunks[i].data, mesh.vertexCount*2*sizeof(float));
+                    }
+                    else RRES_LOG("WARNING: MESH: Vertex attribute texcoord2 not valid, componentCount/vertexFormat do not fit");
+                    
+                } break;
+                case RRES_VERTEX_ATTRIBUTE_TEXCOORD3: 
+                {
+                    RRES_LOG("WARNING: MESH: Vertex attribute texcoord3 not supported");
+                    
+                } break;
+                case RRES_VERTEX_ATTRIBUTE_TEXCOORD4:
+                {
+                    RRES_LOG("WARNING: MESH: Vertex attribute texcoord4 not supported");
+                    
+                } break;
+                case RRES_VERTEX_ATTRIBUTE_NORMAL: 
+                {
+                    // raylib expects 3 components per vertex and float vertex format
+                    if ((rres.chunks[i].props[2] == 3) && (rres.chunks[i].props[3] == RRES_VERTEX_FORMAT_FLOAT)) 
+                    {
+                        mesh.normals = (float *)RL_CALLOC(mesh.vertexCount*3*sizeof(float));
+                        memcpy(mesh.normals, rres.chunks[i].data, mesh.vertexCount*3*sizeof(float));
+                    }
+                    else RRES_LOG("WARNING: MESH: Vertex attribute normal not valid, componentCount/vertexFormat do not fit");
+                    
+                } break;
+                case RRES_VERTEX_ATTRIBUTE_TANGENT: 
+                {
+                    // raylib expects 4 components per vertex and float vertex format
+                    if ((rres.chunks[i].props[2] == 4) && (rres.chunks[i].props[3] == RRES_VERTEX_FORMAT_FLOAT)) 
+                    {
+                        mesh.tangents = (float *)RL_CALLOC(mesh.vertexCount*4*sizeof(float));
+                        memcpy(mesh.tangents, rres.chunks[i].data, mesh.vertexCount*4*sizeof(float));
+                    }
+                    else RRES_LOG("WARNING: MESH: Vertex attribute tangent not valid, componentCount/vertexFormat do not fit");
+                    
+                } break;
+                case RRES_VERTEX_ATTRIBUTE_COLOR: 
+                {
+                    // raylib expects 4 components per vertex and unsigned char vertex format
+                    if ((rres.chunks[i].props[2] == 4) && (rres.chunks[i].props[3] == RRES_VERTEX_FORMAT_UBYTE)) 
+                    {
+                        mesh.colors = (unsigned char *)RL_CALLOC(mesh.vertexCount*4*sizeof(unsigned char));
+                        memcpy(mesh.colors, rres.chunks[i].data, mesh.vertexCount*4*sizeof(unsigned char));
+                    }
+                    else RRES_LOG("WARNING: MESH: Vertex attribute color not valid, componentCount/vertexFormat do not fit");
+                    
+                } break;
+                case RRES_VERTEX_ATTRIBUTE_INDEX: 
+                {
+                    // raylib expects 1 components per index and unsigned short vertex format
+                    if ((rres.chunks[i].props[2] == 1) && (rres.chunks[i].props[3] == RRES_VERTEX_FORMAT_USHORT)) 
+                    {
+                        mesh.indices = (unsigned char *)RL_CALLOC(rres.chunks[i].props[0]*sizeof(unsigned short));
+                        memcpy(mesh.indices, rres.chunks[i].data, rres.chunks[i].props[0]*sizeof(unsigned short));
+                    }
+                    else RRES_LOG("WARNING: MESH: Vertex attribute index not valid, componentCount/vertexFormat do not fit");
+                    
+                } break;
                 default: break;
             }
         }
