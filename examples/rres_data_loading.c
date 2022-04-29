@@ -46,12 +46,12 @@ int main(void)
     }
 
     // Load content from rres file
-    rresData rres = { 0 };
+    rresResource rres = { 0 };
     
     // NOTE: rresLoadRaw() and similar functions already check internally if ((rres.count > 0) && (rres.chunks != NULL))
 
     // TEST 01: RRES_DATA_RAW -> OK!!!
-    rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "resources/image.png.raw"));
+    rres = rresLoadResource("resources.rres", rresGetIdFromFileName(dir, "resources/image.png.raw"));
     unsigned int dataSize = 0;
     void *data = rresLoadRaw(rres, &dataSize);      // NOTE: data must be unloaded at the end
     if ((data != NULL) && (dataSize > 0))
@@ -60,39 +60,39 @@ int main(void)
         fwrite(data, dataSize, 1, rawFile);
         fclose(rawFile);
     }
-    rresUnloadData(rres);
+    rresUnloadResource(rres);
 
     // TEST 02: RRES_DATA_TEXT -> OK!!!
-    rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "resources/text_data.txt"));
+    rres = rresLoadResource("resources.rres", rresGetIdFromFileName(dir, "resources/text_data.txt"));
     char *text = rresLoadText(rres);
-    rresUnloadData(rres);
+    rresUnloadResource(rres);
 
     // TEST 03: RRES_DATA_IMAGE -> OK!!!
-    rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "resources/images/fudesumi.png"));
+    rres = rresLoadResource("resources.rres", rresGetIdFromFileName(dir, "resources/images/fudesumi.png"));
     Image image = rresLoadImage(rres);
     if (image.data != NULL)
     {
         Texture2D texture = LoadTextureFromImage(image);
         UnloadImage(image);
     }
-    rresUnloadData(rres);
+    rresUnloadResource(rres);
 
     // TEST 03: RRES_DATA_WAVE -> OK!!!
-    rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "resources/audio/target.ogg"));
+    rres = rresLoadResource("resources.rres", rresGetIdFromFileName(dir, "resources/audio/target.ogg"));
     Wave wave = rresLoadWave(rres);
     Sound sound = LoadSoundFromWave(wave);
     UnloadWave(wave);
-    rresUnloadData(rres);
+    rresUnloadResource(rres);
 
     // TEST 04: RRES_DATA_FONT_INFO (multichunk) -> ...
     rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "resources/fonts/pixantiqua.ttf"));
     Font font = rresLoadFont(rres);
-    rresUnloadData(rres);
+    rresUnloadResource(rres);
 
     // TEST 05: RRES_DATA_VERTEX (multichunk!) -> ...
-    rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "resources/models/castle.obj"));
+    rres = rresLoadResource("resources.rres", rresGetIdFromFileName(dir, "resources/models/castle.obj"));
     Mesh mesh = rresLoadMesh(rres);
-    rresUnloadData(rres);
+    rresUnloadResource(rres);
 
     Model model = LoadModelFromMesh(mesh);
 
