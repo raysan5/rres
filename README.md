@@ -233,7 +233,7 @@ The currently defined data `types` consist of the following properties and data:
 | `RRES_DATA_RAW`    |  `RAWD`  |      1       | `props[0]`:size  |  raw file bytes  |
 | `RRES_DATA_TEXT`   |  `TEXT`  |      4       | `props[0]`:size<br>`props[1]`:`rresTextEncoding`<br>`props[2]`:`rresCodeLang`<br>`props[3]`:cultureCode  |  text data   |
 | `RRES_DATA_IMAGE`  |  `IMGE`  |      4       | `props[0]`:width<br>`props[1]`:height<br>`props[2]`:`rresPixelFormat`<br>`props[3]`:mipmaps |  pixel data         |
-| `RRES_DATA_WAVE`   |  `WAVE`  |      4       | `props[0]`:sampleCount<br>`props[1]`:sampleRate<br>`props[2]`:sampleSize<br>`props[3]`:channels | audio samples data |
+| `RRES_DATA_WAVE`   |  `WAVE`  |      4       | `props[0]`:frameCount<br>`props[1]`:sampleRate<br>`props[2]`:sampleSize<br>`props[3]`:channels | audio samples data |
 | `RRES_DATA_VERTEX` |  `VRTX`  |      4       | `props[0]`:vertexCount<br>`props[1]`:`rresVertexAttribute`<br>`props[2]`:componentCount<br>`props[3]`:`rresVertexFormat` | vertex data |
 | `RRES_DATA_GLYPH_INFO`| `FNTG`|      4       | `props[0]`:baseSize<br>`props[1]`:glyphCount<br>`props[2]`:glyphPadding<br>`props[3]`:`rresFontStyle` | `rresFontGlyphInfo[0..glyphCount]` |
 | `RRES_DATA_LINK`   |  `LINK`  |      1       | `props[0]`:size       | filepath data |
