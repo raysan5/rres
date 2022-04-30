@@ -164,15 +164,17 @@ typedef struct rresResourceInfoHeader {
 } rresResourceInfoHeader;
 ```
 
-Considerations:
+_Fields Description:_
 
- - `type` is a [`FourCC`](https://en.wikipedia.org/wiki/FourCC) code and identifies the type of data contained in the resource chunk. Check `rresResourceDataType` section.
+ - `type` is a [`FourCC`](https://en.wikipedia.org/wiki/FourCC) code and identifies the type of resource data contained in the `rresResourceDataChunk`. Enum `rresResourceDataType` defines several data types, new ones could be added if requried.
  - `id` is a global resource identifier, it's generated from input filename using a CRC32 hash and it's not unique. One input file can generate multiple resource chunks, all the generated chunks share the same identifier and they are loaded together when the resource is loaded. For example, a input .ttf could generate two resource chunks (`RRES_DATA_IMAGE` + `RRES_DATA_GLYPH_INFO`) with same identifier that will be loaded together when their identifier is requested. It's up to the user to decide what to do with loaded data.
  - `compType` defines the compression algorithm used for the resource chunk data. Compression depends on the middle library between rres and the engine, `rres.h` just defines some useful algorithm values to be used in case of implementing compression. Compression should always be applied before encryption and it compresses the full `rresResourceData` (`Property Count` + `Properties[]` + `Data`). If no data encryption is applied, `packedSize` defines the size of compressed data.
  - `cipherType` defines the encryption algorithm used for the resource chunk data. Like compression, encryption depends on the middle library between rres and the engine, `rres.h` just defines some useful algorithm values to be used in case of implementing encryption. Encryption should be applied after compression. Depending on the encryption algorithm and encryption mode it could require some extra piece of data to be attached to the resource data (i.e encryption MAC), this is implementation dependant and the rres packer tool / rres middle library for the engines are the responsible to manage that extra data. It's recommended to be just appended to resource data and considered on `packedSize`.
  - `flags` is reserved for additional flags, in case they are required by the implementation.
+ - `packedSize` defines the packed size (compressed/encrypted + additional user data) of `rresResourceDataChunk`. Packaged data could contain appended user data at the end, after compressed/encrypted data, for example the nonce/MAC for the encrypted data, but it is implementation dependant, managed by the `rres` packer tool and the user library to load the chunks data into target engine structures.
+ - `baseSize` defines the base size (uncompressed/unencrypted) of `rresResourceDataChunk`.
  - `nextOffset` defines the global file position address for the next _related_ resource chunk, it's useful for input files that generate multiple resources, like fonts or meshes.
- - `crc32` is useful for a quick check of data corruption, by default it considers the `rresResourceData` chunk.
+ - `crc32` is calculated over the full `rresResourceData` chunk (`packedSize`) and it's intended to detect data corruption errors. 
 
 ### Resource Data Chunk: `rresResourceDataChunk`
 
@@ -181,12 +183,8 @@ Considerations:
  - `Property Count`: Number of properties contained, depends on resource `type`
  - `Properties[]`: Resource data required properties, depend on resource `type`
  - `Data`: Resource data, depend on resource `type`
- 
-Considerations:
- 
- - `rresResourceInfoHeader.type` defines the type of resource, one of the types contained in enum `rresResourceDataType`.
- - `rresResourceInfoHeader.baseSize` defines the base size (uncompressed/unencrypted) of `rresResourceDataChunk`. 
- - `rresResourceInfoHeader.packedSize` defines the compressed/encrypted size of `rresResourceDataChunk`. It could also consider any extra data appended to `rresResourceData` (i.e. encryption MAC) but it is implementation dependant.
+
+_NOTE: rresResourceDataChunk could contain additional user data, in those cases additional data size must be considered in `packedSize`._
  
 ### Resource Data Type: `rresResourceDataType`
 
