@@ -121,18 +121,27 @@ The following C struct defines the `rresFileHeader`:
 // rres file header (16 bytes)
 typedef struct rresFileHeader {
     unsigned char id[4];            // File identifier: rres
-    unsigned short version;         // File version: 100 for version 1.0.0
+    unsigned short version;         // File version: 100 for version 1.0
     unsigned short chunkCount;      // Number of resource chunks in the file (MAX: 65535)
     unsigned int cdOffset;          // Central Directory offset in file (0 if not available)
     unsigned int reserved;          // <reserved>
 } rresFileHeader;
 ```
 
+| Field | Description |
+| :---: | :---------- |
+| `id` | File signature identifier, it must be the four characters: `r`,`r`,`e`,`s`. | 
+| `version` | Defines the version and subversion of the format. |
+| `chunkCount`| Number of resource chunks present in the file. Note that it could be greater than the number of input files processed. |
+| `cdOffset` | Central Directory absolute offset within the file, note that `CDIR` is just another resource chunk type, **Central Directory can be present in the file or not**. It's recommended to be placed as the last chunk in the file if a custom `rres` packer is implemented. Check `rresCentralDir` section for more details.
+| `reserved` | This field is reserved for future additions if required. |
+
+_Table 01. `rresFileHeader` fields description and details_
+
 Considerations:
 
  - `rres` files are limited by design to a **maximum of 65535 resource chunks**, in case more resources need to be packed is recommended to create multiple `rres` files.
  - `rres` files use 32 bit offsets to address the different resource chunks, consequently, **no more than ~4GB of data can be addressed**, please keep the `rres` files smaller than **4GB**. In case of more space required to package resources, create multiple `rres` files.
- - Central Directory is just another resource chunk, **Central Directory can be present in the file or not**. It's recommended to be placed as the last chunk in the file if a custom `rres` packer is implemented. More info on `rresCentralDir` section.
 
 ## Resource Chunk: `rresResourceChunk`
 
@@ -164,17 +173,20 @@ typedef struct rresResourceInfoHeader {
 } rresResourceInfoHeader;
 ```
 
-_Fields Description:_
+| Field | Description |
+| :---: | :---------- |
+| `type` | A [`FourCC`](https://en.wikipedia.org/wiki/FourCC) code and identifies the type of resource data contained in the `rresResourceDataChunk`. Enum `rresResourceDataType` defines several data types, new ones could be added if requried. |
+| `id` | A global resource identifier, it's generated from input filename using a CRC32 hash and it's not unique. One input file can generate multiple resource chunks, all the generated chunks share the same identifier and they are loaded together when the resource is loaded. For example, a input .ttf could generate two resource chunks (`RRES_DATA_IMAGE` + `RRES_DATA_GLYPH_INFO`) with same identifier that will be loaded together when their identifier is requested. It's up to the user to decide what to do with loaded data. |
+| `compType` | Defines the compression algorithm used for the resource chunk data. Compression depends on the middle library between rres and the engine, `rres.h` just defines some useful algorithm values to be used in case of implementing compression. Compression should always be applied before encryption and it compresses the full `rresResourceData` (`Property Count` + `Properties[]` + `Data`). If no data encryption is applied, `packedSize` defines the size of compressed data. |
+| `cipherType` | Defines the encryption algorithm used for the resource chunk data. Like compression, encryption depends on the middle library between rres and the engine, `rres.h` just defines some useful algorithm values to be used in case of implementing encryption. Encryption should be applied after compression. Depending on the encryption algorithm and encryption mode it could require some extra piece of data to be attached to the resource data (i.e encryption MAC), this is implementation dependant and the rres packer tool / rres middle library for the engines are the responsible to manage that extra data. It's recommended to be just appended to resource data and considered on `packedSize`. |
+| `flags` | Reserved for additional flags, in case they are required by the implementation. |
+| `packedSize` | Defines the packed size (compressed/encrypted + additional user data) of `rresResourceDataChunk`. Packaged data could contain appended user data at the end, after compressed/encrypted data, for example the nonce/MAC for the encrypted data, but it is implementation dependant, managed by the `rres` packer tool and the user library to load the chunks data into target engine structures. |
+| `baseSize` | Defines the base size (uncompressed/unencrypted) of `rresResourceDataChunk`. |
+| `nextOffset` | Defines the global file position address for the next _related_ resource chunk, it's useful for input files that generate multiple resources, like fonts or meshes. |
+| `reserved` | This field is reserved for future additions if required. |
+| `crc32` | Calculated over the full `rresResourceData` chunk (`packedSize`) and it's intended to detect data corruption errors. |
 
- - `type` is a [`FourCC`](https://en.wikipedia.org/wiki/FourCC) code and identifies the type of resource data contained in the `rresResourceDataChunk`. Enum `rresResourceDataType` defines several data types, new ones could be added if requried.
- - `id` is a global resource identifier, it's generated from input filename using a CRC32 hash and it's not unique. One input file can generate multiple resource chunks, all the generated chunks share the same identifier and they are loaded together when the resource is loaded. For example, a input .ttf could generate two resource chunks (`RRES_DATA_IMAGE` + `RRES_DATA_GLYPH_INFO`) with same identifier that will be loaded together when their identifier is requested. It's up to the user to decide what to do with loaded data.
- - `compType` defines the compression algorithm used for the resource chunk data. Compression depends on the middle library between rres and the engine, `rres.h` just defines some useful algorithm values to be used in case of implementing compression. Compression should always be applied before encryption and it compresses the full `rresResourceData` (`Property Count` + `Properties[]` + `Data`). If no data encryption is applied, `packedSize` defines the size of compressed data.
- - `cipherType` defines the encryption algorithm used for the resource chunk data. Like compression, encryption depends on the middle library between rres and the engine, `rres.h` just defines some useful algorithm values to be used in case of implementing encryption. Encryption should be applied after compression. Depending on the encryption algorithm and encryption mode it could require some extra piece of data to be attached to the resource data (i.e encryption MAC), this is implementation dependant and the rres packer tool / rres middle library for the engines are the responsible to manage that extra data. It's recommended to be just appended to resource data and considered on `packedSize`.
- - `flags` is reserved for additional flags, in case they are required by the implementation.
- - `packedSize` defines the packed size (compressed/encrypted + additional user data) of `rresResourceDataChunk`. Packaged data could contain appended user data at the end, after compressed/encrypted data, for example the nonce/MAC for the encrypted data, but it is implementation dependant, managed by the `rres` packer tool and the user library to load the chunks data into target engine structures.
- - `baseSize` defines the base size (uncompressed/unencrypted) of `rresResourceDataChunk`.
- - `nextOffset` defines the global file position address for the next _related_ resource chunk, it's useful for input files that generate multiple resources, like fonts or meshes.
- - `crc32` is calculated over the full `rresResourceData` chunk (`packedSize`) and it's intended to detect data corruption errors. 
+_Table 02. `rresResourceInfoHeader` fields description and details_
 
 ### Resource Data Chunk: `rresResourceDataChunk`
 
@@ -226,6 +238,8 @@ The currently defined data `types` consist of the following properties and data:
 | `RRES_DATA_GLYPH_INFO`| `FNTG`|      4       | `props[0]`:baseSize<br>`props[1]`:glyphCount<br>`props[2]`:glyphPadding<br>`props[3]`:`rresFontStyle` | `rresFontGlyphInfo[0..glyphCount]` |
 | `RRES_DATA_LINK`   |  `LINK`  |      1       | `props[0]`:size       | filepath data |
 | `RRES_DATA_DIRECTORY` | `CDIR`|      1       | `props[0]`:entryCount | `rresDirEntry[0..entryCount]` |
+
+_Table 03. `rresResourceDataType` defined values and details_
 
 `rres.h` defines the following `enums` for convenience to assign some of the properties:
 
