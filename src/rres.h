@@ -261,7 +261,7 @@ typedef enum rresResourceDataType {
                                             //    props[3]:mipmaps
                                             //    data: pixels
     RRES_DATA_WAVE         = 4,             // FourCC: WAVE - Audio file data, 4 properties
-                                            //    props[0]:sampleCount
+                                            //    props[0]:frameCount
                                             //    props[1]:sampleRate
                                             //    props[2]:sampleSize
                                             //    props[3]:channels 
