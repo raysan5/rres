@@ -485,7 +485,7 @@ RRESAPI unsigned int rresComputeCRC32(unsigned char *buffer, int len);
 // rres file header (16 bytes)
 typedef struct rresFileHeader {
     unsigned char id[4];            // File identifier: rres
-    unsigned short version;         // File version: 100 for version 1.0.0
+    unsigned short version;         // File version: 100 for version 1.0
     unsigned short chunkCount;      // Number of resource chunks in the file (MAX: 65535)
     unsigned int cdOffset;          // Central Directory offset in file (0 if not available)
     unsigned int reserved;          // <reserved>
