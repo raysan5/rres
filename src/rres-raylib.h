@@ -493,7 +493,8 @@ static Image rresLoadResourceChunkImage(rresResourceChunk chunk)
 }
 
 // Unpack compressed/encrypted data from resource chunk
-// NOTE: Function return 0 on success or other value on failure
+// NOTE 1: Function return 0 on success or an error code on failure
+// NOTE 2: Data corruption CRC32 check has already been performed by rresLoadResource() on rres.h
 static int rresUnpackResourceChunk(rresResourceChunk *chunk)
 {
     int result = 0;
@@ -516,14 +517,22 @@ static int rresUnpackResourceChunk(rresResourceChunk *chunk)
         {
 #if defined(RRES_SUPPORT_ENCRYPTION_MONOCYPHER)
             // Get some memory for the possible message output
-            unsigned char *decryptedData = (unsigned char *)RL_CALLOC(MAX_MESSAGE_SIZE, 1);
+            unsigned char *decryptedData = (unsigned char *)RL_CALLOC(chunk->packedSize, 1);
+            
+            // WARNING: Implementation dependant! 
+            // rrespacker tool appends (salt + nonce + MAC) to encrypted data for convenience,
+            // Actually, chunk->packedSize considers those additional elements
 
             // Required variables for key stretching
             uint8_t key[32] = { 0 };                    // Encryption key
             const uint32_t blocks = 16384;              // Key stretching blocks: 16 megabytes
             const uint32_t iterations = 3;              // Key stretching iterations: 3 iterations
             void *workArea = RL_MALLOC(blocks*1024);    // Key stretching work area
-            uint8_t salt[16] = { 0 };                   // TODO: Key stretching salt
+            uint8_t salt[16] = { 0 };                   // Key stretching salt
+            
+            // Retrieve salt from chunk packed data
+            // salt is stored at the end of packed data, before nonce and MAC: salt[16] + nonce[24] + MAC[16]
+            memcpy(salt, ((unsigned char *)chunk->data) + (chunk->packedSize - 16 - 24 - 16), 16);
 
             // Encryption key, generated from user password, using Argon2i algorythm for key stretching (256 bit)
             crypto_argon2i(key, 32, workArea, blocks, iterations, (uint8_t *)password, 16, salt, 16);
@@ -533,11 +542,16 @@ static int rresUnpackResourceChunk(rresResourceChunk *chunk)
             RL_FREE(workArea);
             
             // Required variables for decryption and message authentication
-            uint8_t nonce[24] = { 0 };                  // TODO: nonce
-            uint8_t mac[16] = { 0 };                    // TODO: Message Authentication Code
+            uint8_t nonce[24] = { 0 };                  // nonce used on encryption, unique to processed file
+            uint8_t mac[16] = { 0 };                    // Message Authentication Code generated on ecryption
+            
+            // Retrieve nonce and MAC from chunk packed data
+            // nonce and MAC are stored at the end of packed data, after salt: salt[16] + nonce[24] + MAC[16]
+            memcpy(nonce, ((unsigned char *)chunk->data) + (chunk->packedSize - 16 - 24), 24);
+            memcpy(mac, ((unsigned char *)chunk->data) + (chunk->packedSize - 16), 16);
 
             // Message decryption requires key, nonce and MAC
-            int decryptResult = crypto_unlock(decryptedData, key, nonce, mac, chunk->data, (chunk->packedSize - 16);
+            int decryptResult = crypto_unlock(decryptedData, key, nonce, mac, chunk->data, (chunk->packedSize - 16 - 24 - 16));
 
             // Wipe secrets if they are no longer needed
             crypto_wipe(nonce, 24);
@@ -547,7 +561,7 @@ static int rresUnpackResourceChunk(rresResourceChunk *chunk)
             {
                 RRES_FREE(chunk->data);
                 chunk->data = decryptedData;
-                chunk->packedSize = chunk->packedSize - 16;     // We remove MAC additional data size from packed size
+                chunk->packedSize -= (16 + 24 + 16);    // We remove additional data size from packed size
             }
             else if (decryptResult == -1) result = 2;   // Wrong password or message corrupted
 #else
