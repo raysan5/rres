@@ -522,7 +522,7 @@ static int UnpackDataFromResourceChunk(rresResourceChunk *chunk)
             memcpy(salt, ((unsigned char *)chunk->data) + (chunk->packedSize - 16 - 24 - 16), 16);
 
             // Encryption key, generated from user password, using Argon2i algorythm for key stretching (256 bit)
-            crypto_argon2i(key, 32, workArea, blocks, iterations, (uint8_t *)password, 16, salt, 16);
+            crypto_argon2i(key, 32, workArea, blocks, iterations, (uint8_t *)rresGetCipherPassword(), 16, salt, 16);
 
             // Wipe key generation secrets, they are no longer needed
             crypto_wipe(salt, 16);
