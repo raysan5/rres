@@ -426,7 +426,7 @@ typedef enum rresVertexFormat {
 
 // FNTG: Font style
 typedef enum rresFontStyle {
-    RRES_FONT_STYLE_DEFAULT = 0,            // Default font style (not defined)
+    RRES_FONT_STYLE_UNDEFINED = 0,          // Undefined font style
     RRES_FONT_STYLE_REGULAR,                // Regular font style
     RRES_FONT_STYLE_BOLD,                   // Bold font style
     RRES_FONT_STYLE_ITALIC,                 // Italic font style
