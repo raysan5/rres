@@ -63,20 +63,14 @@
 //----------------------------------------------------------------------------------
 
 // rres data loading to raylib data structures
-RRESAPI void *rresLoadRaw(rresResource rres, int *size);    // Load raw data from rres resource
-RRESAPI char *rresLoadText(rresResource rres);              // Load text data from rres resource
-RRESAPI Image rresLoadImage(rresResource rres);             // Load Image data from rres resource
-RRESAPI Wave rresLoadWave(rresResource rres);               // Load Wave data from rres resource
-RRESAPI Font rresLoadFont(rresResource rres);               // Load Font data from rres resource
-RRESAPI Mesh rresLoadMesh(rresResource rres);               // Load Mesh data from rres resource
-//RRESAPI Material rresLoadMaterial(rresResource rres);       // TODO: Load Material data from rres resource
-//RRESAPI Model rresLoadModel(rresResource rres);             // TODO: Load Model data from rres resource
-
-// Utilities for encrypted data
-// NOTE: The cipher password is kept as the pointer provided, 
-// no internal copy is done, it's up to the user to manage that sensitive data properly
-// It's recommended to allocate the password previously to rres file loading and wipe that memory space after rres loading
-RRESAPI void rresSetCipherPassword(const char *pass);       // Set password to be used in case of encrypted data found
+RLAPI void *LoadDataFromResource(rresResource rres, int *size);     // Load raw data from rres resource
+RLAPI char *LoadTextFromResource(rresResource rres);                // Load text data from rres resource
+RLAPI Image LoadImageFromResource(rresResource rres);               // Load Image data from rres resource
+RLAPI Wave LoadWaveFromResource(rresResource rres);                 // Load Wave data from rres resource
+RLAPI Font LoadFontFromResource(rresResource rres);                 // Load Font data from rres resource
+RLAPI Mesh LoadMeshFromResource(rresResource rres);                 // Load Mesh data from rres resource
+//RLAPI Material LoadMaterialFromResource(rresResource rres);       // TODO: Load Material data from rres resource
+//RLAPI Model LoadModelFromResource(rresResource rres);             // TODO: Load Model data from rres resource
 
 #endif // RRES_RAYLIB_H
 
@@ -112,35 +106,34 @@ RRESAPI void rresSetCipherPassword(const char *pass);       // Set password to b
 //----------------------------------------------------------------------------------
 // Global Variables Definition
 //----------------------------------------------------------------------------------
-static const char *password = NULL;
+//...
 
 //----------------------------------------------------------------------------------
 // Module specific Functions Declaration
 //----------------------------------------------------------------------------------
 
 // Load simple data chunks that are later required by multi-chunk resources
-static void *rresLoadResourceChunkRaw(rresResourceChunk chunk, int *size);  // Load chunk: RRES_DATA_RAW
-static char *rresLoadResourceChunkText(rresResourceChunk chunk);            // Load chunk: RRES_DATA_TEXT
-static Image rresLoadResourceChunkImage(rresResourceChunk chunk);           // Load chunk: RRES_DATA_IMAGE
+static void *LoadDataFromResourceChunk(rresResourceChunk chunk, int *size);     // Load chunk: RRES_DATA_RAW
+static char *LoadTextFromResourceChunk(rresResourceChunk chunk);                // Load chunk: RRES_DATA_TEXT
+static Image LoadImageFromResourceChunk(rresResourceChunk chunk);               // Load chunk: RRES_DATA_IMAGE
 
-// Unpack compressed/encrypted data from chunk
-// NOTE: Function return 0 on success or other value on failure
-static int rresUnpackResourceChunk(rresResourceChunk *chunk);
+static int UnpackDataFromResourceChunk(rresResourceChunk *chunk);   // Unpack compressed/encrypted data from chunk
+                                                                    // NOTE: Function return 0 on success or other value on failure
 
-static const char *rresGetFourCCFromType(unsigned int type)             // Return FourCC from resource type, useful for log info
+static const char *GetFourCCFromType(unsigned int type)             // Get FourCC 4-char code from resource type, useful for log info
 
 //----------------------------------------------------------------------------------
 // Module Functions Definition
 //----------------------------------------------------------------------------------
 
 // Load raw data from rres resource
-void *rresLoadRaw(rresResource rres, int *size)
+void *LoadDataFromResource(rresResource rres, int *size)
 {
     void *data = NULL;
 
     if ((rres.count >= 1) && (rres.chunks[0].type == RRES_DATA_RAW))
     {
-        data = rresLoadResourceChunkRaw(rres.chunks[0], size);
+        data = LoadDataFromResourceChunk(rres.chunks[0], size);
     }
 
     return data;
@@ -148,39 +141,39 @@ void *rresLoadRaw(rresResource rres, int *size)
 
 // Load text data from rres resource
 // NOTE: Text must be NULL terminated
-char *rresLoadText(rresResource rres)
+char *LoadTextFromResource(rresResource rres)
 {
     char *text = NULL;
 
     if ((rres.count >= 1) && (rres.chunks[0].type == RRES_DATA_TEXT))
     {
-        text = rresLoadResourceChunkText(rres.chunks[0]);
+        text = LoadTextFromResourceChunk(rres.chunks[0]);
     }
 
     return text;
 }
 
 // Load Image data from rres resource
-Image rresLoadImage(rresResource rres)
+Image LoadImageFromResource(rresResource rres)
 {
     Image image = { 0 };
 
     if ((rres.count >= 1) && (rres.chunks[0].type == RRES_DATA_IMAGE))
     {
-        image = rresLoadResourceChunkImage(rres.chunks[0]);
+        image = LoadImageFromResourceChunk(rres.chunks[0]);
     }
 
     return image;
 }
 
 // Load Wave data from rres resource
-Wave rresLoadWave(rresResource rres)
+Wave LoadWaveFromResource(rresResource rres)
 {
     Wave wave = { 0 };
 
     if ((rres.count >= 1) && (rres.chunks[0].type == RRES_DATA_WAVE))
     {
-        int result = rresUnpackResourceChunk(&rres.chunks[0]);
+        int result = UnpackDataFromResourceChunk(&rres.chunks[0]);
 
         if (result == 0)    // Data was successfully decompressed/decrypted
         {
@@ -199,7 +192,7 @@ Wave rresLoadWave(rresResource rres)
 }
 
 // Load Font data from rres resource
-Font rresLoadFont(rresResource rres)
+Font LoadFontFromResource(rresResource rres)
 {
     Font font = { 0 };
 
@@ -210,7 +203,7 @@ Font rresLoadFont(rresResource rres)
     {
         if (rres.chunks[0].type == RRES_DATA_GLYPH_INFO)
         {
-            int result = rresUnpackResourceChunk(&rres.chunks[0]);
+            int result = UnpackDataFromResourceChunk(&rres.chunks[0]);
 
             if (result == 0)    // Data was successfully decompressed/decrypted
             {
@@ -243,7 +236,7 @@ Font rresLoadFont(rresResource rres)
         // Load font image chunk
         if (rres.chunks[1].type == RRES_DATA_IMAGE)
         {
-            Image image = rresLoadResourceChunkImage(rres.chunks[1]);
+            Image image = LoadImageFromResourceChunk(rres.chunks[1]);
             font.texture = LoadTextureFromImage(image);
             UnloadImage(image);
         }
@@ -255,14 +248,14 @@ Font rresLoadFont(rresResource rres)
 // Load Mesh data from rres resource
 // NOTE: We try to load vertex data following raylib structure constraints,
 // in case data does not fit raylib Mesh structure, it is not loaded
-Mesh rresLoadMesh(rresResource rres)
+Mesh LoadMeshFromResource(rresResource rres)
 {
     Mesh mesh = { 0 };
     
     // Mesh resource consist of (n) chunks:
     for (int i = 0; i < rres.count; i++)
     {
-        result = rresUnpackResourceChunk(&rres.chunks[i]);
+        result = UnpackDataFromResourceChunk(&rres.chunks[i]);
         
         if (result == 0)
         {
@@ -376,25 +369,19 @@ Mesh rresLoadMesh(rresResource rres)
     return mesh;
 }
 
-// Set password to be used in case of encrypted data found
-void rresSetCipherPassword(const char *pass)
-{
-    password = pass;
-}
-
 //----------------------------------------------------------------------------------
 // Module specific Functions Definition
 //----------------------------------------------------------------------------------
 
 // Load data chunk: RRES_DATA_RAW
 // NOTE: This chunk can be used raw files embedding or other binary blobs
-static void *rresLoadResourceChunkRaw(rresResourceChunk chunk, int *size);
+static void *LoadDataFromResourceChunk(rresResourceChunk chunk, int *size);
 {
     void *rawData = NULL;
 
     if (chunk.type == RRES_DATA_RAW)
     {
-        int result = rresUnpackResourceChunk(&rres.chunks[0]);
+        int result = UnpackDataFromResourceChunk(&rres.chunks[0]);
 
         if (result == 0)    // Data was successfully decompressed/decrypted
         {
@@ -409,13 +396,13 @@ static void *rresLoadResourceChunkRaw(rresResourceChunk chunk, int *size);
 
 // Load data chunk: RRES_DATA_TEXT
 // NOTE: This chunk can be used for shaders or other text data elements (materials?)
-static char *rresLoadResourceChunkText(rresResourceChunk chunk)
+static char *LoadTextFromResourceChunk(rresResourceChunk chunk)
 {
     void *text = NULL;
 
     if (chunk.type == RRES_DATA_TEXT)
     {
-        int result = rresUnpackResourceChunk(&rres.chunks[0]);
+        int result = UnpackDataFromResourceChunk(&rres.chunks[0]);
 
         if (result == 0)    // Data was successfully decompressed/decrypted
         {
@@ -432,13 +419,13 @@ static char *rresLoadResourceChunkText(rresResourceChunk chunk)
 
 // Load data chunk: RRES_DATA_IMAGE
 // NOTE: Many data types use images data in some way (font, material...)
-static Image rresLoadResourceChunkImage(rresResourceChunk chunk)
+static Image LoadImageFromResourceChunk(rresResourceChunk chunk)
 {
     Image image = { 0 };
 
     if (chunk.type == RRES_DATA_IMAGE)
     {
-        int result = rresUnpackResourceChunk(&rres.chunks[0]);
+        int result = UnpackDataFromResourceChunk(&rres.chunks[0]);
 
         if (result == 0)    // Data was successfully decompressed/decrypted
         {
@@ -495,7 +482,7 @@ static Image rresLoadResourceChunkImage(rresResourceChunk chunk)
 // Unpack compressed/encrypted data from resource chunk
 // NOTE 1: Function return 0 on success or an error code on failure
 // NOTE 2: Data corruption CRC32 check has already been performed by rresLoadResource() on rres.h
-static int rresUnpackResourceChunk(rresResourceChunk *chunk)
+static int UnpackDataFromResourceChunk(rresResourceChunk *chunk)
 {
     int result = 0;
 
@@ -627,21 +614,21 @@ static int rresUnpackResourceChunk(rresResourceChunk *chunk)
     {
         switch (result)
         {
-            case 0: RRES_LOG("INFO: %s: Chunk data decompressed/decrypted successfully\n", rresGetFourCCFromType(chunk.type)); break;
-            case 1: RRES_LOG("WARNING: %s: Chunk data encryption algorithm not supported\n", rresGetFourCCFromType(chunk.type)); break;
-            case 2: RRES_LOG("WARNING: %s: Chunk data decryption failed, wrong password provided\n", rresGetFourCCFromType(chunk.type)); break;
-            case 3: RRES_LOG("WARNING: %s: Chunk data compression algorithm not supported\n", rresGetFourCCFromType(chunk.type)); break;
-            case 4: RRES_LOG("WARNING: %s: Chunk data decompression failed\n", rresGetFourCCFromType(chunk.type)); break;
+            case 0: RRES_LOG("INFO: %s: Chunk data decompressed/decrypted successfully\n", GetFourCCFromType(chunk.type)); break;
+            case 1: RRES_LOG("WARNING: %s: Chunk data encryption algorithm not supported\n", GetFourCCFromType(chunk.type)); break;
+            case 2: RRES_LOG("WARNING: %s: Chunk data decryption failed, wrong password provided\n", GetFourCCFromType(chunk.type)); break;
+            case 3: RRES_LOG("WARNING: %s: Chunk data compression algorithm not supported\n", GetFourCCFromType(chunk.type)); break;
+            case 4: RRES_LOG("WARNING: %s: Chunk data decompression failed\n", GetFourCCFromType(chunk.type)); break;
             default: break;
         }
     }
-    else RRES_LOG("INFO: %s: Chunk does not require data decompression/decryption\n", rresGetFourCCFromType(chunk.type));
+    else RRES_LOG("INFO: %s: Chunk does not require data decompression/decryption\n", GetFourCCFromType(chunk.type));
 
     return result;
 }
 
 // Return FourCC from resource type, useful for log info
-static const char *rresGetFourCCFromType(unsigned int type)
+static const char *GetFourCCFromType(unsigned int type)
 {
     switch (type)
     {
