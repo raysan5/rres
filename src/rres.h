@@ -342,8 +342,9 @@ typedef enum rresErrorType {
 //----------------------------------------------------------------------------------
 // TEXT: Text encoding property values
 typedef enum rresTextEncoding {
-    RRES_TEXT_ENCODING_UTF8     = 0,        // Default text encoding
-    RRES_TEXT_ENCODING_UTF8_BOM = 1,        // UTF-8 text encoding with Byte-Order-Mark
+    RRES_TEXT_ENCODING_UNDEFINED = 0,       // Not defined, usually UTF-8
+    RRES_TEXT_ENCODING_UTF8      = 1,       // UTF-8 text encoding
+    RRES_TEXT_ENCODING_UTF8_BOM  = 2,       // UTF-8 text encoding with Byte-Order-Mark
     RRES_TEXT_ENCODING_UTF16_LE  = 10,      // UTF-16 Little Endian text encoding
     RRES_TEXT_ENCODING_UTF16_BE  = 11,      // UTF-16 Big Endian text encoding
     // TODO: Add additional encodings if required
@@ -352,7 +353,7 @@ typedef enum rresTextEncoding {
 // TEXT: Text code language
 // NOTE: It could be useful for code script resources
 typedef enum rresCodeLang {
-    RRES_CODE_LANG_PLAIN_TEXT = 0,          // Text contains plain text, not a specific code language
+    RRES_CODE_LANG_UNDEFINED = 0,           // Undefined code language, text is plain text
     RRES_CODE_LANG_C,                       // Text contains C code
     RRES_CODE_LANG_CPP,                     // Text contains C++ code
     RRES_CODE_LANG_CS,                      // Text contains C# code
