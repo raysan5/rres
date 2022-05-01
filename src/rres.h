@@ -445,14 +445,22 @@ extern "C" {            // Prevents name mangling of functions
 #endif
 
 // Load all resource chunks for a specified rresId
-RRESAPI rresResource rresLoadResource(const char *fileName, int rresId);
-RRESAPI void rresUnloadResource(rresResource rres);
+RRESAPI rresResource rresLoadResource(const char *fileName, int rresId);        // Load resource from file for provided id, 
+                                                                                // NOTE: Resource could consist of multiple resource chunks
+RRESAPI void rresUnloadResource(rresResource rres);                             // Unload resource from memory, all chunks it contains
 
-RRESAPI rresCentralDir rresLoadCentralDirectory(const char *fileName);
-RRESAPI void rresUnloadCentralDirectory(rresCentralDir dir);
+RRESAPI rresCentralDir rresLoadCentralDirectory(const char *fileName);          // Load central directory resource chunk from file
+RRESAPI void rresUnloadCentralDirectory(rresCentralDir dir);                    // Unload central directory resource chunk
 
-RRESAPI int rresGetIdFromFileName(rresCentralDir dir, const char *fileName);
-RRESAPI unsigned int rresComputeCRC32(unsigned char *buffer, int len);
+RRESAPI int rresGetIdFromFileName(rresCentralDir dir, const char *fileName);    // Get resource id for a provided input filename
+                                                                                // NOTE: It requires CDIR available in the file (it's optinal by design)
+RRESAPI unsigned int rresComputeCRC32(unsigned char *data, int len);            // Compute CRC32 for provided data
+
+// Manage password for data encryption/decryption
+// NOTE: The cipher password is kept as an internal pointer to provided string, it's up to the user to manage that sensible data properly
+// It's recommended to allocate the password previously to rres file loading and wipe that memory space after rres loading
+RRESAPI void rresSetCipherPassword(const char *pass);                           // Set password to be used on data decryption
+RRESAPI const char *rresGetCipherPassword(void);                                // Get password to be used on data decryption 
 
 #ifdef __cplusplus
 }
@@ -508,7 +516,7 @@ typedef struct rresResourceInfoHeader {
 //----------------------------------------------------------------------------------
 // Global Variables Definition
 //----------------------------------------------------------------------------------
-//...
+static const char *password = NULL; // Password pointer, managed by user libraries
 
 //----------------------------------------------------------------------------------
 // Module Internal Functions Declaration
@@ -717,7 +725,7 @@ int rresGetIdFromFileName(rresCentralDir dir, const char *fileName)
 
 // Compute CRC32 hash
 // NOTE: CRC32 is used as rres id, generated from original filename
-unsigned int rresComputeCRC32(unsigned char *buffer, int len)
+unsigned int rresComputeCRC32(unsigned char *data, int len)
 {
     static unsigned int crcTable[256] = {
         0x00000000, 0x77073096, 0xEE0E612C, 0x990951BA, 0x076DC419, 0x706AF48F, 0xE963A535, 0x9E6495A3,
@@ -756,7 +764,7 @@ unsigned int rresComputeCRC32(unsigned char *buffer, int len)
 
     unsigned int crc = ~0u;
 
-    for (int i = 0; i < len; i++) crc = (crc >> 8)^crcTable[buffer[i]^(crc&0xff)];
+    for (int i = 0; i < len; i++) crc = (crc >> 8)^crcTable[data[i]^(crc&0xff)];
 
     return ~crc;
 }
@@ -827,6 +835,18 @@ static void rresUnloadResourceChunk(rresResourceChunk chunk)
 {
     RRES_FREE(chunk.props);   // Resource chunk properties
     RRES_FREE(chunk.data);    // Resource chunk data
+}
+
+// Set password to be used on data decryption
+void rresSetCipherPassword(const char *pass)
+{
+    password = pass;
+}
+
+// Get password to be used on data decryption 
+const char *rresGetCipherPassword(void)
+{
+    return password;
 }
 
 #endif // RRES_IMPLEMENTATION
