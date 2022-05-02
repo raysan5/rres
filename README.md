@@ -332,7 +332,7 @@ After data has been copied to the destination structure it can be unloaded with 
 
 ### Engine mapping library: `rres-raylib.h`
 
-The mapping library includes `rres.h` and provides funtionality to load the generic resource data loaded from the `rres` file into `raylib` structures. The API provided is simple and intuitive, following `raylib` conventions:
+The mapping library includes `rres.h` and provides functionality to load the generic resource data loaded from the `rres` file into `raylib` structures. The API provided is simple and intuitive, following `raylib` conventions:
 
 ```c
 RLAPI void *LoadDataFromResource(rresResource rres, int *size);     // Load raw data from rres resource
