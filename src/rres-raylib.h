@@ -10,10 +10,14 @@
 *       or source files without problems. But only ONE file should hold the implementation.
 *
 *   #define RRES_SUPPORT_COMPRESSION_LZ4
-*       Support data compression LZ4 algorithm, provided by lz4.h/lz4.c library
+*       Support data compression algorithm LZ4, provided by lz4.h/lz4.c library
+*
+*   #define RRES_SUPPORT_ENCRYPTION_AES
+*       Support data encryption algorithm AES, provided by aes.h/aes.c library
 * 
 *   #define RRES_SUPPORT_ENCRYPTION_MONOCYPHER
-*       Support data encryption algorithms provided by monocypher.h/monocypher.c library
+*       Support data encryption algorithm XChaCha20-Poly1305, 
+*       provided by monocypher.h/monocypher.c library
 * 
 * 
 *   LICENSE: MIT
@@ -85,12 +89,19 @@ RLAPI Mesh LoadMeshFromResource(rresResource rres);                 // Load Mesh
 // Include supported compression/encryption algorithms
 // NOTE: They should be the same supported by the rres packaging tool (rrespacker)
 #if defined(RRES_SUPPORT_COMPRESSION_LZ4)
-    #include "external/lz4.h"               // LZ4 compression algorithm
-    #include "external/lz4.c"               // LZ4 compression algorithm implementation
+    // https://github.com/lz4/lz4
+    #include "external/lz4.h"               // Compression algorithm: LZ4
+    #include "external/lz4.c"               // Compression algorithm implementation: LZ4
+#endif
+#if defined(RRES_SUPPORT_ENCRYPTION_AES)
+    // https://github.com/kokke/tiny-AES-c
+    #include "external/aes.h"               // Encryption algorithm: AES
+    #include "external/aes.c"               // Encryption algorithm implementation: AES
 #endif
 #if defined(RRES_SUPPORT_ENCRYPTION_MONOCYPHER)
-    #include "external/monocypher.h"        // Encryption algorithms
-    #include "external/monocypher.c"        // Encryption algorithms implementation
+    // https://github.com/LoupVaillant/Monocypher
+    #include "external/monocypher.h"        // Encryption algorithm: XChaCha20-Poly1305
+    #include "external/monocypher.c"        // Encryption algorithm implementation: XChaCha20-Poly1305
 #endif
 
 //----------------------------------------------------------------------------------
