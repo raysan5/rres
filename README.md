@@ -290,9 +290,9 @@ In case a `rres` file is generated with no `Central Directory`, a secondary head
 
 The following diagram shows a sample implementation of `rres` for [`raylib`](https://github.com/raysan5/raylib) library.
 
-![rres v1.0](https://raw.githubusercontent.com/raysan5/rres/master/design/rres_libs_tools.png)
+![rres v1.0](https://raw.githubusercontent.com/raysan5/rres/master/design/rres_implementation.png)
 
-_Fig 01. rres sample implementation: custom engine lib and tool._
+_Fig 02. rres sample implementation: custom engine lib and tool._
 
 `rres` implementation consist of several pieces:
 
@@ -349,7 +349,11 @@ Note that data decompression/decryption should be implemented in this custom map
 
 ### Packaging tool: `rrespacker`
 
-TODO.
+The `rres` packing tool is in charge of processing all the input files and creating the `rres` file following the specification. In case some compression/encryption algorythm is supported it must be implemented by this tool and same algorithm should be supported by the mapping library, in our case `rres-raylib.h`.
+
+![rres v1.0](https://raw.githubusercontent.com/raysan5/rres/master/design/rrespacker_screenshot.png)
+
+_Fig 03. rrespacker tool, GUI interface, it also supports CLI for batch processing._
 
 ## License
 
