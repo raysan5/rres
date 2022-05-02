@@ -357,6 +357,6 @@ _Fig 03. rrespacker tool, GUI interface, it also supports CLI for batch processi
 
 ## License
 
-`rres` file-format specs and `rres.h` library are licensed under MIT license. Check [LICENSE](LICENSE) for further details.
+`rres` file-format specs, `rres.h` library and `rres-raylib.h` library are licensed under MIT license. Check [LICENSE](LICENSE) for further details.
 
 *Copyright (c) 2014-2022 Ramon Santamaria ([@raysan5](https://twitter.com/raysan5))*
