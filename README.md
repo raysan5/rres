@@ -79,7 +79,7 @@ rres file format consists of a file header (`rresFileHeader`) followed by a numb
 
 ![rres v1.0](https://raw.githubusercontent.com/raysan5/rres/master/design/rres_file_format_REV5.png)
 
-_Fig 1. rres v1.0 file structure._
+_Fig 01. rres v1.0 file structure._
 
 _NOTE: rresResourceChunk(s) are usually generated from input files. It's important to note that resources could not be mapped to files 1:1, one input file could generate multiple resource chunks. For example, a .ttf input file could generate an image resource chunk (`RRES_DATA_IMAGE` type) plus a font glyph info resource chunk (`RRES_DATA_GLYPH_INFO` type)._
 
@@ -286,18 +286,23 @@ In case a `rres` file is generated with no `Central Directory`, a secondary head
 
 ## Custom Engine Implementation
 
-`rres` is designed as an **engine-agnostic file format**, processed data is mostly threated as generic data, common to any game engine. Developers can implement a custom abstraction layers to **map `rres` generic data to their own engines data structures**. 
+`rres` is designed as an **engine-agnostic file format**, processed data is treated as generic data, common to any game engine. Developers can implement a custom abstraction layers to **map `rres` generic data to their own engines data structures** and also **custom `rres` packaging tools**.
 
-`rres-raylib.h` is a sample implementation of `rres` generic data mappint to [`raylib`](https://github.com/raysan5/raylib) library data types. It maps the different `rres` data types to `raylib` data structures. The API provided is simple and intuitive:
+The following diagram shows a sample implementation of `rres` for [`raylib`](https://github.com/raysan5/raylib) library.
 
-```c
-RRESAPI void *rresLoadRaw(rresResource rres, int *size);    // Load raw data from rres resource
-RRESAPI char *rresLoadText(rresResource rres);              // Load text data from rres resource
-RRESAPI Image rresLoadImage(rresResource rres);             // Load Image data from rres resource
-RRESAPI Wave rresLoadWave(rresResource rres);               // Load Wave data from rres resource
-RRESAPI Font rresLoadFont(rresResource rres);               // Load Font data from rres resource
-RRESAPI Mesh rresLoadMesh(rresResource rres);               // Load Mesh data from rres resource
-```
+![rres v1.0](https://raw.githubusercontent.com/raysan5/rres/master/design/rres_libs_tools.png)
+
+_Fig 01. rres sample implementation: custom engine lib and tool._
+
+`rres` implementation consist of several pieces:
+
+ - [Base library: `rres.h`](#base-library-rresh)
+ - [Engine mapping library: `rres-raylib.h`](#engine-mapping-library-rres-raylibh)
+ - [Packaging tool: `rrespacker`](#packaging-tool-rrespacker)
+
+### Base library: `rres.h`
+
+Base `rres` library is in charge of reading `rres` files resource chunks into generic resource structures, returned to the user. In our implementation the user exposed resource structures (`rresResourceChunk`, `rresResource`) are different than the ones used internally to process the `rres` file data (`rresFileHeader`, `rresResourceInfoHeader`). This design decision is due to the returned data for the user consist of a combination of the resource data info and resource data, and user does not need to have all the information after being properly processed. Our implementation does not include resource file writing, that functionality has been implemented directly in `rrespacker` tool.
 
 `rresResource` is provided by `rres.h` along functions to load it and contains an array of `rresResourceChunk`, defined as following:
 
@@ -325,9 +330,26 @@ A `rresResource` could be loaded from the `.rres` file with the provided functio
 
 After data has been copied to the destination structure it can be unloaded with function: **`rresUnloadResource()`**.
 
-Note that data decompression/decryption should be implemented in the custom abstraction library, `rres` only provides the identifiers for convenience.
+### Engine mapping library: `rres-raylib.h`
 
-An `rres` mapping library can be created for any engine/framework to support the `rres` file format.
+The mapping library includes `rres.h` and provides funtionality to load the generic resource data loaded from the `rres` file into `raylib` structures. The API provided is simple and intuitive, following `raylib` conventions:
+
+```c
+RLAPI void *LoadDataFromResource(rresResource rres, int *size);     // Load raw data from rres resource
+RLAPI char *LoadTextFromResource(rresResource rres);                // Load text data from rres resource
+RLAPI Image LoadImageFromResource(rresResource rres);               // Load Image data from rres resource
+RLAPI Wave LoadWaveFromResource(rresResource rres);                 // Load Wave data from rres resource
+RLAPI Font LoadFontFromResource(rresResource rres);                 // Load Font data from rres resource
+RLAPI Mesh LoadMeshFromResource(rresResource rres);                 // Load Mesh data from rres resource
+```
+
+Note that data decompression/decryption should be implemented in this custom mapping library, `rres` only provides compressor/cipher identifier values for convenience. Compressors and ciphers support depends on user implementation and it must be aligned with the packaging tool.
+
+`rres` file-format is engine-agnostic and a mapping library can be created for any engine/framework in any programming language.
+
+### Packaging tool: `rrespacker`
+
+TODO.
 
 ## License
 
