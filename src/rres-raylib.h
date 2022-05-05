@@ -14,12 +14,12 @@
 *
 *   #define RRES_SUPPORT_ENCRYPTION_AES
 *       Support data encryption algorithm AES, provided by aes.h/aes.c library
-* 
+*
 *   #define RRES_SUPPORT_ENCRYPTION_MONOCYPHER
-*       Support data encryption algorithm XChaCha20-Poly1305, 
+*       Support data encryption algorithm XChaCha20-Poly1305,
 *       provided by monocypher.h/monocypher.c library
-* 
-* 
+*
+*
 *   LICENSE: MIT
 *
 *   Copyright (c) 2020-2022 Ramon Santamaria (@raysan5)
@@ -46,6 +46,10 @@
 
 #ifndef RRES_RAYLIB_H
 #define RRES_RAYLIB_H
+
+#ifndef RRES_H
+    #include "rres.h"
+#endif
 
 //----------------------------------------------------------------------------------
 // Defines and Macros
@@ -75,6 +79,8 @@ RLAPI Font LoadFontFromResource(rresResource rres);                 // Load Font
 RLAPI Mesh LoadMeshFromResource(rresResource rres);                 // Load Mesh data from rres resource
 //RLAPI Material LoadMaterialFromResource(rresResource rres);       // TODO: Load Material data from rres resource
 //RLAPI Model LoadModelFromResource(rresResource rres);             // TODO: Load Model data from rres resource
+
+RLAPI void SetBaseDirectory(const char *baseDir);                   // Set base directory for externally linked data
 
 #endif // RRES_RAYLIB_H
 
@@ -117,7 +123,7 @@ RLAPI Mesh LoadMeshFromResource(rresResource rres);                 // Load Mesh
 //----------------------------------------------------------------------------------
 // Global Variables Definition
 //----------------------------------------------------------------------------------
-//...
+const char *baseDir = NULL;
 
 //----------------------------------------------------------------------------------
 // Module specific Functions Declaration
@@ -125,7 +131,7 @@ RLAPI Mesh LoadMeshFromResource(rresResource rres);                 // Load Mesh
 
 // Load simple data chunks that are later required by multi-chunk resources
 static void *LoadDataFromResourceChunk(rresResourceChunk chunk, int *size);     // Load chunk: RRES_DATA_RAW
-static char *LoadTextFromResourceChunk(rresResourceChunk chunk);                // Load chunk: RRES_DATA_TEXT
+static char *LoadTextFromResourceChunk(rresResourceChunk chunk, int *codeLang); // Load chunk: RRES_DATA_TEXT
 static Image LoadImageFromResourceChunk(rresResourceChunk chunk);               // Load chunk: RRES_DATA_IMAGE
 
 static int UnpackDataFromResourceChunk(rresResourceChunk *chunk);   // Unpack compressed/encrypted data from chunk
@@ -143,9 +149,30 @@ void *LoadDataFromResource(rresResource rres, int *size)
 {
     void *data = NULL;
 
-    if ((rres.count >= 1) && (rres.chunks[0].type == RRES_DATA_RAW))
+    if (rres.count >= 1)    // Verify we got at least one resource
     {
-        data = LoadDataFromResourceChunk(rres.chunks[0], size);
+        // Data can be provided in the resource or linked to an external file
+        if (rres.chunks[0].type == RRES_DATA_RAW)
+        {
+            data = LoadDataFromResourceChunk(rres.chunks[0], size);
+        }
+        else if (rres.chunks[0].type == RRES_DATA_LINK)
+        {
+            data = LoadDataFromResourceLink(rres.chunks[0]);    // Get raw data from external linked file
+
+            unsigned char filePath[MAX_]
+
+            // Get external link filepath
+            unsigned char *linkFilePath = RL_CALLOC(chunk.props[0], 1);
+            memcpy(linkFilePath, chunk.data, chunk.props[0]);
+
+            // Get/set base directory to append filepath
+            if (baseDir == NULL) baseDir = GetWorkingDirectory();     // ALTERNATIVE: GetApplicationDirectory()
+
+            if (FileExists(linkFilePath))
+            // Try to load external file as raw data
+            data = LoadFileData(linkFilePath, size);
+        }
     }
 
     return data;
@@ -156,10 +183,13 @@ void *LoadDataFromResource(rresResource rres, int *size)
 char *LoadTextFromResource(rresResource rres)
 {
     char *text = NULL;
+    int codeLang = 0;
 
     if ((rres.count >= 1) && (rres.chunks[0].type == RRES_DATA_TEXT))
     {
-        text = LoadTextFromResourceChunk(rres.chunks[0]);
+        text = LoadTextFromResourceChunk(rres.chunks[0], &codeLang);
+
+        // TODO: Consider text code language to load shader or code scripts
     }
 
     return text;
@@ -263,114 +293,114 @@ Font LoadFontFromResource(rresResource rres)
 Mesh LoadMeshFromResource(rresResource rres)
 {
     Mesh mesh = { 0 };
-    
+
     // Mesh resource consist of (n) chunks:
     for (int i = 0; i < rres.count; i++)
     {
         result = UnpackDataFromResourceChunk(&rres.chunks[i]);
-        
+
         if (result == 0)
         {
             // NOTE: raylib only supports vertex arrays with same vertex count,
             // rres.chunks[0] defined vertexCount will be the reference for the following chunks
             // The only exception to vertexCount is the mesh.indices array
             if (mesh.vertexCount == 0) mesh.vertexCount = rres.chunks[0].props[0];
-            
+
             // Verify chunk type and vertex count
             if (rres.chunks[i].type == RRES_DATA_VERTEX)
             {
                 // In case vertex count do not match we skip that resource chunk
                 if ((rres.chunks[i].props[1] != RRES_VERTEX_ATTRIBUTE_INDEX) && (rres.chunks[i].props[0] != mesh.vertexCount)) continue;
-                
+
                 // NOTE: We are only loading raylib supported rresVertexFormat and raylib expected components count
                 switch (rres.chunks[i].props[1])    // Check rresVertexAttribute value
                 {
-                    case RRES_VERTEX_ATTRIBUTE_POSITION: 
+                    case RRES_VERTEX_ATTRIBUTE_POSITION:
                     {
                         // raylib expects 3 components per vertex and float vertex format
-                        if ((rres.chunks[i].props[2] == 3) && (rres.chunks[i].props[3] == RRES_VERTEX_FORMAT_FLOAT)) 
+                        if ((rres.chunks[i].props[2] == 3) && (rres.chunks[i].props[3] == RRES_VERTEX_FORMAT_FLOAT))
                         {
                             mesh.vertices = (float *)RL_CALLOC(mesh.vertexCount*3*sizeof(float));
                             memcpy(mesh.vertices, rres.chunks[i].data, mesh.vertexCount*3*sizeof(float));
                         }
                         else RRES_LOG("WARNING: MESH: Vertex attribute position not valid, componentCount/vertexFormat do not fit\n");
-                        
+
                     } break;
-                    case RRES_VERTEX_ATTRIBUTE_TEXCOORD1: 
+                    case RRES_VERTEX_ATTRIBUTE_TEXCOORD1:
                     {
                         // raylib expects 2 components per vertex and float vertex format
-                        if ((rres.chunks[i].props[2] == 2) && (rres.chunks[i].props[3] == RRES_VERTEX_FORMAT_FLOAT) 
+                        if ((rres.chunks[i].props[2] == 2) && (rres.chunks[i].props[3] == RRES_VERTEX_FORMAT_FLOAT)
                         {
                             mesh.texcoords = (float *)RL_CALLOC(mesh.vertexCount*2*sizeof(float));
                             memcpy(mesh.texcoords, rres.chunks[i].data, mesh.vertexCount*2*sizeof(float));
                         }
                         else RRES_LOG("WARNING: MESH: Vertex attribute texcoord1 not valid, componentCount/vertexFormat do not fit\n");
-                        
+
                     } break;
-                    case RRES_VERTEX_ATTRIBUTE_TEXCOORD2: 
+                    case RRES_VERTEX_ATTRIBUTE_TEXCOORD2:
                     {
                         // raylib expects 2 components per vertex and float vertex format
-                        if ((rres.chunks[i].props[2] == 2) && (rres.chunks[i].props[3] == RRES_VERTEX_FORMAT_FLOAT) 
+                        if ((rres.chunks[i].props[2] == 2) && (rres.chunks[i].props[3] == RRES_VERTEX_FORMAT_FLOAT)
                         {
                             mesh.texcoords2 = (float *)RL_CALLOC(mesh.vertexCount*2*sizeof(float));
                             memcpy(mesh.texcoords2, rres.chunks[i].data, mesh.vertexCount*2*sizeof(float));
                         }
                         else RRES_LOG("WARNING: MESH: Vertex attribute texcoord2 not valid, componentCount/vertexFormat do not fit\n");
-                        
+
                     } break;
-                    case RRES_VERTEX_ATTRIBUTE_TEXCOORD3: 
+                    case RRES_VERTEX_ATTRIBUTE_TEXCOORD3:
                     {
                         RRES_LOG("WARNING: MESH: Vertex attribute texcoord3 not supported\n");
-                        
+
                     } break;
                     case RRES_VERTEX_ATTRIBUTE_TEXCOORD4:
                     {
                         RRES_LOG("WARNING: MESH: Vertex attribute texcoord4 not supported\n");
-                        
+
                     } break;
-                    case RRES_VERTEX_ATTRIBUTE_NORMAL: 
+                    case RRES_VERTEX_ATTRIBUTE_NORMAL:
                     {
                         // raylib expects 3 components per vertex and float vertex format
-                        if ((rres.chunks[i].props[2] == 3) && (rres.chunks[i].props[3] == RRES_VERTEX_FORMAT_FLOAT)) 
+                        if ((rres.chunks[i].props[2] == 3) && (rres.chunks[i].props[3] == RRES_VERTEX_FORMAT_FLOAT))
                         {
                             mesh.normals = (float *)RL_CALLOC(mesh.vertexCount*3*sizeof(float));
                             memcpy(mesh.normals, rres.chunks[i].data, mesh.vertexCount*3*sizeof(float));
                         }
                         else RRES_LOG("WARNING: MESH: Vertex attribute normal not valid, componentCount/vertexFormat do not fit\n");
-                        
+
                     } break;
-                    case RRES_VERTEX_ATTRIBUTE_TANGENT: 
+                    case RRES_VERTEX_ATTRIBUTE_TANGENT:
                     {
                         // raylib expects 4 components per vertex and float vertex format
-                        if ((rres.chunks[i].props[2] == 4) && (rres.chunks[i].props[3] == RRES_VERTEX_FORMAT_FLOAT)) 
+                        if ((rres.chunks[i].props[2] == 4) && (rres.chunks[i].props[3] == RRES_VERTEX_FORMAT_FLOAT))
                         {
                             mesh.tangents = (float *)RL_CALLOC(mesh.vertexCount*4*sizeof(float));
                             memcpy(mesh.tangents, rres.chunks[i].data, mesh.vertexCount*4*sizeof(float));
                         }
                         else RRES_LOG("WARNING: MESH: Vertex attribute tangent not valid, componentCount/vertexFormat do not fit\n");
-                        
+
                     } break;
-                    case RRES_VERTEX_ATTRIBUTE_COLOR: 
+                    case RRES_VERTEX_ATTRIBUTE_COLOR:
                     {
                         // raylib expects 4 components per vertex and unsigned char vertex format
-                        if ((rres.chunks[i].props[2] == 4) && (rres.chunks[i].props[3] == RRES_VERTEX_FORMAT_UBYTE)) 
+                        if ((rres.chunks[i].props[2] == 4) && (rres.chunks[i].props[3] == RRES_VERTEX_FORMAT_UBYTE))
                         {
                             mesh.colors = (unsigned char *)RL_CALLOC(mesh.vertexCount*4*sizeof(unsigned char));
                             memcpy(mesh.colors, rres.chunks[i].data, mesh.vertexCount*4*sizeof(unsigned char));
                         }
                         else RRES_LOG("WARNING: MESH: Vertex attribute color not valid, componentCount/vertexFormat do not fit\n");
-                        
+
                     } break;
-                    case RRES_VERTEX_ATTRIBUTE_INDEX: 
+                    case RRES_VERTEX_ATTRIBUTE_INDEX:
                     {
                         // raylib expects 1 components per index and unsigned short vertex format
-                        if ((rres.chunks[i].props[2] == 1) && (rres.chunks[i].props[3] == RRES_VERTEX_FORMAT_USHORT)) 
+                        if ((rres.chunks[i].props[2] == 1) && (rres.chunks[i].props[3] == RRES_VERTEX_FORMAT_USHORT))
                         {
                             mesh.indices = (unsigned char *)RL_CALLOC(rres.chunks[i].props[0]*sizeof(unsigned short));
                             memcpy(mesh.indices, rres.chunks[i].data, rres.chunks[i].props[0]*sizeof(unsigned short));
                         }
                         else RRES_LOG("WARNING: MESH: Vertex attribute index not valid, componentCount/vertexFormat do not fit\n");
-                        
+
                     } break;
                     default: break;
                 }
@@ -408,7 +438,7 @@ static void *LoadDataFromResourceChunk(rresResourceChunk chunk, int *size);
 
 // Load data chunk: RRES_DATA_TEXT
 // NOTE: This chunk can be used for shaders or other text data elements (materials?)
-static char *LoadTextFromResourceChunk(rresResourceChunk chunk)
+static char *LoadTextFromResourceChunk(rresResourceChunk chunk, int *codeLang)
 {
     void *text = NULL;
 
@@ -420,9 +450,10 @@ static char *LoadTextFromResourceChunk(rresResourceChunk chunk)
         {
             text = (char *)RL_CALLOC(chunk.props[0] + 1, 1);    // We add NULL terminator, just in case
             memcpy(text, chunk.data, chunk.props[0]);
-            
+
             // TODO: We got some extra text properties, in case they could be useful for users:
             // chunk.props[1]:rresTextEncoding, chunk.props[2]:rresCodeLang, chunk. props[3]:cultureCode
+            *codeLang = chunk.props[2];
         }
     }
 
@@ -444,7 +475,7 @@ static Image LoadImageFromResourceChunk(rresResourceChunk chunk)
             image.width = chunk.props[0];
             image.height = chunk.props[1];
             int format = chunk.props[2];
-            
+
             // Assign equivalent pixel formats for our engine
             // NOTE: In this case rresPixelFormat defined values match raylib PixelFormat values
             switch (format)
@@ -459,7 +490,7 @@ static Image LoadImageFromResourceChunk(rresResourceChunk chunk)
                 case RRES_PIXELFORMAT_UNCOMP_R32: image.format = PIXELFORMAT_UNCOMPRESSED_R32; break;
                 case RRES_PIXELFORMAT_UNCOMP_R32G32B32: image.format = PIXELFORMAT_UNCOMPRESSED_R32G32B32; break;
                 case RRES_PIXELFORMAT_UNCOMP_R32G32B32A32: image.format = PIXELFORMAT_UNCOMPRESSED_R32G32B32A32; break;
-                case RRES_PIXELFORMAT_COMP_DXT1_RGB: image.format = PIXELFORMAT_COMPRESSED_DXT1_RGB; break;  
+                case RRES_PIXELFORMAT_COMP_DXT1_RGB: image.format = PIXELFORMAT_COMPRESSED_DXT1_RGB; break;
                 case RRES_PIXELFORMAT_COMP_DXT1_RGBA: image.format = PIXELFORMAT_COMPRESSED_DXT1_RGBA; break;
                 case RRES_PIXELFORMAT_COMP_DXT3_RGBA: image.format = PIXELFORMAT_COMPRESSED_DXT3_RGBA; break;
                 case RRES_PIXELFORMAT_COMP_DXT5_RGBA: image.format = PIXELFORMAT_COMPRESSED_DXT5_RGBA; break;
@@ -472,12 +503,12 @@ static Image LoadImageFromResourceChunk(rresResourceChunk chunk)
                 case RRES_PIXELFORMAT_COMP_ASTC_8x8_RGBA: image.format = PIXELFORMAT_COMPRESSED_ASTC_8x8_RGBA; break;
                 default: break;
             }
-            
+
             image.mipmaps = chunk.props[3];
 
             // Image data size can be computed from image properties
             unsigned int size = GetPixelDataSize(image.width, image.height, image.format);
-            
+
             // NOTE: Computed image data must match the data size of the chunk processed (minus props size)
             if (size == (chunk.baseSize - 20))
             {
@@ -515,10 +546,10 @@ static int UnpackDataFromResourceChunk(rresResourceChunk *chunk)
         if (chunk->cipherType == RRES_CIPHER_AES)   // rrespacker implements AES-CTR 256 bit
         {
 #if defined(RRES_SUPPORT_ENCRYPTION_AES)
-            // WARNING: Implementation dependant! 
+            // WARNING: Implementation dependant!
             // rrespacker tool appends (salt + MD5) to encrypted data for convenience,
             // Actually, chunk->packedSize considers those additional elements
-            
+
             // Get some memory for the possible message output
             unsigned char *decryptedData = (unsigned char *)RL_CALLOC(chunk->packedSize - 16 - 16, 1);
             if (decryptedData != NULL) memcpy(decryptedData, chunk->data, chunk->packedSize - 16 - 16);
@@ -529,7 +560,7 @@ static int UnpackDataFromResourceChunk(rresResourceChunk *chunk)
             const uint32_t iterations = 3;              // Key stretching iterations: 3 iterations
             void *workArea = RL_MALLOC(blocks*1024);    // Key stretching work area
             uint8_t salt[16] = { 0 };                   // Key stretching salt
-            
+
             // Retrieve salt from chunk packed data
             // salt is stored at the end of packed data, before nonce and MAC: salt[16] + MD5[16]
             memcpy(salt, ((unsigned char *)chunk->data) + (chunk->packedSize - 16 - 16), 16);
@@ -540,10 +571,10 @@ static int UnpackDataFromResourceChunk(rresResourceChunk *chunk)
             // Wipe key generation secrets, they are no longer needed
             crypto_wipe(salt, 16);
             RL_FREE(workArea);
-            
+
             // Required variables for decryption and message authentication
             unsigned int md5[4] = { 0 };                // Message Authentication Code generated on encryption
-            
+
             // Retrieve MD5 from chunk packed data
             // NOTE: MD5 is stored at the end of packed data, after salt: salt[16] + MD5[16]
             memcpy(md5, ((unsigned char *)chunk->data) + (chunk->packedSize - 16), 4*sizeof(unsigned int));
@@ -552,7 +583,7 @@ static int UnpackDataFromResourceChunk(rresResourceChunk *chunk)
             struct AES_ctx ctx = { 0 };
             AES_init_ctx(&ctx, key);
             AES_CTR_xcrypt_buffer(&ctx, (uint8_t *)decryptedData, info.packedSize - 16 - 16);   // AES Counter mode, stream cipher
-            
+
             // Verify MD5 to check if data decryption worked
             unsigned int decryptMD5[4] = { 0 };
             unsigned int *md5Ptr = ComputeMD5(decryptedData, info.packedSize - 16 - 16);
@@ -570,25 +601,25 @@ static int UnpackDataFromResourceChunk(rresResourceChunk *chunk)
             else result = 2;    // Data was not decrypted as expected, wrong password or message corrupted
 #else
             result = 1;         // Decryption algorithm not supported
-#endif  
+#endif
         }
         if (chunk->cipherType == RRES_CIPHER_XCHACHA20_POLY1305)    // rrespacker implements XChaCha20-Poly1305
         {
 #if defined(RRES_SUPPORT_ENCRYPTION_MONOCYPHER)
-            // WARNING: Implementation dependant! 
+            // WARNING: Implementation dependant!
             // rrespacker tool appends (salt + nonce + MAC) to encrypted data for convenience,
             // Actually, chunk->packedSize considers those additional elements
 
             // Get some memory for the possible message output
             unsigned char *decryptedData = (unsigned char *)RL_CALLOC(chunk->packedSize - 16 - 24 - 16, 1);
-            
+
             // Required variables for key stretching
             uint8_t key[32] = { 0 };                    // Encryption key
             const uint32_t blocks = 16384;              // Key stretching blocks: 16 megabytes
             const uint32_t iterations = 3;              // Key stretching iterations: 3 iterations
             void *workArea = RL_MALLOC(blocks*1024);    // Key stretching work area
             uint8_t salt[16] = { 0 };                   // Key stretching salt
-            
+
             // Retrieve salt from chunk packed data
             // salt is stored at the end of packed data, before nonce and MAC: salt[16] + nonce[24] + MAC[16]
             memcpy(salt, ((unsigned char *)chunk->data) + (chunk->packedSize - 16 - 24 - 16), 16);
@@ -599,11 +630,11 @@ static int UnpackDataFromResourceChunk(rresResourceChunk *chunk)
             // Wipe key generation secrets, they are no longer needed
             crypto_wipe(salt, 16);
             RL_FREE(workArea);
-            
+
             // Required variables for decryption and message authentication
             uint8_t nonce[24] = { 0 };                  // nonce used on encryption, unique to processed file
             uint8_t mac[16] = { 0 };                    // Message Authentication Code generated on encryption
-            
+
             // Retrieve nonce and MAC from chunk packed data
             // nonce and MAC are stored at the end of packed data, after salt: salt[16] + nonce[24] + MAC[16]
             memcpy(nonce, ((unsigned char *)chunk->data) + (chunk->packedSize - 16 - 24), 24);
@@ -639,7 +670,7 @@ static int UnpackDataFromResourceChunk(rresResourceChunk *chunk)
             int uncompDataSize = 0;
             unsigned char *uncompData = (unsigned char *)RL_MALLOC(chunk->baseSize);
             uncompData = DecompressData(chunk->data, chunk->packedSize, &uncompDataSize);
-            
+
             if (uncompDataSize > 0)     // Decompression successful
             {
                 RRES_FREE(chunk->data);
@@ -667,7 +698,7 @@ static int UnpackDataFromResourceChunk(rresResourceChunk *chunk)
                 chunk->packedSize = uncompDataSize;
             }
             else result = 4;            // Decompression process failed
-            
+
             // WARNING: Decompression could be successful but not the original message size returned
             if (uncompDataSize != chunk->baseSize) RRES_LOG("WARNING: Decompressed data could be corrupted, unexpected size\n");
 #else
@@ -680,7 +711,7 @@ static int UnpackDataFromResourceChunk(rresResourceChunk *chunk)
         }
         else result = 3;    // Compression algorithm not supported
     }
-    
+
     // Show some log info about the decompression/decryption process
     if ((chunk->cipherType != RRES_CIPHER_NONE) || (chunk->compType != RRES_COMP_NONE))
     {

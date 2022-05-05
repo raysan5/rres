@@ -15,7 +15,7 @@
 #include "../src/rres.h"                // Required to read rres data chunks
 
 #define RRES_RAYLIB_IMPLEMENTATION
-#include "../src/rres-raylib.h"         // Required to map rres data chunks into raylib structs 
+#include "../src/rres-raylib.h"         // Required to map rres data chunks into raylib structs
 
 #include <stdio.h>
 
@@ -47,7 +47,7 @@ int main(void)
 
     // Load content from rres file
     rresResource rres = { 0 };
-    
+
     // NOTE: LoadDataFromResource() and similar functions already check internally if ((rres.count > 0) && (rres.chunks != NULL))
 
     // TEST 01: RRES_DATA_RAW -> OK!!!

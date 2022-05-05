@@ -13,12 +13,12 @@
 *   FILE STRUCTURE:
 *
 *   rres files consist of a file header followed by a number of resource chunks.
-* 
-*   Optionally it can contain a Central Directory resource chunk (usually at the end) with the info 
+*
+*   Optionally it can contain a Central Directory resource chunk (usually at the end) with the info
 *   of all the files processed into the rres file.
-* 
-*   NOTE: Chunks count could not match files count, some processed files (i.e Font, Mesh) 
-*   could generate multiple chunks with the same id related by the rresResourceInfoHeader.nextOffset 
+*
+*   NOTE: Chunks count could not match files count, some processed files (i.e Font, Mesh)
+*   could generate multiple chunks with the same id related by the rresResourceInfoHeader.nextOffset
 *   Those chunks are loaded together when resource is loaded
 *
 *   rresFileHeader               (16 bytes)
@@ -41,7 +41,7 @@
 *           Next Offset           (4 bytes)     // Next resource chunk offset (if required)
 *           Reserved              (4 bytes)     // <reserved>
 *           CRC32                 (4 bytes)     // Resource Data Chunk CRC32
-*                                
+*
 *       rresResourceDataChunk     (n bytes)     // Packed data
 *           Property Count        (4 bytes)     // Number of properties contained
 *           Properties[]          (4*i bytes)   // Resource data required properties, depend on Type
@@ -73,7 +73,7 @@
 *     - Endianness: rres does not care about endianness, data is stored as desired by the host platform (most probably Little Endian)
 *       Endianness won't affect chunk data but it will affect rresFileHeader and rresResourceInfoHeader
 *     - CRC32 hash is used to to generate the rres file identifier from filename
-*       There is a "small" probability of random collision (1 in 2^32 approx.) but considering 
+*       There is a "small" probability of random collision (1 in 2^32 approx.) but considering
 *       the chance of collision is related to the number of data inputs, not the size of the inputs, we assume that risk
 *       Also note that CRC32 is not used as a security/cryptographic hash, just an identifier for the input file
 *     - CRC32 hash is also used to detect chunk data corruption. CRC32 is smaller and computationally much less complex than MD5 or SHA1.
@@ -92,7 +92,7 @@
 *     - stdlib.h: Required for memory allocation: malloc(), calloc(), free()
 *                 NOTE: Allocators can be redefined with macros RRES_MALLOC, RRES_CALLOC, RRES_FREE
 *     - stdio.h:  Required for file access functionality: FILE, fopen(), fseek(), fread(), fclose()
-*     - string.h: Required for memory data mamagement: memcpy(), strcmp() 
+*     - string.h: Required for memory data mamagement: memcpy(), strcmp()
 *
 *
 *   VERSION HISTORY:
@@ -110,10 +110,10 @@
 *   to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
 *   copies of the Software, and to permit persons to whom the Software is
 *   furnished to do so, subject to the following conditions:
-*   
+*
 *   The above copyright notice and this permission notice shall be included in all
 *   copies or substantial portions of the Software.
-*   
+*
 *   THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
 *   IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
 *   FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
@@ -233,7 +233,7 @@ typedef struct rresFontGlyphInfo {
 
 // rres resource chunk data type
 // NOTE 1: Data type determines the properties and the data included in every chunk
-// NOTE 2: This enum defines the basic resource data types, 
+// NOTE 2: This enum defines the basic resource data types,
 // some input files could generate multiple resource chunks:
 //   Fonts processed could generate (2) resource chunks:
 //   - [FNTG] rres[0]: RRES_DATA_GLYPH_INFO
@@ -250,21 +250,21 @@ typedef enum rresResourceDataType {
                                             //    data: raw bytes
     RRES_DATA_TEXT         = 2,             // FourCC: TEXT - Text file data, 4 properties
                                             //    props[0]:size (bytes)
-                                            //    props[1]:rresTextEncoding 
-                                            //    props[2]:rresCodeLang 
+                                            //    props[1]:rresTextEncoding
+                                            //    props[2]:rresCodeLang
                                             //    props[3]:cultureCode
                                             //    data: text
     RRES_DATA_IMAGE        = 3,             // FourCC: IMGE - Image file data, 4 properties
-                                            //    props[0]:width 
-                                            //    props[1]:height 
-                                            //    props[2]:rresPixelFormat 
+                                            //    props[0]:width
+                                            //    props[1]:height
+                                            //    props[2]:rresPixelFormat
                                             //    props[3]:mipmaps
                                             //    data: pixels
     RRES_DATA_WAVE         = 4,             // FourCC: WAVE - Audio file data, 4 properties
                                             //    props[0]:frameCount
                                             //    props[1]:sampleRate
                                             //    props[2]:sampleSize
-                                            //    props[3]:channels 
+                                            //    props[3]:channels
                                             //    data: samples
     RRES_DATA_VERTEX       = 5,             // FourCC: VRTX - Vertex file data, 4 properties
                                             //    props[0]:vertexCount
@@ -325,7 +325,7 @@ typedef enum rresEncryptionType {
     RRES_CIPHER_SALSA20     = 70,           // SALSA20 encryption
     RRES_CIPHER_CHACHA20    = 71,           // CHACHA20 encryption
     RRES_CIPHER_XCHACHA20   = 72,           // XCHACHA20 encryption
-    RRES_CIPHER_XCHACHA20_POLY1305 = 73,    // XCHACHA20 with POLY1305 for message authentification (MAC) 
+    RRES_CIPHER_XCHACHA20_POLY1305 = 73,    // XCHACHA20 with POLY1305 for message authentification (MAC)
     // twofish, RC4, RC5, RC6               // TODO: Add additional encryption algorithm if required
 } rresEncryptionType;
 
@@ -446,7 +446,7 @@ extern "C" {            // Prevents name mangling of functions
 #endif
 
 // Load all resource chunks for a specified rresId
-RRESAPI rresResource rresLoadResource(const char *fileName, int rresId);        // Load resource from file for provided id, 
+RRESAPI rresResource rresLoadResource(const char *fileName, int rresId);        // Load resource from file for provided id,
                                                                                 // NOTE: Resource could consist of multiple resource chunks
 RRESAPI void rresUnloadResource(rresResource rres);                             // Unload resource from memory, all chunks it contains
 
@@ -461,7 +461,7 @@ RRESAPI unsigned int rresComputeCRC32(unsigned char *data, int len);            
 // NOTE: The cipher password is kept as an internal pointer to provided string, it's up to the user to manage that sensible data properly
 // It's recommended to allocate the password previously to rres file loading and wipe that memory space after rres loading
 RRESAPI void rresSetCipherPassword(const char *pass);                           // Set password to be used on data decryption
-RRESAPI const char *rresGetCipherPassword(void);                                // Get password to be used on data decryption 
+RRESAPI const char *rresGetCipherPassword(void);                                // Get password to be used on data decryption
 
 #ifdef __cplusplus
 }
@@ -575,7 +575,7 @@ rresResource rresLoadResource(const char *fileName, int rresId)
                     fseek(rresFile, currentFileOffset, SEEK_SET);           // Return to first resource chunk position
 
                     // Read and load data chunk from file data
-                    // NOTE: Read data can be compressed/encrypted, 
+                    // NOTE: Read data can be compressed/encrypted,
                     // it's up to the user library to manage decompression/decryption
                     void *data = RRES_MALLOC(info.packedSize);              // Allocate enough memory to store resource data chunk
                     fread(data, info.packedSize, 1, rresFile);              // Read data: propsCount + props[] + data (+additional_data)
@@ -660,7 +660,7 @@ rresCentralDir rresLoadCentralDirectory(const char *fileName)
 
                     void *data = RRES_MALLOC(info.packedSize);
                     fread(data, info.packedSize, 1, rresFile);
-                    
+
                     // Load resource chunk with Central Directory data,
                     // data is uncompressed/unencrypted by default
                     rresResourceChunk chunk = rresLoadResourceChunk(info, data);
@@ -678,7 +678,7 @@ rresCentralDir rresLoadCentralDirectory(const char *fileName)
                         // NOTE: There is a reserved integer value before fileNameSize
                         dir.entries[i].fileNameSize = ((int *)ptr)[3];  // Resource fileName size
 
-                        // Resource fileName, NULL terminated and 0-padded to 4-byte, 
+                        // Resource fileName, NULL terminated and 0-padded to 4-byte,
                         // fileNameSize considers NULL and padding
                         memcpy(dir.entries[i].fileName, ptr + 16, dir.entries[i].fileNameSize);
 
@@ -776,7 +776,7 @@ unsigned int rresComputeCRC32(unsigned char *data, int len)
 static rresResourceChunk rresLoadResourceChunk(rresResourceInfoHeader info, void *data)
 {
     rresResourceChunk chunk = { 0 };
-    
+
     // Register required info for user
     chunk.baseSize = info.baseSize;
     chunk.packedSize = info.packedSize;
@@ -793,7 +793,7 @@ static rresResourceChunk rresLoadResourceChunk(rresResourceInfoHeader info, void
     else if ((info.type[0] == 'F') && (info.type[1] == 'N') && (info.type[2] == 'T') && (info.type[3] == 'G')) chunk.type = RRES_DATA_GLYPH_INFO; // FNTG
     else if ((info.type[0] == 'L') && (info.type[1] == 'I') && (info.type[2] == 'N') && (info.type[3] == 'K')) chunk.type = RRES_DATA_LINK;       // LINK
     else if ((info.type[0] == 'C') && (info.type[1] == 'D') && (info.type[2] == 'I') && (info.type[3] == 'R')) chunk.type = RRES_DATA_DIRECTORY;  // CDIR
-    
+
     // CRC32 data validation, verify packed data is not corrupted
     unsigned int crc32 = rresComputeCRC32(data, info.packedSize);
 
@@ -815,7 +815,7 @@ static rresResourceChunk rresLoadResourceChunk(rresResourceInfoHeader info, void
             chunk.data = RRES_MALLOC(info.baseSize);
             memcpy(chunk.data, ((unsigned char *)data) + sizeof(int) + (chunk.propCount*sizeof(int)), info.baseSize);
         }
-        else    
+        else
         {
             // Data is compressed/encrypted
             // We can not retrieve properties, it must be processed by user library
@@ -823,7 +823,7 @@ static rresResourceChunk rresLoadResourceChunk(rresResourceInfoHeader info, void
             memcpy(chunk.data, (unsigned char *)data, info.packedSize);
         }
     }
-    
+
     if (crc32 != info.crc32) RRES_LOG("WARNING: [ID %i] CRC32 does not match, data can be corrupted\n", info.id);
 
     return chunk;
@@ -842,7 +842,7 @@ void rresSetCipherPassword(const char *pass)
     password = pass;
 }
 
-// Get password to be used on data decryption 
+// Get password to be used on data decryption
 const char *rresGetCipherPassword(void)
 {
     return password;
