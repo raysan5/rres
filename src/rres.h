@@ -301,7 +301,7 @@ typedef enum rresCompressionType {
     RRES_COMP_LZ4           = 20,           // LZ4 compression
     RRES_COMP_LZMA2         = 30,           // LZMA2 compression
     RRES_COMP_QOI           = 40,           // QOI compression, useful for RGB(A) image data
-    // gzip, brotli, lzo, zstd...           // TODO: Add other compression algorithms to enum
+    // gzip, brotli, lzo, zstd...           // TODO: Add additional compression algorithms if required
 } rresCompressionType;
 
 // Encryption algoritms
@@ -326,7 +326,7 @@ typedef enum rresEncryptionType {
     RRES_CIPHER_CHACHA20    = 71,           // CHACHA20 encryption
     RRES_CIPHER_XCHACHA20   = 72,           // XCHACHA20 encryption
     RRES_CIPHER_XCHACHA20_POLY1305 = 73,    // XCHACHA20 with POLY1305 for message authentification (MAC) 
-    // twofish, RC4, RC5, RC6               // TODO: Other encryption algorithm...
+    // twofish, RC4, RC5, RC6               // TODO: Add additional encryption algorithm if required
 } rresEncryptionType;
 
 // TODO: rres error codes (not used at this moment)
@@ -592,9 +592,7 @@ rresResource rresLoadResource(const char *fileName, int rresId)
                     {
                         fseek(rresFile, info.nextOffset, SEEK_SET);         // Jump to next resource
                         fread(&info, sizeof(rresResourceInfoHeader), 1, rresFile);  // Read next resource info header
-                        
-                        // TODO: For security, linked resource chunk could be checked to verify it's the same than original resource
-                        
+
                         void *data = RRES_MALLOC(info.packedSize);          // Allocate enough memory to store resource data chunk
                         fread(data, info.packedSize, 1, rresFile);          // Read data: propsCount + props[] + data (+additional_data)
                         rres.chunks[i] = rresLoadResourceChunk(info, data); // Load user data from info and resource data
