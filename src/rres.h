@@ -9,6 +9,17 @@
 *       If not defined, the library is in header only mode and can be included in other headers
 *       or source files without problems. But only ONE file should hold the implementation.
 *
+*   FEATURES:
+* 
+*     - Multi-resource files: Some files could end-up generating multiple connected resources in
+*       the rres output file (i.e TTF files could generate RRES_DATA_GLYPH_INFO and RRES_DATA_IMAGE).
+*     - File packaging as raw resource data: Avoid data processing and just package the file bytes.
+*     - Per-file data compression/encryption: Configure compression/encription for every input file.
+*     - Externally linked files: Package only the file path, to be loaded from external file when the
+*       specific id is requested. WARNING: Be careful with path, it should be relative to application dir.
+*     - Central Directory resource (optional): Create a central directory with the input filename relation
+*       to the resource(s) id. This is the default option but it can be avoided; in that case, a header
+*       file (.h) is generated with the file ids definitions.
 *
 *   FILE STRUCTURE:
 *
