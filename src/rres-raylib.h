@@ -479,10 +479,7 @@ static void *LoadDataFromResourceLink(rresResourceChunk chunk, int *size)
             data = LoadFileText(fullFilePath);
             *size = TextLength(data);
         }
-        else
-        {
-            data = LoadFileData(fullFilePath, size);
-        }
+        else data = LoadFileData(fullFilePath, size);
     }
     else RRES_LOG("WARNING: [%s] Linked external file could not be found\n", linkFilePath);
 }
