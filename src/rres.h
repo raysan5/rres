@@ -169,7 +169,7 @@
     #define RRES_LOG(...)
 #endif
 
-#define RRES_MAX_CDIR_FILENAME_LENGTH  1024
+#define RRES_MAX_FILENAME_SIZE      1024
 
 //----------------------------------------------------------------------------------
 // Types and Structures Definition
@@ -206,7 +206,7 @@ typedef struct rresDirEntry {
     unsigned int offset;            // Resource global offset in file
     unsigned int reserved;          // reserved
     unsigned int fileNameSize;      // Resource fileName size (NULL terminator and 4-byte alignment padding considered)
-    char fileName[RRES_MAX_CDIR_FILENAME_LENGTH];  // Resource original fileName (NULL terminated and padded to 4-byte alignment)
+    char fileName[RRES_MAX_FILENAME_SIZE];  // Resource original fileName (NULL terminated and padded to 4-byte alignment)
 } rresDirEntry;
 
 // CDIR: rres central directory
@@ -365,6 +365,7 @@ typedef enum rresCodeLang {
     RRES_CODE_LANG_ODIN,                    // Text contains Odin code
     RRES_CODE_LANG_JAI,                     // Text contains Jai code
     RRES_CODE_LANG_GDSCRIPT,                // Text contains GDScript (Godot) code
+    RRES_CODE_LANG_GLSL,                    // Text contains GLSL shader code
     // TODO: Add additional code languages if required
 } rresCodeLang;
 
