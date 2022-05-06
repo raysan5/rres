@@ -130,6 +130,7 @@ const char *baseDir = NULL;
 //----------------------------------------------------------------------------------
 
 // Load simple data chunks that are later required by multi-chunk resources
+static void *LoadDataFromResourceLink(rresResourceChunk chunk, int *size);      // Load chunk: RRES_DATA_LINK
 static void *LoadDataFromResourceChunk(rresResourceChunk chunk, int *size);     // Load chunk: RRES_DATA_RAW
 static char *LoadTextFromResourceChunk(rresResourceChunk chunk, int *codeLang); // Load chunk: RRES_DATA_TEXT
 static Image LoadImageFromResourceChunk(rresResourceChunk chunk);               // Load chunk: RRES_DATA_IMAGE
@@ -137,7 +138,7 @@ static Image LoadImageFromResourceChunk(rresResourceChunk chunk);               
 static int UnpackDataFromResourceChunk(rresResourceChunk *chunk);   // Unpack compressed/encrypted data from chunk
                                                                     // NOTE: Function return 0 on success or other value on failure
 
-static const char *GetFourCCFromType(unsigned int type)             // Get FourCC 4-char code from resource type, useful for log info
+static const char *GetFourCCFromType(unsigned int type);            // Get FourCC 4-char code from resource type, useful for log info
 static unsigned int *ComputeMD5(unsigned char *data, int size);     // Compute MD5 hash code, returns 4 integers array (static)
 
 //----------------------------------------------------------------------------------
@@ -147,35 +148,27 @@ static unsigned int *ComputeMD5(unsigned char *data, int size);     // Compute M
 // Load raw data from rres resource
 void *LoadDataFromResource(rresResource rres, int *size)
 {
-    void *data = NULL;
+    void *rawData = NULL;
 
     if (rres.count >= 1)    // Verify we got at least one resource
     {
         // Data can be provided in the resource or linked to an external file
-        if (rres.chunks[0].type == RRES_DATA_RAW)
+        if (rres.chunks[0].type == RRES_DATA_RAW)       // Raw data
         {
-            data = LoadDataFromResourceChunk(rres.chunks[0], size);
+            rawData = LoadDataFromResourceChunk(rres.chunks[0], size);
         }
-        else if (rres.chunks[0].type == RRES_DATA_LINK)
+        else if (rres.chunks[0].type == RRES_DATA_LINK) // Link to external file
         {
-            data = LoadDataFromResourceLink(rres.chunks[0]);    // Get raw data from external linked file
+            // Get raw data from external linked file
+            unsigned int dataSize = 0;
+            void *data = LoadDataFromResourceLink(rres.chunks[0], &dataSize);
 
-            unsigned char filePath[MAX_]
-
-            // Get external link filepath
-            unsigned char *linkFilePath = RL_CALLOC(chunk.props[0], 1);
-            memcpy(linkFilePath, chunk.data, chunk.props[0]);
-
-            // Get/set base directory to append filepath
-            if (baseDir == NULL) baseDir = GetWorkingDirectory();     // ALTERNATIVE: GetApplicationDirectory()
-
-            if (FileExists(linkFilePath))
-            // Try to load external file as raw data
-            data = LoadFileData(linkFilePath, size);
+            rawData = data;
+            *size = dataSize;
         }
     }
 
-    return data;
+    return rawData;
 }
 
 // Load text data from rres resource
@@ -185,11 +178,22 @@ char *LoadTextFromResource(rresResource rres)
     char *text = NULL;
     int codeLang = 0;
 
-    if ((rres.count >= 1) && (rres.chunks[0].type == RRES_DATA_TEXT))
+    if (rres.count >= 1)
     {
-        text = LoadTextFromResourceChunk(rres.chunks[0], &codeLang);
+        if (rres.chunks[0].type == RRES_DATA_TEXT)      // Text data
+        {
+            text = LoadTextFromResourceChunk(rres.chunks[0], &codeLang);
 
-        // TODO: Consider text code language to load shader or code scripts
+            // TODO: Consider text code language to load shader or code scripts
+        }
+        else if (rres.chunks[0].type == RRES_DATA_LINK)  // Link to external file
+        {
+            // Get raw data from external linked file
+            unsigned int dataSize = 0;
+            void *data = LoadDataFromResourceLink(rres.chunks[0], &dataSize);
+
+            text = data;
+        }
     }
 
     return text;
@@ -200,9 +204,21 @@ Image LoadImageFromResource(rresResource rres)
 {
     Image image = { 0 };
 
-    if ((rres.count >= 1) && (rres.chunks[0].type == RRES_DATA_IMAGE))
+    if (rres.count >= 1)
     {
-        image = LoadImageFromResourceChunk(rres.chunks[0]);
+        if (rres.chunks[0].type == RRES_DATA_IMAGE)     // Image data
+        {
+            image = LoadImageFromResourceChunk(rres.chunks[0]);
+        }
+        else if (rres.chunks[0].type == RRES_DATA_LINK) // Link to external file
+        {
+            // Get raw data from external linked file
+            unsigned int dataSize = 0;
+            void *data = LoadDataFromResourceLink(rres.chunks[0], &dataSize);
+
+            // Load image from linked file data
+            image = LoadImageFromMemory(GetFileExtension(rres.chunks[0].data), data, dataSize);
+        }
     }
 
     return image;
@@ -213,20 +229,32 @@ Wave LoadWaveFromResource(rresResource rres)
 {
     Wave wave = { 0 };
 
-    if ((rres.count >= 1) && (rres.chunks[0].type == RRES_DATA_WAVE))
+    if (rres.count >= 1)
     {
-        int result = UnpackDataFromResourceChunk(&rres.chunks[0]);
-
-        if (result == 0)    // Data was successfully decompressed/decrypted
+        if (rres.chunks[0].type == RRES_DATA_WAVE)      // Wave data
         {
-            wave.frameCount = rres.chunks[0].props[0];
-            wave.sampleRate = rres.chunks[0].props[1];
-            wave.sampleSize = rres.chunks[0].props[2];
-            wave.channels = rres.chunks[0].props[3];
+            int result = UnpackDataFromResourceChunk(&rres.chunks[0]);
 
-            unsigned int size = wave.frameCount*wave.sampleSize/8;
-            wave.data = RL_CALLOC(size);
-            memcpy(wave.data, rres.chunks[0].data, size);
+            if (result == 0)    // Data was successfully decompressed/decrypted
+            {
+                wave.frameCount = rres.chunks[0].props[0];
+                wave.sampleRate = rres.chunks[0].props[1];
+                wave.sampleSize = rres.chunks[0].props[2];
+                wave.channels = rres.chunks[0].props[3];
+
+                unsigned int size = wave.frameCount*wave.sampleSize/8;
+                wave.data = RL_CALLOC(size, 1);
+                memcpy(wave.data, rres.chunks[0].data, size);
+            }
+        }
+        else if (rres.chunks[0].type == RRES_DATA_LINK) // Link to external file
+        {
+            // Get raw data from external linked file
+            unsigned int dataSize = 0;
+            void *data = LoadDataFromResourceLink(rres.chunks[0], &dataSize);
+
+            // Load image from linked file data
+            wave = LoadWaveFromMemory(GetFileExtension(rres.chunks[0].data), data, dataSize);
         }
     }
 
@@ -254,8 +282,8 @@ Font LoadFontFromResource(rresResource rres)
                 font.glyphCount = rres.chunks[0].props[1];         // Number of characters (glyphs)
                 font.glyphPadding = rres.chunks[0].props[2];      // Padding around the chars
 
-                font.recs = (Rectangle *)RL_CALLOC(font.glyphCount*sizeof(Rectangle));
-                font.glyphs = (GlyphInfo *)RL_CALLOC(font.glyphCount*sizeof(GlyphInfo));
+                font.recs = (Rectangle *)RL_CALLOC(font.glyphCount, sizeof(Rectangle));
+                font.glyphs = (GlyphInfo *)RL_CALLOC(font.glyphCount, sizeof(GlyphInfo));
 
                 for (int i = 0; i < font.glyphCount; i++)
                 {
@@ -283,6 +311,16 @@ Font LoadFontFromResource(rresResource rres)
             UnloadImage(image);
         }
     }
+    else if ((rres.count == 1) && (rres.chunks[1].type == RRES_DATA_LINK))  // Link to external font file
+    {
+        // Get raw data from external linked file
+        unsigned int dataSize = 0;
+        void *data = LoadDataFromResourceLink(rres.chunks[0], &dataSize);
+
+        // Load image from linked file data
+        // NOTE: Loading font at 32px base size and default charset (95 glyphs)
+        font = LoadFontFromMemory(GetFileExtension(rres.chunks[0].data), data, dataSize, 32, NULL, 0);
+    }
 
     return font;
 }
@@ -297,7 +335,7 @@ Mesh LoadMeshFromResource(rresResource rres)
     // Mesh resource consist of (n) chunks:
     for (int i = 0; i < rres.count; i++)
     {
-        result = UnpackDataFromResourceChunk(&rres.chunks[i]);
+        int result = UnpackDataFromResourceChunk(&rres.chunks[i]);
 
         if (result == 0)
         {
@@ -320,7 +358,7 @@ Mesh LoadMeshFromResource(rresResource rres)
                         // raylib expects 3 components per vertex and float vertex format
                         if ((rres.chunks[i].props[2] == 3) && (rres.chunks[i].props[3] == RRES_VERTEX_FORMAT_FLOAT))
                         {
-                            mesh.vertices = (float *)RL_CALLOC(mesh.vertexCount*3*sizeof(float));
+                            mesh.vertices = (float *)RL_CALLOC(mesh.vertexCount*3, sizeof(float));
                             memcpy(mesh.vertices, rres.chunks[i].data, mesh.vertexCount*3*sizeof(float));
                         }
                         else RRES_LOG("WARNING: MESH: Vertex attribute position not valid, componentCount/vertexFormat do not fit\n");
@@ -329,9 +367,9 @@ Mesh LoadMeshFromResource(rresResource rres)
                     case RRES_VERTEX_ATTRIBUTE_TEXCOORD1:
                     {
                         // raylib expects 2 components per vertex and float vertex format
-                        if ((rres.chunks[i].props[2] == 2) && (rres.chunks[i].props[3] == RRES_VERTEX_FORMAT_FLOAT)
+                        if ((rres.chunks[i].props[2] == 2) && (rres.chunks[i].props[3] == RRES_VERTEX_FORMAT_FLOAT))
                         {
-                            mesh.texcoords = (float *)RL_CALLOC(mesh.vertexCount*2*sizeof(float));
+                            mesh.texcoords = (float *)RL_CALLOC(mesh.vertexCount*2, sizeof(float));
                             memcpy(mesh.texcoords, rres.chunks[i].data, mesh.vertexCount*2*sizeof(float));
                         }
                         else RRES_LOG("WARNING: MESH: Vertex attribute texcoord1 not valid, componentCount/vertexFormat do not fit\n");
@@ -340,9 +378,9 @@ Mesh LoadMeshFromResource(rresResource rres)
                     case RRES_VERTEX_ATTRIBUTE_TEXCOORD2:
                     {
                         // raylib expects 2 components per vertex and float vertex format
-                        if ((rres.chunks[i].props[2] == 2) && (rres.chunks[i].props[3] == RRES_VERTEX_FORMAT_FLOAT)
+                        if ((rres.chunks[i].props[2] == 2) && (rres.chunks[i].props[3] == RRES_VERTEX_FORMAT_FLOAT))
                         {
-                            mesh.texcoords2 = (float *)RL_CALLOC(mesh.vertexCount*2*sizeof(float));
+                            mesh.texcoords2 = (float *)RL_CALLOC(mesh.vertexCount*2, sizeof(float));
                             memcpy(mesh.texcoords2, rres.chunks[i].data, mesh.vertexCount*2*sizeof(float));
                         }
                         else RRES_LOG("WARNING: MESH: Vertex attribute texcoord2 not valid, componentCount/vertexFormat do not fit\n");
@@ -363,7 +401,7 @@ Mesh LoadMeshFromResource(rresResource rres)
                         // raylib expects 3 components per vertex and float vertex format
                         if ((rres.chunks[i].props[2] == 3) && (rres.chunks[i].props[3] == RRES_VERTEX_FORMAT_FLOAT))
                         {
-                            mesh.normals = (float *)RL_CALLOC(mesh.vertexCount*3*sizeof(float));
+                            mesh.normals = (float *)RL_CALLOC(mesh.vertexCount*3, sizeof(float));
                             memcpy(mesh.normals, rres.chunks[i].data, mesh.vertexCount*3*sizeof(float));
                         }
                         else RRES_LOG("WARNING: MESH: Vertex attribute normal not valid, componentCount/vertexFormat do not fit\n");
@@ -374,7 +412,7 @@ Mesh LoadMeshFromResource(rresResource rres)
                         // raylib expects 4 components per vertex and float vertex format
                         if ((rres.chunks[i].props[2] == 4) && (rres.chunks[i].props[3] == RRES_VERTEX_FORMAT_FLOAT))
                         {
-                            mesh.tangents = (float *)RL_CALLOC(mesh.vertexCount*4*sizeof(float));
+                            mesh.tangents = (float *)RL_CALLOC(mesh.vertexCount*4, sizeof(float));
                             memcpy(mesh.tangents, rres.chunks[i].data, mesh.vertexCount*4*sizeof(float));
                         }
                         else RRES_LOG("WARNING: MESH: Vertex attribute tangent not valid, componentCount/vertexFormat do not fit\n");
@@ -385,7 +423,7 @@ Mesh LoadMeshFromResource(rresResource rres)
                         // raylib expects 4 components per vertex and unsigned char vertex format
                         if ((rres.chunks[i].props[2] == 4) && (rres.chunks[i].props[3] == RRES_VERTEX_FORMAT_UBYTE))
                         {
-                            mesh.colors = (unsigned char *)RL_CALLOC(mesh.vertexCount*4*sizeof(unsigned char));
+                            mesh.colors = (unsigned char *)RL_CALLOC(mesh.vertexCount*4, sizeof(unsigned char));
                             memcpy(mesh.colors, rres.chunks[i].data, mesh.vertexCount*4*sizeof(unsigned char));
                         }
                         else RRES_LOG("WARNING: MESH: Vertex attribute color not valid, componentCount/vertexFormat do not fit\n");
@@ -396,7 +434,7 @@ Mesh LoadMeshFromResource(rresResource rres)
                         // raylib expects 1 components per index and unsigned short vertex format
                         if ((rres.chunks[i].props[2] == 1) && (rres.chunks[i].props[3] == RRES_VERTEX_FORMAT_USHORT))
                         {
-                            mesh.indices = (unsigned char *)RL_CALLOC(rres.chunks[i].props[0]*sizeof(unsigned short));
+                            mesh.indices = (unsigned char *)RL_CALLOC(rres.chunks[i].props[0], sizeof(unsigned short));
                             memcpy(mesh.indices, rres.chunks[i].data, rres.chunks[i].props[0]*sizeof(unsigned short));
                         }
                         else RRES_LOG("WARNING: MESH: Vertex attribute index not valid, componentCount/vertexFormat do not fit\n");
@@ -415,15 +453,49 @@ Mesh LoadMeshFromResource(rresResource rres)
 // Module specific Functions Definition
 //----------------------------------------------------------------------------------
 
+// Load data chunk: RRES_DATA_LINK
+static void *LoadDataFromResourceLink(rresResourceChunk chunk, int *size)
+{
+    unsigned char fullFilePath[2048] = { 0 };
+    void *data = NULL;
+    *size = 0;
+
+    // Get external link filepath
+    unsigned char *linkFilePath = RL_CALLOC(chunk.props[0], 1);
+    if (linkFilePath != NULL) memcpy(linkFilePath, chunk.data, chunk.props[0]);
+
+    // Get base directory to append filepath if not provided by user
+    if (baseDir == NULL) baseDir = GetApplicationDirectory();
+    
+    strcpy(fullFilePath, baseDir);
+    strcat(fullFilePath, linkFilePath);
+
+    if (FileExists(fullFilePath))
+    {
+        // Load external file as raw data
+        // NOTE: We check if file is a text file to allow automatic line-endings processing
+        if (IsFileExtension(linkFilePath, ".txt;.md;.vs;.fs;.info;.c;.h;.json;.xml;.glsl"))     // Text file
+        {
+            data = LoadFileText(fullFilePath);
+            *size = TextLength(data);
+        }
+        else
+        {
+            data = LoadFileData(fullFilePath, size);
+        }
+    }
+    else RRES_LOG("WARNING: [%s] Linked external file could not be found\n", linkFilePath);
+}
+
 // Load data chunk: RRES_DATA_RAW
 // NOTE: This chunk can be used raw files embedding or other binary blobs
-static void *LoadDataFromResourceChunk(rresResourceChunk chunk, int *size);
+static void *LoadDataFromResourceChunk(rresResourceChunk chunk, int *size)
 {
     void *rawData = NULL;
 
-    if (chunk.type == RRES_DATA_RAW)
+    if (chunk.type == RRES_DATA_RAW)    // TODO: WARNING: Type double checked?
     {
-        int result = UnpackDataFromResourceChunk(&rres.chunks[0]);
+        int result = UnpackDataFromResourceChunk(&chunk);
 
         if (result == 0)    // Data was successfully decompressed/decrypted
         {
@@ -444,7 +516,7 @@ static char *LoadTextFromResourceChunk(rresResourceChunk chunk, int *codeLang)
 
     if (chunk.type == RRES_DATA_TEXT)
     {
-        int result = UnpackDataFromResourceChunk(&rres.chunks[0]);
+        int result = UnpackDataFromResourceChunk(&chunk);
 
         if (result == 0)    // Data was successfully decompressed/decrypted
         {
@@ -454,6 +526,7 @@ static char *LoadTextFromResourceChunk(rresResourceChunk chunk, int *codeLang)
             // TODO: We got some extra text properties, in case they could be useful for users:
             // chunk.props[1]:rresTextEncoding, chunk.props[2]:rresCodeLang, chunk. props[3]:cultureCode
             *codeLang = chunk.props[2];
+            //chunks.props[3]:cultureCode could be useful for localized text
         }
     }
 
@@ -468,7 +541,7 @@ static Image LoadImageFromResourceChunk(rresResourceChunk chunk)
 
     if (chunk.type == RRES_DATA_IMAGE)
     {
-        int result = UnpackDataFromResourceChunk(&rres.chunks[0]);
+        int result = UnpackDataFromResourceChunk(&chunk);
 
         if (result == 0)    // Data was successfully decompressed/decrypted
         {
@@ -512,7 +585,7 @@ static Image LoadImageFromResourceChunk(rresResourceChunk chunk)
             // NOTE: Computed image data must match the data size of the chunk processed (minus props size)
             if (size == (chunk.baseSize - 20))
             {
-                image.data = RL_CALLOC(size);
+                image.data = RL_CALLOC(size, 1);
                 memcpy(image.data, chunk.data, size);
             }
             else RRES_LOG("WARNING: IMGE: Chunk data size do not match expected image data size\n");
@@ -662,7 +735,7 @@ static int UnpackDataFromResourceChunk(rresResourceChunk *chunk)
     }
 
     // STEP 2: If decryption was successful, try to decompress data
-    if (result == 0) && (chunk->compType != RRES_COMP_NONE)
+    if ((result == 0) && (chunk->compType != RRES_COMP_NONE))
     {
         // Decompress data
         if (chunk->compType == RRES_COMP_DEFLATE)
@@ -681,8 +754,6 @@ static int UnpackDataFromResourceChunk(rresResourceChunk *chunk)
 
             // Security check, uncompDataSize must match the provided chunk->baseSize
             if (uncompDataSize != chunk->baseSize) RRES_LOG("WARNING: Decompressed data could be corrupted, unexpected size\n");
-
-            RL_FREE(compData);
         }
         else if (chunk->compType == RRES_COMP_LZ4)
         {
@@ -707,7 +778,12 @@ static int UnpackDataFromResourceChunk(rresResourceChunk *chunk)
         }
         else if (chunk->compType == RRES_COMP_QOI)
         {
-            // TODO.
+            // TODO: Implement QOI decompression
+            int uncompDataSize = 0;
+            unsigned char *uncompData = (unsigned char *)RL_MALLOC(chunk->baseSize);
+            
+            //qoi_desc desc = { 0 };
+            //uncompData = qoi_decode(chunk->data, chunk->packedSize, &desc, 0);
         }
         else result = 3;    // Compression algorithm not supported
     }
@@ -717,15 +793,15 @@ static int UnpackDataFromResourceChunk(rresResourceChunk *chunk)
     {
         switch (result)
         {
-            case 0: RRES_LOG("INFO: %s: Chunk data decompressed/decrypted successfully\n", GetFourCCFromType(chunk.type)); break;
-            case 1: RRES_LOG("WARNING: %s: Chunk data encryption algorithm not supported\n", GetFourCCFromType(chunk.type)); break;
-            case 2: RRES_LOG("WARNING: %s: Chunk data decryption failed, wrong password provided\n", GetFourCCFromType(chunk.type)); break;
-            case 3: RRES_LOG("WARNING: %s: Chunk data compression algorithm not supported\n", GetFourCCFromType(chunk.type)); break;
-            case 4: RRES_LOG("WARNING: %s: Chunk data decompression failed\n", GetFourCCFromType(chunk.type)); break;
+            case 0: RRES_LOG("INFO: %s: Chunk data decompressed/decrypted successfully\n", GetFourCCFromType(chunk->type)); break;
+            case 1: RRES_LOG("WARNING: %s: Chunk data encryption algorithm not supported\n", GetFourCCFromType(chunk->type)); break;
+            case 2: RRES_LOG("WARNING: %s: Chunk data decryption failed, wrong password provided\n", GetFourCCFromType(chunk->type)); break;
+            case 3: RRES_LOG("WARNING: %s: Chunk data compression algorithm not supported\n", GetFourCCFromType(chunk->type)); break;
+            case 4: RRES_LOG("WARNING: %s: Chunk data decompression failed\n", GetFourCCFromType(chunk->type)); break;
             default: break;
         }
     }
-    else RRES_LOG("INFO: %s: Chunk does not require data decompression/decryption\n", GetFourCCFromType(chunk.type));
+    else RRES_LOG("INFO: %s: Chunk does not require data decompression/decryption\n", GetFourCCFromType(chunk->type));
 
     return result;
 }

@@ -2,10 +2,10 @@
 *
 *   raylib [rres] example - rres data loading
 *
-*   This example has been created using raylib 3.7 (www.raylib.com)
+*   This example has been created using raylib 4.1-dev (www.raylib.com)
 *   raylib is licensed under an unmodified zlib/libpng license (View raylib.h for details)
 *
-*   Copyright (c) 2021 Ramon Santamaria (@raysan5)
+*   Copyright (c) 2021-2022 Ramon Santamaria (@raysan5)
 *
 ********************************************************************************************/
 
@@ -70,9 +70,10 @@ int main(void)
     // TEST 03: RRES_DATA_IMAGE -> OK!!!
     rres = rresLoadResource("resources.rres", rresGetIdFromFileName(dir, "resources/images/fudesumi.png"));
     Image image = LoadImageFromResource(rres);
+    Texture2D texture = { 0 };
     if (image.data != NULL)
     {
-        Texture2D texture = LoadTextureFromImage(image);
+        texture = LoadTextureFromImage(image);
         UnloadImage(image);
     }
     rresUnloadResource(rres);
@@ -85,7 +86,7 @@ int main(void)
     rresUnloadResource(rres);
 
     // TEST 04: RRES_DATA_FONT_INFO (multichunk) -> ...
-    rres = rresLoadData("resources.rres", rresGetIdFromFileName(dir, "resources/fonts/pixantiqua.ttf"));
+    rres = rresLoadResource("resources.rres", rresGetIdFromFileName(dir, "resources/fonts/pixantiqua.ttf"));
     Font font = LoadFontFromResource(rres);
     rresUnloadResource(rres);
 
