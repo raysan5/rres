@@ -217,6 +217,8 @@ Image LoadImageFromResource(rresResource rres)
             void *data = LoadDataFromResourceLink(rres.chunks[0], &dataSize);
 
             // Load image from linked file data
+            // NOTE: Function checks internally if the file extension is supported to
+            // properly load the data, if it fails it logs the result and image.data = NULL
             image = LoadImageFromMemory(GetFileExtension(rres.chunks[0].data), data, dataSize);
         }
     }
@@ -253,7 +255,9 @@ Wave LoadWaveFromResource(rresResource rres)
             unsigned int dataSize = 0;
             void *data = LoadDataFromResourceLink(rres.chunks[0], &dataSize);
 
-            // Load image from linked file data
+            // Load wave from linked file data
+            // NOTE: Function checks internally if the file extension is supported to
+            // properly load the data, if it fails it logs the result and wave.data = NULL
             wave = LoadWaveFromMemory(GetFileExtension(rres.chunks[0].data), data, dataSize);
         }
     }
@@ -318,7 +322,9 @@ Font LoadFontFromResource(rresResource rres)
         void *data = LoadDataFromResourceLink(rres.chunks[0], &dataSize);
 
         // Load image from linked file data
-        // NOTE: Loading font at 32px base size and default charset (95 glyphs)
+        // NOTE 1: Loading font at 32px base size and default charset (95 glyphs)
+        // NOTE 2: Function checks internally if the file extension is supported to
+        // properly load the data, if it fails it logs the result and font.texture.id = 0
         font = LoadFontFromMemory(GetFileExtension(rres.chunks[0].data), data, dataSize, 32, NULL, 0);
     }
 
@@ -331,6 +337,8 @@ Font LoadFontFromResource(rresResource rres)
 Mesh LoadMeshFromResource(rresResource rres)
 {
     Mesh mesh = { 0 };
+
+    // TODO: Support externally linked mesh resource?
 
     // Mesh resource consist of (n) chunks:
     for (int i = 0; i < rres.count; i++)
