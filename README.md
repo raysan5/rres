@@ -20,7 +20,7 @@
 4. [File Structure](#file-structure)
 5. [File Header: `rresFileHeader`](#file-header-rresfileheader)
 6. [Resource Chunk: `rresResourceChunk`](#resource-chunk-rresresourcechunk)
-    1. [Resource Info Header: `rresResourceInfoHeader`](#resource-info-header-rresresourceinfoheader)
+    1. [Resource Info Header: `rresResourceChunkInfo`](#resource-info-header-rresresourceinfoheader)
     2. [Resource Data Chunk: `rresResourceChunkData`](#resource-data-chunk-rresresourcedatachunk)
     3. [Resource Data Type: `rresResourceDataType`](#resource-data-type-rresresourcedatatype)
     4. [Resource Chunk: Central Directory: `rresCentralDir`](#resource-chunk-central-directory-rrescentraldir)
@@ -75,9 +75,9 @@ It's been an **8 years project**, working on it on-and-off, with many redesigns 
 
 ## File Structure
 
-rres file format consists of a file header (`rresFileHeader`) followed by a number of resource chunks (`rresResourceChunk`). Every resource chunk has a resource info header (`rresResourceInfoHeader`) that includes a `FOURCC` data type code and resource data information. The resource data (`rresResourceChunkData`) contains a small set of properties to identify data, depending on the type and could contain some additional data at the end.
+rres file format consists of a file header (`rresFileHeader`) followed by a number of resource chunks (`rresResourceChunk`). Every resource chunk has a resource info header (`rresResourceChunkInfo`) that includes a `FOURCC` data type code and resource data information. The resource data (`rresResourceChunkData`) contains a small set of properties to identify data, depending on the type and could contain some additional data at the end.
 
-![rres v1.0](https://raw.githubusercontent.com/raysan5/rres/master/design/rres_file_format_REV5.png)
+![rres v1.0](https://raw.githubusercontent.com/raysan5/rres/master/design/rres_file_format_REV6.png)
 
 _Fig 01. rres v1.0 file structure._
 
@@ -94,7 +94,7 @@ rresFileHeader               (16 bytes)
 
 rresResourceChunk[]
 {
-    rresResourceInfoHeader   (32 bytes)
+    rresResourceChunkInfo   (32 bytes)
         Type                  (4 bytes)     // Resource type (FourCC)
         Id                    (4 bytes)     // Resource identifier (CRC32 filename hash or custom)
         Compressor            (1 byte)      // Data compression algorithm
@@ -151,15 +151,15 @@ It's important to note that one input file could generate several resource chunk
 
 On `rres` creation, `rres` packer could create an additional resource chunk of type `RRES_DATA_DIRECTORY` containing data about the processed input files. It could be useful in some cases, for example to relate the input filename directly to the generated resource(s) id and also to extract the data in a similar file structure to the original input one.
 
-Every resource chunk is divided in two part: `rresResourceInfoHeader` + `rresResourceData`.
+Every resource chunk is divided in two part: `rresResourceChunkInfo` + `rresResourceData`.
 
-### Resource Info Header: `rresResourceInfoHeader`
+### Resource Info Header: `rresResourceChunkInfo`
 
-The following C struct defines the `rresResourceInfoHeader`:
+The following C struct defines the `rresResourceChunkInfo`:
 
 ```c
 // rres resource chunk info header (32 bytes)
-typedef struct rresResourceInfoHeader {
+typedef struct rresResourceChunkInfo {
     unsigned char type[4];          // Resource chunk type (FourCC)
     unsigned int id;                // Resource chunk identifier (generated from filename CRC32 hash)
     unsigned char compType;         // Data compression algorithm
@@ -170,7 +170,7 @@ typedef struct rresResourceInfoHeader {
     unsigned int nextOffset;        // Next resource chunk global offset (if resource has multiple chunks)
     unsigned int reserved;          // <reserved>
     unsigned int crc32;             // Data chunk CRC32 (propCount + props[] + data)
-} rresResourceInfoHeader;
+} rresResourceChunkInfo;
 ```
 
 | Field | Description |
@@ -186,7 +186,7 @@ typedef struct rresResourceInfoHeader {
 | `reserved` | This field is reserved for future additions if required. |
 | `crc32` | Calculated over the full `rresResourceData` chunk (`packedSize`) and it's intended to detect data corruption errors. |
 
-_Table 02. `rresResourceInfoHeader` fields description and details_
+_Table 02. `rresResourceChunkInfo` fields description and details_
 
 ### Resource Data Chunk: `rresResourceChunkData`
 
@@ -200,7 +200,7 @@ _NOTE: rresResourceChunkData could contain additional user data, in those cases 
  
 ### Resource Data Type: `rresResourceDataType`
 
-The resource `type` specified in the `rresResourceInfoHeader` defines the type of data and the number of properties contained in the resource chunk.
+The resource `type` specified in the `rresResourceChunkInfo` defines the type of data and the number of properties contained in the resource chunk.
 
 Here it is the currently defined data types. Please note that some input files could generate multiple resource chunks of multiple types. Additional resource types could be added if required.
 
@@ -302,7 +302,7 @@ _Fig 02. rres sample implementation: custom engine lib and tool._
 
 ### Base library: `rres.h`
 
-Base `rres` library is in charge of reading `rres` files resource chunks into generic resource structures, returned to the user. In our implementation the user exposed resource structures (`rresResourceChunk`, `rresResource`) are different than the ones used internally to process the `rres` file data (`rresFileHeader`, `rresResourceInfoHeader`). This design decision is due to the returned data for the user consist of a combination of the resource data info and resource data, and user does not need to have all the information after being properly processed. Our implementation does not include resource file writing, that functionality has been implemented directly in `rrespacker` tool.
+Base `rres` library is in charge of reading `rres` files resource chunks into generic resource structures, returned to the user. In our implementation the user exposed resource structures (`rresResourceChunk`, `rresResource`) are different than the ones used internally to process the `rres` file data (`rresFileHeader`, `rresResourceChunkInfo`). This design decision is due to the returned data for the user consist of a combination of the resource data info and resource data, and user does not need to have all the information after being properly processed. Our implementation does not include resource file writing, that functionality has been implemented directly in `rrespacker` tool.
 
 `rresResource` is provided by `rres.h` along functions to load it and contains an array of `rresResourceChunk`, defined as following:
 
