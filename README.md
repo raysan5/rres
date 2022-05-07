@@ -21,7 +21,7 @@
 5. [File Header: `rresFileHeader`](#file-header-rresfileheader)
 6. [Resource Chunk: `rresResourceChunk`](#resource-chunk-rresresourcechunk)
     1. [Resource Info Header: `rresResourceInfoHeader`](#resource-info-header-rresresourceinfoheader)
-    2. [Resource Data Chunk: `rresResourceDataChunk`](#resource-data-chunk-rresresourcedatachunk)
+    2. [Resource Data Chunk: `rresResourceChunkData`](#resource-data-chunk-rresresourcedatachunk)
     3. [Resource Data Type: `rresResourceDataType`](#resource-data-type-rresresourcedatatype)
     4. [Resource Chunk: Central Directory: `rresCentralDir`](#resource-chunk-central-directory-rrescentraldir)
 7. [Custom Engine Implementation](#custom-engine-implementation)
@@ -75,7 +75,7 @@ It's been an **8 years project**, working on it on-and-off, with many redesigns 
 
 ## File Structure
 
-rres file format consists of a file header (`rresFileHeader`) followed by a number of resource chunks (`rresResourceChunk`). Every resource chunk has a resource info header (`rresResourceInfoHeader`) that includes a `FOURCC` data type code and resource data information. The resource data (`rresResourceDataChunk`) contains a small set of properties to identify data, depending on the type and could contain some additional data at the end.
+rres file format consists of a file header (`rresFileHeader`) followed by a number of resource chunks (`rresResourceChunk`). Every resource chunk has a resource info header (`rresResourceInfoHeader`) that includes a `FOURCC` data type code and resource data information. The resource data (`rresResourceChunkData`) contains a small set of properties to identify data, depending on the type and could contain some additional data at the end.
 
 ![rres v1.0](https://raw.githubusercontent.com/raysan5/rres/master/design/rres_file_format_REV5.png)
 
@@ -106,7 +106,7 @@ rresResourceChunk[]
         Reserved              (4 bytes)     // <reserved>
         CRC32                 (4 bytes)     // Resource Data Chunk CRC32
                              
-    rresResourceDataChunk     (n bytes)     // Packed data
+    rresResourceChunkData     (n bytes)     // Packed data
         Property Count        (4 bytes)     // Number of properties contained
         Properties[]          (4*i bytes)   // Resource data required properties, depend on Type
         Data                  (m bytes)     // Resource data
@@ -175,28 +175,28 @@ typedef struct rresResourceInfoHeader {
 
 | Field | Description |
 | :---: | :---------- |
-| `type` | A [`FourCC`](https://en.wikipedia.org/wiki/FourCC) code and identifies the type of resource data contained in the `rresResourceDataChunk`. Enum `rresResourceDataType` defines several data types, new ones could be added if requried. |
+| `type` | A [`FourCC`](https://en.wikipedia.org/wiki/FourCC) code and identifies the type of resource data contained in the `rresResourceChunkData`. Enum `rresResourceDataType` defines several data types, new ones could be added if requried. |
 | `id` | A global resource identifier, it's generated from input filename using a CRC32 hash and it's not unique. One input file can generate multiple resource chunks, all the generated chunks share the same identifier and they are loaded together when the resource is loaded. For example, a input .ttf could generate two resource chunks (`RRES_DATA_IMAGE` + `RRES_DATA_GLYPH_INFO`) with same identifier that will be loaded together when their identifier is requested. It's up to the user to decide what to do with loaded data. |
 | `compType` | Defines the compression algorithm used for the resource chunk data. Compression depends on the middle library between rres and the engine, `rres.h` just defines some useful algorithm values to be used in case of implementing compression. Compression should always be applied before encryption and it compresses the full `rresResourceData` (`Property Count` + `Properties[]` + `Data`). If no data encryption is applied, `packedSize` defines the size of compressed data. |
 | `cipherType` | Defines the encryption algorithm used for the resource chunk data. Like compression, encryption depends on the middle library between rres and the engine, `rres.h` just defines some useful algorithm values to be used in case of implementing encryption. Encryption should be applied after compression. Depending on the encryption algorithm and encryption mode it could require some extra piece of data to be attached to the resource data (i.e encryption MAC), this is implementation dependant and the rres packer tool / rres middle library for the engines are the responsible to manage that extra data. It's recommended to be just appended to resource data and considered on `packedSize`. |
 | `flags` | Reserved for additional flags, in case they are required by the implementation. |
-| `packedSize` | Defines the packed size (compressed/encrypted + additional user data) of `rresResourceDataChunk`. Packaged data could contain appended user data at the end, after compressed/encrypted data, for example the nonce/MAC for the encrypted data, but it is implementation dependant, managed by the `rres` packer tool and the user library to load the chunks data into target engine structures. |
-| `baseSize` | Defines the base size (uncompressed/unencrypted) of `rresResourceDataChunk`. |
+| `packedSize` | Defines the packed size (compressed/encrypted + additional user data) of `rresResourceChunkData`. Packaged data could contain appended user data at the end, after compressed/encrypted data, for example the nonce/MAC for the encrypted data, but it is implementation dependant, managed by the `rres` packer tool and the user library to load the chunks data into target engine structures. |
+| `baseSize` | Defines the base size (uncompressed/unencrypted) of `rresResourceChunkData`. |
 | `nextOffset` | Defines the global file position address for the next _related_ resource chunk, it's useful for input files that generate multiple resources, like fonts or meshes. |
 | `reserved` | This field is reserved for future additions if required. |
 | `crc32` | Calculated over the full `rresResourceData` chunk (`packedSize`) and it's intended to detect data corruption errors. |
 
 _Table 02. `rresResourceInfoHeader` fields description and details_
 
-### Resource Data Chunk: `rresResourceDataChunk`
+### Resource Data Chunk: `rresResourceChunkData`
 
-`rresResourceDataChunk` contains the following data:
+`rresResourceChunkData` contains the following data:
 
  - `Property Count`: Number of properties contained, depends on resource `type`
  - `Properties[]`: Resource data required properties, depend on resource `type`
  - `Data`: Resource data, depend on resource `type`
 
-_NOTE: rresResourceDataChunk could contain additional user data, in those cases additional data size must be considered in `packedSize`._
+_NOTE: rresResourceChunkData could contain additional user data, in those cases additional data size must be considered in `packedSize`._
  
 ### Resource Data Type: `rresResourceDataType`
 
@@ -271,7 +271,7 @@ typedef struct rresDirEntry {
 } rresDirEntry;
 
 // rres central directory
-// NOTE: This data represents the rresResourceDataChunk
+// NOTE: This data represents the rresResourceChunkData
 typedef struct rresCentralDir {
     unsigned int count;             // Central directory entries count
     rresDirEntry *entries;          // Central directory entries

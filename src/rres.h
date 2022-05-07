@@ -53,7 +53,7 @@
 *           Reserved              (4 bytes)     // <reserved>
 *           CRC32                 (4 bytes)     // Resource Data Chunk CRC32
 *
-*       rresResourceDataChunk     (n bytes)     // Packed data
+*       rresResourceChunkData     (n bytes)     // Packed data
 *           Property Count        (4 bytes)     // Number of properties contained
 *           Properties[]          (4*i bytes)   // Resource data required properties, depend on Type
 *           Data                  (m bytes)     // Resource data
@@ -63,7 +63,7 @@
 *   {
 *       rresResourceInfoHeader   (32 bytes)
 *
-*       rresCentralDir            (n bytes)     // rresResourceDataChunk
+*       rresCentralDir            (n bytes)     // rresResourceChunkData
 *           Entries Count         (4 bytes)     // Central directory entries count (files)
 *           rresDirEntry[]
 *           {
@@ -189,8 +189,8 @@
 // rres resource chunk
 // WARNING: This is the resource type returned to the user after
 // reading and processing data from file, it's not directly aligned with
-// internal resource data types: rresResourceInfoHeader + rresResourceDataChunk
-// It just returns the data required to process and load the resource by the engine library
+// internal resource data types: rresResourceInfoHeader + rresResourceChunkData
+// It just returns the minimal data required to process and load the resource by the engine library
 typedef struct rresResourceChunk {
     unsigned int type;              // Resource chunk data type
     unsigned short compType;        // Resource compression algorithm
@@ -202,8 +202,8 @@ typedef struct rresResourceChunk {
     void *data;                     // Resource chunk data
 } rresResourceChunk;
 
-// rres resource
-// NOTE: It could consist of multiple chunks
+// rres resource    
+// NOTE: It supports multiple resource chunks
 typedef struct rresResource {
     unsigned int count;             // Resource chunks count
     rresResourceChunk *chunks;      // Resource chunks
@@ -221,14 +221,14 @@ typedef struct rresDirEntry {
 } rresDirEntry;
 
 // CDIR: rres central directory
-// NOTE: This data conforms the rresResourceDataChunk
+// NOTE: This data conforms the rresResourceChunkData
 typedef struct rresCentralDir {
     unsigned int count;             // Central directory entries count
     rresDirEntry *entries;          // Central directory entries
 } rresCentralDir;
 
 // FNTG: rres font glyphs info (32 bytes)
-// NOTE: And array of this type conforms the rresResourceDataChunk
+// NOTE: And array of this type conforms the rresResourceChunkData
 typedef struct rresFontGlyphInfo {
     int x, y, width, height;        // Glyph rectangle in the atlas image
     int value;                      // Glyph codepoint value
@@ -458,8 +458,7 @@ extern "C" {            // Prevents name mangling of functions
 #endif
 
 // Load all resource chunks for a specified rresId
-RRESAPI rresResource rresLoadResource(const char *fileName, int rresId);        // Load resource from file for provided id,
-                                                                                // NOTE: Resource could consist of multiple resource chunks
+RRESAPI rresResource rresLoadResource(const char *fileName, int rresId);        // Load resource for provided id (multiple resource chunks)
 RRESAPI void rresUnloadResource(rresResource rres);                             // Unload resource from memory, all chunks it contains
 
 RRESAPI rresCentralDir rresLoadCentralDirectory(const char *fileName);          // Load central directory resource chunk from file
@@ -472,8 +471,8 @@ RRESAPI unsigned int rresComputeCRC32(unsigned char *data, int len);            
 // Manage password for data encryption/decryption
 // NOTE: The cipher password is kept as an internal pointer to provided string, it's up to the user to manage that sensible data properly
 // It's recommended to allocate the password previously to rres file loading and wipe that memory space after rres loading
-RRESAPI void rresSetCipherPassword(const char *pass);                           // Set password to be used on data decryption
-RRESAPI const char *rresGetCipherPassword(void);                                // Get password to be used on data decryption
+RRESAPI void rresSetCipherPassword(const char *pass);           // Set password to be used on data decryption
+RRESAPI const char *rresGetCipherPassword(void);                // Get password to be used on data decryption
 
 #ifdef __cplusplus
 }
@@ -534,7 +533,7 @@ static const char *password = NULL; // Password pointer, managed by user librari
 //----------------------------------------------------------------------------------
 // Module Internal Functions Declaration
 //----------------------------------------------------------------------------------
-static rresResourceChunk rresLoadResourceChunk(rresResourceInfoHeader info, void *data);
+static rresResourceChunk rresLoadResourceChunk(rresResourceInfoHeader info, void *packedData);
 static void rresUnloadResourceChunk(rresResourceChunk chunk);
 
 //----------------------------------------------------------------------------------
