@@ -814,7 +814,7 @@ static int UnpackDataFromResourceChunk(rresResourceChunk *chunk)
 
         if (result == 0)
         {
-            // Data is uncompressed/decrypted into chunk->data.raw but data.propCount and data.props[] are still empty, 
+            // Data is decompressed/decrypted into chunk->data.raw but data.propCount and data.props[] are still empty, 
             // they must be filled with the just updated chunk->data.raw (that contains everything)
             chunk->data.propCount = ((int *)chunk->data.raw)[0];
 
