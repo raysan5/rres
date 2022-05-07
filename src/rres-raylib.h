@@ -798,13 +798,10 @@ static int UnpackDataFromResourceChunk(rresResourceChunk *chunk)
         else result = 3;    // Compression algorithm not supported
     }
 
-    // TODO: WARNING: Data was uncompressed/decrypted into chunk.data.raw but data.propCount and data.props[]
-    // are still empty, they must be filled with the newly created data.raw (that contains everything)
-
-
-    // Show some log info about the decompression/decryption process
+    // Update chunk->data.propCount and chunk->data.props if required
     if ((chunk->cipherType != RRES_CIPHER_NONE) || (chunk->compType != RRES_COMP_NONE))
     {
+        // Show some log info about the decompression/decryption process
         switch (result)
         {
             case 0: RRES_LOG("INFO: %s: Chunk data decompressed/decrypted successfully\n", GetFourCCFromType(chunk->type)); break;
@@ -813,6 +810,25 @@ static int UnpackDataFromResourceChunk(rresResourceChunk *chunk)
             case 3: RRES_LOG("WARNING: %s: Chunk data compression algorithm not supported\n", GetFourCCFromType(chunk->type)); break;
             case 4: RRES_LOG("WARNING: %s: Chunk data decompression failed\n", GetFourCCFromType(chunk->type)); break;
             default: break;
+        }
+
+        if (result == 0)
+        {
+            // Data is uncompressed/decrypted into chunk->data.raw but data.propCount and data.props[] are still empty, 
+            // they must be filled with the just updated chunk->data.raw (that contains everything)
+            chunk->data.propCount = ((int *)chunk->data.raw)[0];
+
+            if (chunk->data.propCount > 0)
+            {
+                chunk->data.props = (int *)RRES_CALLOC(chunk->data.propCount, sizeof(int));
+                for (unsigned int i = 0; i < chunk->data.propCount; i++) chunk->data.props[i] = ((int *)chunk->data.raw)[1 + i];
+            }
+
+            // Move chunk->data.raw pointer (chunk->data.propCount*sizeof(int)) positions
+            void *raw = RRES_CALLOC(chunk->baseSize - chunk->data.propCount*sizeof(int), 1);
+            if (raw != NULL) memcpy(raw, (unsigned char *)chunk->data.raw + (chunk->data.propCount*sizeof(int)), chunk->baseSize - chunk->data.propCount*sizeof(int));
+            RRES_FREE(chunk->data.raw);
+            chunk->data.raw = raw;
         }
     }
     else RRES_LOG("INFO: %s: Chunk does not require data decompression/decryption\n", GetFourCCFromType(chunk->type));
