@@ -92,8 +92,11 @@ RLAPI void SetBaseDirectory(const char *baseDir);                   // Set base 
 
 #if defined(RRES_RAYLIB_IMPLEMENTATION)
 
-// Include supported compression/encryption algorithms
+// Compression/Encryption algorithms supported
 // NOTE: They should be the same supported by the rres packaging tool (rrespacker)
+// https://github.com/phoboslab/qoi
+#include "external/qoi.h"                   // Compression algorithm: QOI (implementation in raylib)
+
 #if defined(RRES_SUPPORT_COMPRESSION_LZ4)
     // https://github.com/lz4/lz4
     #include "external/lz4.h"               // Compression algorithm: LZ4
@@ -643,7 +646,7 @@ static int UnpackDataFromResourceChunk(rresResourceChunk *chunk)
             // salt is stored at the end of packed data, before nonce and MAC: salt[16] + MD5[16]
             memcpy(salt, ((unsigned char *)chunk->data) + (chunk->packedSize - 16 - 16), 16);
 
-            // Encryption key, generated from user password, using Argon2i algorythm for key stretching (256 bit)
+            // Encryption key, generated from user password, using Argon2i algorithm for key stretching (256 bit)
             crypto_argon2i(key, 32, workArea, blocks, iterations, (uint8_t *)rresGetCipherPassword(), 16, salt, 16);
 
             // Wipe key generation secrets, they are no longer needed
@@ -702,7 +705,7 @@ static int UnpackDataFromResourceChunk(rresResourceChunk *chunk)
             // salt is stored at the end of packed data, before nonce and MAC: salt[16] + nonce[24] + MAC[16]
             memcpy(salt, ((unsigned char *)chunk->data) + (chunk->packedSize - 16 - 24 - 16), 16);
 
-            // Encryption key, generated from user password, using Argon2i algorythm for key stretching (256 bit)
+            // Encryption key, generated from user password, using Argon2i algorithm for key stretching (256 bit)
             crypto_argon2i(key, 32, workArea, blocks, iterations, (uint8_t *)rresGetCipherPassword(), 16, salt, 16);
 
             // Wipe key generation secrets, they are no longer needed
@@ -783,12 +786,13 @@ static int UnpackDataFromResourceChunk(rresResourceChunk *chunk)
         }
         else if (chunk->compType == RRES_COMP_QOI)
         {
-            // TODO: Implement QOI decompression
             int uncompDataSize = 0;
             unsigned char *uncompData = (unsigned char *)RL_MALLOC(chunk->baseSize);
             
-            //qoi_desc desc = { 0 };
-            //uncompData = qoi_decode(chunk->data, chunk->packedSize, &desc, 0);
+            qoi_desc desc = { 0 };
+            uncompData = qoi_decode(chunk->data, chunk->packedSize, &desc, 0);
+
+            if (uncompDataSize != chunk->baseSize) RRES_LOG("WARNING: Decompressed data could be corrupted, unexpected size\n");
         }
         else result = 3;    // Compression algorithm not supported
     }

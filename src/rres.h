@@ -194,7 +194,7 @@
 typedef struct rresResourceChunk {
     unsigned int type;              // Resource chunk data type
     unsigned short compType;        // Resource compression algorithm
-    unsigned short cipherType;      // Resource cipher algorythm
+    unsigned short cipherType;      // Resource cipher algorithm
     unsigned int packedSize;        // Packed data size (including props, compressed and/or encripted + additional data appended)
     unsigned int baseSize;          // Base data size (including propCount, props and uncompressed/decrypted data)
     unsigned int propCount;         // Resource chunk properties count
