@@ -797,8 +797,9 @@ unsigned int rresComputeCRC32(unsigned char *data, int len)
 //----------------------------------------------------------------------------------
 // Module Internal Functions Definition
 //----------------------------------------------------------------------------------
-// Load data chunk from resource packed data as contained in file
-// WARNING: Data can be compressed and/or encrypted, in those cases is up to the user to process it
+// Load user resource chunk from resource packed data (as contained in .rres file)
+// WARNING: Data can be compressed and/or encrypted, in those cases is up to the user to process it,
+// and chunk.data.propCount = 0, chunk.data.props = NULL and chunk.data.raw contains all resource packed data
 static rresResourceChunk rresLoadResourceChunk(rresResourceChunkInfo info, void *data)
 {
     rresResourceChunk chunk = { 0 };
@@ -826,7 +827,6 @@ static rresResourceChunk rresLoadResourceChunk(rresResourceChunkInfo info, void 
     if ((chunk.type != RRES_DATA_NULL) && (crc32 == info.crc32))   // Make sure chunk contains data and data is not corrupted
     {
         // Check if data chunk is compressed/encrypted to retrieve properties + data
-        // If data is compressed/encrypted we just return the loaded chunk and user must manage decompression/decryption on user library
         if ((info.compType == RRES_COMP_NONE) && (info.cipherType == RRES_CIPHER_NONE))
         {
             // Data is not compressed/encrypted (info.packedSize = info.baseSize)
@@ -844,8 +844,8 @@ static rresResourceChunk rresLoadResourceChunk(rresResourceChunkInfo info, void 
         else
         {
             // Data is compressed/encrypted
-            // We can not retrieve properties, it must be processed by user library
-            // We just store the full pack of raw data in chunk.data.raw
+            // We just return the loaded resource packed data from .rres file,
+            // it's up to the user to manage decompression/decryption on user library
             chunk.data.raw = RRES_MALLOC(info.packedSize);
             memcpy(chunk.data.raw, (unsigned char *)data, info.packedSize);
         }
