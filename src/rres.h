@@ -461,6 +461,10 @@ extern "C" {            // Prevents name mangling of functions
 RRESAPI rresResource rresLoadResource(const char *fileName, int rresId);        // Load resource for provided id (multiple resource chunks)
 RRESAPI void rresUnloadResource(rresResource rres);                             // Unload resource from memory, all chunks it contains
 
+// TODO: Support loading only one resource chunk?
+//RRESAPI rresResourceChunk rresLoadResourceChunk(const char *fileName, int rresId);  // Load one resource chunk for provided id
+//RRESAPI void rresUnloadResourceChunk(rresResource rres);                            // Unload resource chunk from memory
+
 RRESAPI rresCentralDir rresLoadCentralDirectory(const char *fileName);          // Load central directory resource chunk from file
 RRESAPI void rresUnloadCentralDirectory(rresCentralDir dir);                    // Unload central directory resource chunk
 
@@ -525,6 +529,23 @@ typedef struct rresResourceInfoHeader {
     unsigned int crc32;             // Data chunk CRC32 (propCount + props[] + data)
 } rresResourceInfoHeader;
 
+
+// TODO: Expose resource structures directly instead of a minimized version? 
+/*
+// rres resource chunk data
+typedef struct rresResourceChunkData {
+    unsigned int propCount;         // Resource chunk properties count
+    int *props;                     // Resource chunk properties
+    void *data;                     // Resource chunk data
+} rresResourceChunkData;
+
+// rres resoruce chunk (info + chunk data)
+typedef struct rresResourceChunk {
+    rresResourceInfoHeader info;    // Resource chunk info header
+    rresResourceChunkData chunk;    // Resource chunk data
+} rresResourceChunk;
+*/
+
 //----------------------------------------------------------------------------------
 // Global Variables Definition
 //----------------------------------------------------------------------------------
@@ -535,6 +556,10 @@ static const char *password = NULL; // Password pointer, managed by user librari
 //----------------------------------------------------------------------------------
 static rresResourceChunk rresLoadResourceChunk(rresResourceInfoHeader info, void *packedData);
 static void rresUnloadResourceChunk(rresResourceChunk chunk);
+
+// TODO: Use a more comprehensive and aligned data structures?
+//static rresResourceChunkData rresLoadResourceChunkData(rresResourceInfoHeader info, void *packedData);
+//static void rresUnloadResourceChunkData(rresResourceChunkData chunk);
 
 //----------------------------------------------------------------------------------
 // Module Functions Definition
