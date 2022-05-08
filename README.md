@@ -101,7 +101,7 @@ rresResourceChunk[]
         Cipher                (1 byte)      // Data encryption algorithm
         Flags                 (2 bytes)     // Data flags (if required)
         Packed data Size      (4 bytes)     // Packed data size (compressed/encrypted + custom data appended)
-        Base data Size        (4 bytes)     // Base data size (uncompressed/decrypted)
+        Base data Size        (4 bytes)     // Base data size (uncompressed/unencrypted)
         Next Offset           (4 bytes)     // Next resource chunk offset (if required)
         Reserved              (4 bytes)     // <reserved>
         CRC32                 (4 bytes)     // Resource Chunk Data CRC32
@@ -320,8 +320,8 @@ typedef struct rresResourceChunk {
     unsigned int type;              // Resource chunk data type
     unsigned short compType;        // Resource compression algorithm
     unsigned short cipherType;      // Resource cipher algorythm
-    unsigned int packedSize;        // Packed data size (including props, compressed and/or encripted + additional data appended)
-    unsigned int baseSize;          // Base data size (including propCount, props and uncompressed/decrypted data)
+    unsigned int packedSize;        // Packed data size (including props, compressed and/or encrypted + additional data appended)
+    unsigned int baseSize;          // Base data size (including propCount, props and uncompressed/unencrypted data)
     rresResourceChunkData data;     // Resource chunk packed data, contains propCount, props[] and raw data
 } rresResourceChunk;
 
