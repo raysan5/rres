@@ -606,9 +606,12 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
             // Data is not encrypted any more, register it
             chunk->cipherType = RRES_CIPHER_NONE;
             updateProps = true;
+
+            RRES_LOG("RRES: %s: Chunk data decrypted successfully\n", GetFourCCFromType(chunk->type));
         }
     }
-    else RRES_LOG("INFO: %s: Chunk does not require data decryption\n", GetFourCCFromType(chunk->type));
+    else decryptedData = chunk->data.raw;
+    //else RRES_LOG("RRES: %s: Chunk does not require data decryption\n", GetFourCCFromType(chunk->type));
 
 
     // STEP 2: If decryption was successful, try to decompress data
@@ -620,7 +623,7 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
             int uncompDataSize = 0;
 
             // TODO: WARNING: Possible issue with allocators! RL_CALLOC() vs RRES_CALLOC()
-            uncompData = DecompressData(chunk->data.raw, chunk->packedSize, &uncompDataSize);
+            uncompData = DecompressData(decryptedData, chunk->packedSize, &uncompDataSize);
 
             if ((uncompData != NULL) && (uncompDataSize > 0))     // Decompression successful
             {
@@ -637,7 +640,7 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
 #if defined(RRES_SUPPORT_COMPRESSION_LZ4)
             int uncompDataSize = 0;
             uncompData = (unsigned char *)RRES_CALLOC(chunk->baseSize, 1);
-            uncompDataSize = LZ4_decompress_safe(chunk->data.raw, uncompData, chunk->packedSize, chunk->baseSize);
+            uncompDataSize = LZ4_decompress_safe(decryptedData, uncompData, chunk->packedSize, chunk->baseSize);
 
             if ((uncompData != NULL) && (uncompDataSize > 0))     // Decompression successful
             {
@@ -657,8 +660,8 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
             int uncompDataSize = 0;
             qoi_desc desc = { 0 };
             // TODO: WARNING: Possible issue with allocators! QOI_MALLOC() vs RRES_MALLOC()
-            uncompData = qoi_decode(chunk->data.raw, chunk->packedSize, &desc, 0);
-            uncompDataSize = desc.width*desc.height*desc.channels;
+            uncompData = qoi_decode(decryptedData, chunk->packedSize, &desc, 0);
+            uncompDataSize = (desc.width*desc.height*desc.channels) + 20;   // Add the 20 bytes of (propCount + props[4])
 
             if ((uncompData != NULL) && (uncompDataSize > 0))     // Decompression successful
             {
@@ -676,10 +679,13 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
             // Data is not encrypted any more, register it
             chunk->compType = RRES_COMP_NONE;
             updateProps = true;
+
+            RRES_LOG("RRES: %s: Chunk data decompressed successfully\n", GetFourCCFromType(chunk->type));
         }
         else updateProps = false;
     }
-    else RRES_LOG("INFO: %s: Chunk does not require data decompression\n", GetFourCCFromType(chunk->type));
+    else unpackedData = decryptedData;
+    //else RRES_LOG("RRES: %s: Chunk does not require data decompression\n", GetFourCCFromType(chunk->type));
 
     // Show some log info about the decompression/decryption process
     switch (result)
@@ -705,11 +711,11 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
         }
 
         // Move chunk->data.raw pointer (chunk->data.propCount*sizeof(int)) positions
-        void *raw = RRES_CALLOC(chunk->baseSize - (sizeof(int) + chunk->data.propCount*sizeof(int)), 1);
-        if (raw != NULL) memcpy(raw, (unsigned char *)unpackedData + (chunk->data.propCount*sizeof(int)), chunk->baseSize - (sizeof(int) + chunk->data.propCount*sizeof(int)));
+        void *raw = RRES_CALLOC(chunk->baseSize - 20, 1);
+        if (raw != NULL) memcpy(raw, ((unsigned char *)unpackedData) + 20, chunk->baseSize - 20);
         RRES_FREE(chunk->data.raw);
         chunk->data.raw = raw;
-        RL_FREE(unpackedData);
+        //RL_FREE(unpackedData);    // TODO: CRASH: Review
     }
 
     return result;
