@@ -304,16 +304,16 @@ _Fig 02. rres sample implementation: custom engine libs and tool._
 
 Base `rres` library is in charge of reading `rres` files resource chunks into a generic resource structure, returned to the user. In our implementation the user exposed resource structures (`rresResourceChunk`, `rresResource`) are different than the ones used internally to process the `rres` file data (`rresFileHeader`, `rresResourceChunkInfo`). This is design decision, user does not need all the info contained in `rresResourceChunkInfo` so only the required info has been directly exposed in `rresResourceChunk`. This implementation does not include resource file writing, that functionality has been implemented directly in `rrespacker` tool.
 
- - `rresResource` contains all related `rresResourceChunks` for a processed input file
- - `rresResourceChunk` contains the individual chunks user-required info and data, note that it does not expose `rresResourceChunkInfo` directly but only some of its values, this is a design decision and could change in other implementations.
+ - `rresResourceMulti` contains multiple `rresResourceChunks` for a processed input file
+ - `rresResourceChunk` contains a single chunk with user-required info and data, note that it does not expose `rresResourceChunkInfo` directly but only some of its values, this is a design decision and could change in other implementations.
  - `rresResourceChunkData` contains the actual data for the resource: the requried properties and the raw data. It's important to note that in the case data was compressed/encrypted, it's up to the user-library (`rres-raylib.h`) to process that data; in those cases `chunk.data.raw` contains the compressed/encrypted data and `chunk.data.propCount = 0` and `chunk.data.props = NULL`; it's up to the user library to fill properties after decompression/decryption.
 
 ```c
 // rres resource
-typedef struct rresResource {
+typedef struct rresResourceMulti {
     unsigned int count;             // Resource chunks count
     rresResourceChunk *chunks;      // Resource chunks
-} rresResource;
+} rresResourceMulti;
 
 // rres resource chunk
 typedef struct rresResourceChunk {
@@ -333,26 +333,29 @@ typedef struct rresResourceChunkData {
 } rresResourceChunkData;
 ```
 
-A full `rresResource` could be loaded from the `.rres` file with the provided function: **`rresLoadResource()`**.
+A single `rresResourceChunk` can be laoded from the `.rres` file with the provided function: **`rresLoadResourceChunk()`** and unloaded with **`rresUnloadResourceChunk()`**.
 
-After data has been copied to the destination structures it can be unloaded with function: **`rresUnloadResource()`**.
+A full `rresResourceMulti` can be loaded from the `.rres` file with the provided function: **`rresLoadResourceMulti()`** and unloaded with **`rresUnloadResourceMulti()`**.
 
 ### Engine mapping library: `rres-raylib.h`
 
 The mapping library includes `rres.h` and provides functionality to map the resource chunks data loaded from the `rres` file into `raylib` structures. The API provided is simple and intuitive, following `raylib` conventions:
 
 ```c
-RLAPI void *LoadDataFromResource(rresResource rres, int *size);     // Load raw data from rres resource
-RLAPI char *LoadTextFromResource(rresResource rres);                // Load text data from rres resource
-RLAPI Image LoadImageFromResource(rresResource rres);               // Load Image data from rres resource
-RLAPI Wave LoadWaveFromResource(rresResource rres);                 // Load Wave data from rres resource
-RLAPI Font LoadFontFromResource(rresResource rres);                 // Load Font data from rres resource
-RLAPI Mesh LoadMeshFromResource(rresResource rres);                 // Load Mesh data from rres resource
+RLAPI void *LoadDataFromResource(rresResourceChunk chunk, int *size);   // Load raw data from rres resource chunk
+RLAPI char *LoadTextFromResource(rresResourceChunk chunk);              // Load text data from rres resource chunk
+RLAPI Image LoadImageFromResource(rresResourceChunk chunk);             // Load Image data from rres resource chunk
+RLAPI Wave LoadWaveFromResource(rresResourceChunk chunk);               // Load Wave data from rres resource chunk
+RLAPI Font LoadFontFromResource(rresResourceMulti multi);               // Load Font data from rres resource multiple chunks
+RLAPI Mesh LoadMeshFromResource(rresResourceMulti multi);               // Load Mesh data from rres resource multiple chunks
+
+RLAPI int UnpackResourceChunk(rresResourceChunk *chunk);                // Unpack resource chunk data (decompres/decrypt data)
+RLAPI void SetBaseDirectory(const char *baseDir);                       // Set base directory for externally linked data
 ```
 
-Note that data decompression/decryption should be implemented in this custom mapping library, `rresResourceChunk` contains compressor/cipher identifier values for convenience. Compressors and ciphers support depends on user implementation and it must be aligned with the packaging tool (`rrespacker`).
+Note that data decompression/decryption is implemented in this custom library, **`UnpackResourceChunk()`** is provided for the users. `rresResourceChunk` contains compressor/cipher identifier values for convenience. Compressors and ciphers support depends on user implementation and it must be aligned with the packaging tool (`rrespacker`).
 
-`rres` file-format is engine-agnostic and a mapping library can be created for any engine/framework in any programming language.
+**`rres` file-format is engine-agnostic, libraries and tools can be created for any engine/framework in any programming language.**
 
 ### Packaging tool: `rrespacker`
 
