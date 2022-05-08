@@ -947,6 +947,8 @@ void rresSetCipherPassword(const char *pass)
 // Get password to be used on data decryption
 const char *rresGetCipherPassword(void)
 {
+    if (password == NULL) password = "password12345";
+
     return password;
 }
 
