@@ -66,7 +66,9 @@ int main(void)
                     // List all files contained on central directory
                     for (unsigned int i = 0; i < dir.count; i++)
                     {
-                        TraceLog(LOG_INFO, "FILE: [%08X] Entry (0x%x): %s (size: %i)", dir.entries[i].id, dir.entries[i].offset, dir.entries[i].fileName, dir.entries[i].fileNameSize);
+                        TraceLog(LOG_INFO, "CDIR: %s - Resource id: [0x%08x] - Offset: 0x%08x", dir.entries[i].fileName, dir.entries[i].id, dir.entries[i].offset);
+                    
+                        // TODO: List all contained resources info
                     }
                 }
 
@@ -76,12 +78,12 @@ int main(void)
                 // NOTE: LoadDataFromResource() and similar functions already check internally if ((rres.count > 0) && (rres.chunks != NULL))
 
                 // TEST 01: RRES_DATA_RAW -> OK!!!
-                rres = rresLoadResource(droppedFiles[0], rresGetIdFromFileName(dir, "resources/image.png.raw"));
+                rres = rresLoadResource(droppedFiles[0], 0x7d44f31f); //rresGetIdFromFileName(dir, "resources/image.png.raw"));
                 unsigned int dataSize = 0;
                 data = LoadDataFromResource(rres, &dataSize);      // NOTE: data must be unloaded at the end
                 if ((data != NULL) && (dataSize > 0))
                 {
-                    FILE *rawFile = fopen("export_image.png", "wb");
+                    FILE *rawFile = fopen("export_data.raw", "wb");
                     fwrite(data, dataSize, 1, rawFile);
                     fclose(rawFile);
                 }
@@ -93,7 +95,7 @@ int main(void)
                 rresUnloadResource(rres);
 
                 // TEST 03: RRES_DATA_IMAGE -> OK!!!
-                rres = rresLoadResource(droppedFiles[0], rresGetIdFromFileName(dir, "resources/images/fudesumi.png"));
+                rres = rresLoadResource(droppedFiles[0], rresGetIdFromFileName(dir, "fudesumi.png"));
                 Image image = LoadImageFromResource(rres);
                 if (image.data != NULL)
                 {

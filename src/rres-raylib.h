@@ -209,11 +209,23 @@ Image LoadImageFromResource(rresResource rres)
 
     if (rres.count >= 1)
     {
-        if (rres.chunks[0].type == RRES_DATA_IMAGE)     // Image data
+        if (rres.chunks[0].type == RRES_DATA_IMAGE)         // Image data
         {
             image = LoadImageFromResourceChunk(rres.chunks[0]);
         }
-        else if (rres.chunks[0].type == RRES_DATA_LINK) // Link to external file
+        /*
+        // TODO: Support image file providd as RRES_DATA_RAW?
+        else if (rres.chunks[0].type == RRES_DATA_RAW)      // Raw image file
+        {
+            int dataSize = 0;
+            void *rawData = LoadDataFromResourceChunk(rres.chunks[0], dataSize);
+
+            image = LoadImageFromMemory("???", rawData, dataSize);
+
+            RRES_FREE(rawData);
+        }
+        */
+        else if (rres.chunks[0].type == RRES_DATA_LINK)     // Link to external file
         {
             // Get raw data from external linked file
             unsigned int dataSize = 0;
@@ -563,11 +575,11 @@ static Image LoadImageFromResourceChunk(rresResourceChunk chunk)
             {
                 case RRES_PIXELFORMAT_UNCOMP_GRAYSCALE: image.format = PIXELFORMAT_UNCOMPRESSED_GRAYSCALE; break;
                 case RRES_PIXELFORMAT_UNCOMP_GRAY_ALPHA: image.format = PIXELFORMAT_UNCOMPRESSED_GRAY_ALPHA; break;
-                case RRES_PIXELFORMAT_UNCOMP_R5G6B5: image.format = PIXELFORMAT_UNCOMPRESSED_R5G5B5A1; break;
-                case RRES_PIXELFORMAT_UNCOMP_R8G8B8: image.format = PIXELFORMAT_UNCOMPRESSED_R5G6B5; break;
-                case RRES_PIXELFORMAT_UNCOMP_R5G5B5A1: image.format = PIXELFORMAT_UNCOMPRESSED_R4G4B4A4; break;
-                case RRES_PIXELFORMAT_UNCOMP_R4G4B4A4: image.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8; break;
-                case RRES_PIXELFORMAT_UNCOMP_R8G8B8A8: image.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8; break;
+                case RRES_PIXELFORMAT_UNCOMP_R5G6B5: image.format = PIXELFORMAT_UNCOMPRESSED_R5G6B5; break;
+                case RRES_PIXELFORMAT_UNCOMP_R8G8B8: image.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8; break;
+                case RRES_PIXELFORMAT_UNCOMP_R5G5B5A1: image.format = PIXELFORMAT_UNCOMPRESSED_R5G5B5A1; break;
+                case RRES_PIXELFORMAT_UNCOMP_R4G4B4A4: image.format = PIXELFORMAT_UNCOMPRESSED_R4G4B4A4; break;
+                case RRES_PIXELFORMAT_UNCOMP_R8G8B8A8: image.format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8; break;
                 case RRES_PIXELFORMAT_UNCOMP_R32: image.format = PIXELFORMAT_UNCOMPRESSED_R32; break;
                 case RRES_PIXELFORMAT_UNCOMP_R32G32B32: image.format = PIXELFORMAT_UNCOMPRESSED_R32G32B32; break;
                 case RRES_PIXELFORMAT_UNCOMP_R32G32B32A32: image.format = PIXELFORMAT_UNCOMPRESSED_R32G32B32A32; break;
@@ -590,11 +602,11 @@ static Image LoadImageFromResourceChunk(rresResourceChunk chunk)
             // Image data size can be computed from image properties
             unsigned int size = GetPixelDataSize(image.width, image.height, image.format);
 
-            // NOTE: Computed image data must match the data size of the chunk processed (minus props size)
+            // NOTE: Computed image data must match the data size of the chunk processed (minus propCount + props[4] size)
             if (size == (chunk.baseSize - 20))
             {
                 image.data = RL_CALLOC(size, 1);
-                memcpy(image.data, chunk.data.raw, size);
+                if (image.data != NULL) memcpy(image.data, chunk.data.raw, size);
             }
             else RRES_LOG("WARNING: IMGE: Chunk data size do not match expected image data size\n");
         }
