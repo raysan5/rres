@@ -38,7 +38,11 @@ int main(void)
     Font font = { 0 };              // Store RRES_DATA_GLYPH_INFO + RRES_DATA_IMAGE
     Model model = { 0 };            // Store RRES_DATA_VERTEX loaded data -> LoadModelFromMesh()
 
-    InitAudioDevice();
+    // Load content from rres file
+    rresResourceChunk chunk = { 0 };    // Single resource chunk
+    rresResourceMulti multi = { 0 };    // Multiple resource chunks
+
+    InitAudioDevice();              // Initialize audio device, useful for audio testing
 
     SetTargetFPS(60);               // Set our game to run at 60 frames-per-second
     //--------------------------------------------------------------------------------------
@@ -55,8 +59,13 @@ int main(void)
 
             if (IsFileExtension(droppedFiles[0], ".rres"))
             {
-                // TEST 00: RRES_DATA_DIRECTORY: OK!!!
+                int result = 0;     // Result of data unpacking
+
+                // TEST 01: Load rres Central Directory (RRES_DATA_DIRECTORY)
+                //------------------------------------------------------------------------------------------------------
                 rresCentralDir dir = rresLoadCentralDirectory(droppedFiles[0]);
+
+                // NOTE: By default central directory is never compressed/encrypted
 
                 // Check if central directory is available
                 // NOTE: CDIR is not mandatory, resources are referenced by its id
@@ -71,59 +80,110 @@ int main(void)
                         // TODO: List all contained resources info
                     }
                 }
+                //------------------------------------------------------------------------------------------------------
 
-                // Load content from rres file
-                rresResource rres = { 0 };
+                // TEST 02: Loading raw data (RRES_DATA_RAW)
+                //------------------------------------------------------------------------------------------------------
+                chunk = rresLoadResourceChunk(droppedFiles[0], rresGetIdFromFileName(dir, "resources/image.png.raw"));
+                result = UnpackResourceChunk(&chunk);               // Decompres/decipher resource data (if required)
 
-                // NOTE: LoadDataFromResource() and similar functions already check internally if ((rres.count > 0) && (rres.chunks != NULL))
-
-                // TEST 01: RRES_DATA_RAW -> OK!!!
-                rres = rresLoadResource(droppedFiles[0], 0x7d44f31f); //rresGetIdFromFileName(dir, "resources/image.png.raw"));
-                unsigned int dataSize = 0;
-                data = LoadDataFromResource(rres, &dataSize);      // NOTE: data must be unloaded at the end
-                if ((data != NULL) && (dataSize > 0))
+                if (result == 0)    // Data decompressed/decrypted successfully
                 {
-                    FILE *rawFile = fopen("export_data.raw", "wb");
-                    fwrite(data, dataSize, 1, rawFile);
-                    fclose(rawFile);
+                    unsigned int dataSize = 0;
+                    data = LoadDataFromResource(chunk, &dataSize);  // Load raw data, must be freed at the end
+
+                    if ((data != NULL) && (dataSize > 0))
+                    {
+                        FILE *rawFile = fopen("export_data.raw", "wb");
+                        fwrite(data, dataSize, 1, rawFile);
+                        fclose(rawFile);
+                    }
                 }
-                rresUnloadResource(rres);
 
-                // TEST 02: RRES_DATA_TEXT -> OK!!!
-                rres = rresLoadResource(droppedFiles[0], rresGetIdFromFileName(dir, "resources/text_data.txt"));
-                text = LoadTextFromResource(rres);
-                rresUnloadResource(rres);
+                rresUnloadResourceChunk(chunk);
+                //------------------------------------------------------------------------------------------------------
 
-                // TEST 03: RRES_DATA_IMAGE -> OK!!!
-                rres = rresLoadResource(droppedFiles[0], rresGetIdFromFileName(dir, "fudesumi.png"));
-                Image image = LoadImageFromResource(rres);
-                if (image.data != NULL)
+                // TEST 03: Load text data (RRES_DATA_TEXT)
+                //------------------------------------------------------------------------------------------------------
+                chunk = rresLoadResourceChunk(droppedFiles[0], rresGetIdFromFileName(dir, "resources/text_data.txt"));
+                result = UnpackResourceChunk(&chunk);       // Decompres/decipher resource data (if required)
+
+                if (result == 0)    // Data decompressed/decrypted successfully
                 {
-                    texture = LoadTextureFromImage(image);
-                    UnloadImage(image);
+                    text = LoadTextFromResource(chunk);     // Load text data, must be freed at the end
                 }
-                rresUnloadResource(rres);
 
-                // TEST 03: RRES_DATA_WAVE -> OK!!!
-                rres = rresLoadResource(droppedFiles[0], rresGetIdFromFileName(dir, "resources/audio/target.ogg"));
-                Wave wave = LoadWaveFromResource(rres);
-                sound = LoadSoundFromWave(wave);
-                UnloadWave(wave);
-                rresUnloadResource(rres);
+                rresUnloadResourceChunk(chunk);
+                //------------------------------------------------------------------------------------------------------
+                
+                // TEST 04: Load image data (RRES_DATA_IMAGE)
+                //------------------------------------------------------------------------------------------------------
+                chunk = rresLoadResourceChunk(droppedFiles[0], rresGetIdFromFileName(dir, "fudesumi.png"));
+                result = UnpackResourceChunk(&chunk);       // Decompres/decipher resource data (if required)
 
-                // TEST 04: RRES_DATA_FONT_INFO (multichunk) -> ...
-                rres = rresLoadResource(droppedFiles[0], rresGetIdFromFileName(dir, "resources/fonts/pixantiqua.ttf"));
-                font = LoadFontFromResource(rres);
-                rresUnloadResource(rres);
+                if (result == 0)    // Data decompressed/decrypted successfully
+                {
+                    Image image = LoadImageFromResource(chunk);
+                    if (image.data != NULL)
+                    {
+                        texture = LoadTextureFromImage(image);
+                        UnloadImage(image);
+                    }
+                }
 
-                // TEST 05: RRES_DATA_VERTEX (multichunk!) -> ...
-                rres = rresLoadResource(droppedFiles[0], rresGetIdFromFileName(dir, "resources/models/castle.obj"));
-                Mesh mesh = LoadMeshFromResource(rres);
-                rresUnloadResource(rres);
+                rresUnloadResourceChunk(chunk);
+                //------------------------------------------------------------------------------------------------------
 
-                Model model = LoadModelFromMesh(mesh);      // Mesh is directly assigned
+                // TEST 05: Load wave data (RRES_DATA_WAVE)
+                //------------------------------------------------------------------------------------------------------
+                chunk = rresLoadResourceChunk(droppedFiles[0], rresGetIdFromFileName(dir, "resources/audio/target.ogg"));
+                result = UnpackResourceChunk(&chunk);       // Decompres/decipher resource data (if required)
 
-                //UnloadMesh(mesh);
+                if (result == 0)    // Data decompressed/decrypted successfully
+                {
+                    Wave wave = LoadWaveFromResource(chunk);
+                    sound = LoadSoundFromWave(wave);
+                    UnloadWave(wave);
+                }
+
+                rresUnloadResourceChunk(chunk);
+                //------------------------------------------------------------------------------------------------------
+
+                // TEST 06: Load font data, multiples chunks (RRES_DATA_GLYPH_INFO + RRE_DATA_IMAGE)
+                //------------------------------------------------------------------------------------------------------
+                multi = rresLoadResourceMulti(droppedFiles[0], rresGetIdFromFileName(dir, "resources/fonts/pixantiqua.ttf"));
+                for (int i = 0; i < multi.count; i++)
+                {
+                    result = UnpackResourceChunk(&chunk);   // Decompres/decipher resource data (if required)
+                    if (result != 0) break;
+                }
+
+                if (result == 0)    // All resources data decompressed/decrypted successfully
+                {
+                    font = LoadFontFromResource(multi);
+                }
+                
+                rresUnloadResourceMulti(multi);
+                //------------------------------------------------------------------------------------------------------
+
+                // TEST 07: Load mesh data, multiples chunks (RRES_DATA_VERTEX x n)
+                //------------------------------------------------------------------------------------------------------
+                multi = rresLoadResourceMulti(droppedFiles[0], rresGetIdFromFileName(dir, "resources/models/castle.obj"));
+                for (int i = 0; i < multi.count; i++)
+                {
+                    result = UnpackResourceChunk(&chunk);   // Decompres/decipher resource data (if required)
+                    if (result != 0) break;
+                }
+
+                if (result == 0)    // All resources data decompressed/decrypted successfully
+                {
+                    Mesh mesh = LoadMeshFromResource(multi);
+                    Model model = LoadModelFromMesh(mesh);      
+                    //UnloadMesh(mesh);     // WARNING: Mesh is assigned, not copied
+                }
+
+                rresUnloadResourceMulti(multi);
+                //------------------------------------------------------------------------------------------------------
 
                 // Unload central directory info, not required any more
                 rresUnloadCentralDirectory(dir);

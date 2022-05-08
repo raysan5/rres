@@ -214,12 +214,12 @@ typedef struct rresResourceChunk {
 //    rresResourceChunkData chunk;    // Resource chunk data
 //} rresResourceChunk;
 
-// rres resource    
+// rres resource multi
 // NOTE: It supports multiple resource chunks
-typedef struct rresResource {
+typedef struct rresResourceMulti {
     unsigned int count;             // Resource chunks count
     rresResourceChunk *chunks;      // Resource chunks
-} rresResource;
+} rresResourceMulti;
 
 // Useful data types for specific chunk types
 //----------------------------------------------------------------------
@@ -270,6 +270,7 @@ typedef enum rresResourceDataType {
     RRES_DATA_NULL         = 0,             // FourCC: NULL - Reserved for empty chunks, no props/data
     RRES_DATA_RAW          = 1,             // FourCC: RAWD - Raw file data, 1 property
                                             //    props[0]:size (bytes)
+                                            //    props[1]: file extension?
                                             //    data: raw bytes
     RRES_DATA_TEXT         = 2,             // FourCC: TEXT - Text file data, 4 properties
                                             //    props[0]:size (bytes)
@@ -470,19 +471,20 @@ extern "C" {            // Prevents name mangling of functions
 #endif
 
 // Load all resource chunks for a specified rresId
-RRESAPI rresResource rresLoadResource(const char *fileName, int rresId);        // Load resource for provided id (multiple resource chunks)
-RRESAPI void rresUnloadResource(rresResource rres);                             // Unload resource from memory, all chunks it contains
+RRESAPI rresResourceMulti rresLoadResourceMulti(const char *fileName, int rresId);  // Load resource for provided id (multiple resource chunks)
+RRESAPI void rresUnloadResourceMulti(rresResourceMulti multi);                      // Unload resource from memory (multiple resource chunks)
+//RRESAPI rresResourceChunk *rresLoadResourceChunkMulti(const char *fileName, int rresId, int *count); // Load multiple resource chunks for provided id
 
 // TODO: Support loading only one resource chunk?
-//RRESAPI rresResourceChunk rresLoadResourceChunk(const char *fileName, int rresId);  // Load one resource chunk for provided id
-//RRESAPI void rresUnloadResourceChunk(rresResource rres);                            // Unload resource chunk from memory
+RRESAPI rresResourceChunk rresLoadResourceChunk(const char *fileName, int rresId);  // Load one resource chunk for provided id
+RRESAPI void rresUnloadResourceChunk(rresResourceChunk chunk);                      // Unload resource chunk from memory
 
-RRESAPI rresCentralDir rresLoadCentralDirectory(const char *fileName);          // Load central directory resource chunk from file
-RRESAPI void rresUnloadCentralDirectory(rresCentralDir dir);                    // Unload central directory resource chunk
+RRESAPI rresCentralDir rresLoadCentralDirectory(const char *fileName);              // Load central directory resource chunk from file
+RRESAPI void rresUnloadCentralDirectory(rresCentralDir dir);                        // Unload central directory resource chunk
 
-RRESAPI int rresGetIdFromFileName(rresCentralDir dir, const char *fileName);    // Get resource id for a provided input filename
-                                                                                // NOTE: It requires CDIR available in the file (it's optinal by design)
-RRESAPI unsigned int rresComputeCRC32(unsigned char *data, int len);            // Compute CRC32 for provided data
+RRESAPI int rresGetIdFromFileName(rresCentralDir dir, const char *fileName);        // Get resource id for a provided input filename
+                                                                                    // NOTE: It requires CDIR available in the file (it's optinal by design)
+RRESAPI unsigned int rresComputeCRC32(unsigned char *data, int len);                // Compute CRC32 for provided data
 
 // Manage password for data encryption/decryption
 // NOTE: The cipher password is kept as an internal pointer to provided string, it's up to the user to manage that sensible data properly
@@ -549,17 +551,16 @@ static const char *password = NULL; // Password pointer, managed by user librari
 //----------------------------------------------------------------------------------
 // Module Internal Functions Declaration
 //----------------------------------------------------------------------------------
-static rresResourceChunk rresLoadResourceChunk(rresResourceChunkInfo info, void *packedData);   // Load user resource chunk
-static void rresUnloadResourceChunk(rresResourceChunk chunk);   // Unload user resource chunk
+static rresResourceChunk rresLoadResourceChunkData(rresResourceChunkInfo info, void *packedData);   // Load user resource chunk
 
 //----------------------------------------------------------------------------------
 // Module Functions Definition
 //----------------------------------------------------------------------------------
 // Load resource from file by id
 // NOTE: All resources conected to base id are loaded
-rresResource rresLoadResource(const char *fileName, int rresId)
+rresResourceMulti rresLoadResourceMulti(const char *fileName, int rresId)
 {
-    rresResource rres = { 0 };
+    rresResourceMulti rres = { 0 };
 
     FILE *rresFile = fopen(fileName, "rb");
 
@@ -587,18 +588,18 @@ rresResource rresLoadResource(const char *fileName, int rresId)
                 {
                     rres.count = 1;
 
-                    long currentFileOffset = ftell(rresFile);   // Store current file position
-                    rresResourceChunkInfo temp = info;         // Temp info header to scan resource chunks
+                    long currentFileOffset = ftell(rresFile);               // Store current file position
+                    rresResourceChunkInfo temp = info;                      // Temp info header to scan resource chunks
 
                     // Count all linked resource chunks checking temp.nextOffset
                     while (temp.nextOffset != 0)
                     {
                         fseek(rresFile, temp.nextOffset, SEEK_SET);         // Jump to next linked resource
-                        fread(&temp, sizeof(rresResourceChunkInfo), 1, rresFile);  // Read next resource info header
+                        fread(&temp, sizeof(rresResourceChunkInfo), 1, rresFile); // Read next resource info header
                         rres.count++;
                     }
 
-                    rres.chunks = (rresResourceChunk *)RRES_CALLOC(rres.count, sizeof(rresResourceChunk));   // Load as many rres slots as required
+                    rres.chunks = (rresResourceChunk *)RRES_CALLOC(rres.count, sizeof(rresResourceChunk)); // Load as many rres slots as required
                     fseek(rresFile, currentFileOffset, SEEK_SET);           // Return to first resource chunk position
 
                     // Read and load data chunk from file data
@@ -606,7 +607,7 @@ rresResource rresLoadResource(const char *fileName, int rresId)
                     // it's up to the user library to manage decompression/decryption
                     void *data = RRES_MALLOC(info.packedSize);              // Allocate enough memory to store resource data chunk
                     fread(data, info.packedSize, 1, rresFile);              // Read data: propsCount + props[] + data (+additional_data)
-                    rres.chunks[0] = rresLoadResourceChunk(info, data);     // Unpack resource data to get rresResourceChunk
+                    rres.chunks[0] = rresLoadResourceChunkData(info, data); // Get chunk.data properly organized (only if uncompressed/unencrypted)
                     RRES_FREE(data);
 
                     // Check if there are more chunks to read
@@ -618,11 +619,11 @@ rresResource rresLoadResource(const char *fileName, int rresId)
                     while (info.nextOffset != 0)
                     {
                         fseek(rresFile, info.nextOffset, SEEK_SET);         // Jump to next resource
-                        fread(&info, sizeof(rresResourceChunkInfo), 1, rresFile);  // Read next resource info header
+                        fread(&info, sizeof(rresResourceChunkInfo), 1, rresFile); // Read next resource info header
 
                         void *data = RRES_MALLOC(info.packedSize);          // Allocate enough memory to store resource data chunk
                         fread(data, info.packedSize, 1, rresFile);          // Read data: propsCount + props[] + data (+additional_data)
-                        rres.chunks[i] = rresLoadResourceChunk(info, data); // Unpack resource data to get rresResourceChunk
+                        rres.chunks[i] = rresLoadResourceChunkData(info, data); // Get chunk.data properly organized (only if uncompressed/unencrypted)
                         RRES_FREE(data);
 
                         i++;
@@ -646,11 +647,92 @@ rresResource rresLoadResource(const char *fileName, int rresId)
 }
 
 // Unload resource data
-void rresUnloadResource(rresResource rres)
+void rresUnloadResourceMulti(rresResourceMulti multi)
 {
-    for (unsigned int i = 0; i < rres.count; i++) rresUnloadResourceChunk(rres.chunks[i]);
+    for (unsigned int i = 0; i < multi.count; i++) rresUnloadResourceChunk(multi.chunks[i]);
 
-    RRES_FREE(rres.chunks);
+    RRES_FREE(multi.chunks);
+}
+
+// Load one resource chunk for provided id
+rresResourceChunk rresLoadResourceChunk(const char *fileName, int rresId)
+{
+    rresResourceChunk chunk = { 0 };
+
+    FILE *rresFile = fopen(fileName, "rb");
+
+    if (rresFile == NULL) RRES_LOG("WARNING: [%s] rres file could not be opened\n", fileName);
+    else
+    {
+        rresFileHeader header = { 0 };
+
+        // Read rres file header
+        fread(&header, sizeof(rresFileHeader), 1, rresFile);
+
+        // Verify file signature: "rres" and file version: 100
+        if (((header.id[0] == 'r') && (header.id[1] == 'r') && (header.id[2] == 'e') && (header.id[3] == 's')) && (header.version == 100))
+        {
+            // Check all available chunks looking for the requested id
+            for (int i = 0; i < header.chunkCount; i++)
+            {
+                rresResourceChunkInfo info = { 0 };
+
+                // Read resource info header
+                fread(&info, sizeof(rresResourceChunkInfo), 1, rresFile);
+
+                // Check if resource id is the requested one
+                if (info.id == rresId)
+                {
+                    // NOTE: We only load first matching id resource chunk found but
+                    // we show a message if additional chunks are detected
+                    if (info.nextOffset != 0) RRES_LOG("WARNING: Multiple linked resource chunks available for the provided id");
+
+                    /*
+                    // Variables required to check multiple chunks
+                    int chunkCount = 0;
+                    long currentFileOffset = ftell(rresFile);       // Store current file position
+                    rresResourceChunkInfo temp = info;              // Temp info header to scan resource chunks
+
+                    // Count all linked resource chunks checking temp.nextOffset
+                    while (temp.nextOffset != 0)
+                    {
+                        fseek(rresFile, temp.nextOffset, SEEK_SET); // Jump to next linked resource
+                        fread(&temp, sizeof(rresResourceChunkInfo), 1, rresFile);  // Read next resource info header
+                        chunkCount++;
+                    }
+
+                    fseek(rresFile, currentFileOffset, SEEK_SET);   // Return to first resource chunk position
+                    */
+
+                    // Read and resource chunk from file data
+                    // NOTE: Read data can be compressed/encrypted, it's up to the user library to manage decompression/decryption
+                    void *data = RRES_MALLOC(info.packedSize);      // Allocate enough memory to store resource data chunk
+                    fread(data, info.packedSize, 1, rresFile);      // Read data: propsCount + props[] + data (+additional_data)
+                    chunk = rresLoadResourceChunkData(info, data);  // Get chunk.data properly organized (only if uncompressed/unencrypted)
+                    RRES_FREE(data);
+
+                    break;      // Resource id found and loaded, stop checking the file
+                }
+                else
+                {
+                    // Skip required data size to read next resource info header
+                    fseek(rresFile, info.packedSize, SEEK_CUR);
+                }
+            }
+        }
+        else RRES_LOG("WARNING: The provided file is not a valid rres file, file signature or version not valid\n");
+
+        fclose(rresFile);
+    }
+
+    return chunk;
+}
+
+// Unload resource chunk from memory
+void rresUnloadResourceChunk(rresResourceChunk chunk)
+{
+    RRES_FREE(chunk.data.props);  // Resource chunk properties
+    RRES_FREE(chunk.data.raw);    // Resource chunk raw data
 }
 
 // Load central directory data
@@ -688,8 +770,8 @@ rresCentralDir rresLoadCentralDirectory(const char *fileName)
                     void *data = RRES_MALLOC(info.packedSize);
                     fread(data, info.packedSize, 1, rresFile);
 
-                    // Load resource chunk with Central Directory data; data is uncompressed/unencrypted by default
-                    rresResourceChunk chunk = rresLoadResourceChunk(info, data);  // Unpack resource data to get rresResourceChunk
+                    // Load resource chunk data (central directory), data is uncompressed/unencrypted by default
+                    rresResourceChunk chunk = rresLoadResourceChunkData(info, data);
                     RRES_FREE(data);
 
                     dir.count = chunk.data.props[0];     // File entries count
@@ -800,7 +882,7 @@ unsigned int rresComputeCRC32(unsigned char *data, int len)
 // Load user resource chunk from resource packed data (as contained in .rres file)
 // WARNING: Data can be compressed and/or encrypted, in those cases is up to the user to process it,
 // and chunk.data.propCount = 0, chunk.data.props = NULL and chunk.data.raw contains all resource packed data
-static rresResourceChunk rresLoadResourceChunk(rresResourceChunkInfo info, void *data)
+static rresResourceChunk rresLoadResourceChunkData(rresResourceChunkInfo info, void *data)
 {
     rresResourceChunk chunk = { 0 };
 
@@ -854,13 +936,6 @@ static rresResourceChunk rresLoadResourceChunk(rresResourceChunkInfo info, void 
     if (crc32 != info.crc32) RRES_LOG("WARNING: [ID %i] CRC32 does not match, data can be corrupted\n", info.id);
 
     return chunk;
-}
-
-// Unload resource chunk
-static void rresUnloadResourceChunk(rresResourceChunk chunk)
-{
-    RRES_FREE(chunk.data.props);  // Resource chunk properties
-    RRES_FREE(chunk.data.raw);    // Resource chunk raw data
 }
 
 // Set password to be used on data decryption
