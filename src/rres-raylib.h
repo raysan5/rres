@@ -251,7 +251,7 @@ Wave LoadWaveFromResource(rresResourceChunk chunk)
             wave.data = RL_CALLOC(size, 1);
             memcpy(wave.data, chunk.data.raw, size);
         }
-        else RRES_LOG("WARNING: Wave provided data must be decompressed/decrypted\n");
+        else RRES_LOG("RRES: WARNING: Wave provided data must be decompressed/decrypted\n");
     }
     else if (chunk.type == RRES_DATA_LINK) // Link to external file
     {
@@ -306,7 +306,7 @@ Font LoadFontFromResource(rresResourceMulti multi)
                     // NOTE: font.glyphs[i].image is not loaded
                 }
             }
-            else RRES_LOG("WARNING: Font glyph provided data must be decompressed/decrypted\n");
+            else RRES_LOG("RRES: WARNING: Font glyph provided data must be decompressed/decrypted\n");
         }
 
         // Load font image chunk
@@ -369,7 +369,7 @@ Mesh LoadMeshFromResource(rresResourceMulti multi)
                             mesh.vertices = (float *)RL_CALLOC(mesh.vertexCount*3, sizeof(float));
                             memcpy(mesh.vertices, multi.chunks[i].data.raw, mesh.vertexCount*3*sizeof(float));
                         }
-                        else RRES_LOG("WARNING: MESH: Vertex attribute position not valid, componentCount/vertexFormat do not fit\n");
+                        else RRES_LOG("RRES: WARNING: MESH: Vertex attribute position not valid, componentCount/vertexFormat do not fit\n");
 
                     } break;
                     case RRES_VERTEX_ATTRIBUTE_TEXCOORD1:
@@ -380,7 +380,7 @@ Mesh LoadMeshFromResource(rresResourceMulti multi)
                             mesh.texcoords = (float *)RL_CALLOC(mesh.vertexCount*2, sizeof(float));
                             memcpy(mesh.texcoords, multi.chunks[i].data.raw, mesh.vertexCount*2*sizeof(float));
                         }
-                        else RRES_LOG("WARNING: MESH: Vertex attribute texcoord1 not valid, componentCount/vertexFormat do not fit\n");
+                        else RRES_LOG("RRES: WARNING: MESH: Vertex attribute texcoord1 not valid, componentCount/vertexFormat do not fit\n");
 
                     } break;
                     case RRES_VERTEX_ATTRIBUTE_TEXCOORD2:
@@ -391,17 +391,17 @@ Mesh LoadMeshFromResource(rresResourceMulti multi)
                             mesh.texcoords2 = (float *)RL_CALLOC(mesh.vertexCount*2, sizeof(float));
                             memcpy(mesh.texcoords2, multi.chunks[i].data.raw, mesh.vertexCount*2*sizeof(float));
                         }
-                        else RRES_LOG("WARNING: MESH: Vertex attribute texcoord2 not valid, componentCount/vertexFormat do not fit\n");
+                        else RRES_LOG("RRES: WARNING: MESH: Vertex attribute texcoord2 not valid, componentCount/vertexFormat do not fit\n");
 
                     } break;
                     case RRES_VERTEX_ATTRIBUTE_TEXCOORD3:
                     {
-                        RRES_LOG("WARNING: MESH: Vertex attribute texcoord3 not supported\n");
+                        RRES_LOG("RRES: WARNING: MESH: Vertex attribute texcoord3 not supported\n");
 
                     } break;
                     case RRES_VERTEX_ATTRIBUTE_TEXCOORD4:
                     {
-                        RRES_LOG("WARNING: MESH: Vertex attribute texcoord4 not supported\n");
+                        RRES_LOG("RRES: WARNING: MESH: Vertex attribute texcoord4 not supported\n");
 
                     } break;
                     case RRES_VERTEX_ATTRIBUTE_NORMAL:
@@ -412,7 +412,7 @@ Mesh LoadMeshFromResource(rresResourceMulti multi)
                             mesh.normals = (float *)RL_CALLOC(mesh.vertexCount*3, sizeof(float));
                             memcpy(mesh.normals, multi.chunks[i].data.raw, mesh.vertexCount*3*sizeof(float));
                         }
-                        else RRES_LOG("WARNING: MESH: Vertex attribute normal not valid, componentCount/vertexFormat do not fit\n");
+                        else RRES_LOG("RRES: WARNING: MESH: Vertex attribute normal not valid, componentCount/vertexFormat do not fit\n");
 
                     } break;
                     case RRES_VERTEX_ATTRIBUTE_TANGENT:
@@ -423,7 +423,7 @@ Mesh LoadMeshFromResource(rresResourceMulti multi)
                             mesh.tangents = (float *)RL_CALLOC(mesh.vertexCount*4, sizeof(float));
                             memcpy(mesh.tangents, multi.chunks[i].data.raw, mesh.vertexCount*4*sizeof(float));
                         }
-                        else RRES_LOG("WARNING: MESH: Vertex attribute tangent not valid, componentCount/vertexFormat do not fit\n");
+                        else RRES_LOG("RRES: WARNING: MESH: Vertex attribute tangent not valid, componentCount/vertexFormat do not fit\n");
 
                     } break;
                     case RRES_VERTEX_ATTRIBUTE_COLOR:
@@ -434,7 +434,7 @@ Mesh LoadMeshFromResource(rresResourceMulti multi)
                             mesh.colors = (unsigned char *)RL_CALLOC(mesh.vertexCount*4, sizeof(unsigned char));
                             memcpy(mesh.colors, multi.chunks[i].data.raw, mesh.vertexCount*4*sizeof(unsigned char));
                         }
-                        else RRES_LOG("WARNING: MESH: Vertex attribute color not valid, componentCount/vertexFormat do not fit\n");
+                        else RRES_LOG("RRES: WARNING: MESH: Vertex attribute color not valid, componentCount/vertexFormat do not fit\n");
 
                     } break;
                     case RRES_VERTEX_ATTRIBUTE_INDEX:
@@ -445,14 +445,14 @@ Mesh LoadMeshFromResource(rresResourceMulti multi)
                             mesh.indices = (unsigned char *)RL_CALLOC(multi.chunks[i].data.props[0], sizeof(unsigned short));
                             memcpy(mesh.indices, multi.chunks[i].data.raw, multi.chunks[i].data.props[0]*sizeof(unsigned short));
                         }
-                        else RRES_LOG("WARNING: MESH: Vertex attribute index not valid, componentCount/vertexFormat do not fit\n");
+                        else RRES_LOG("RRES: WARNING: MESH: Vertex attribute index not valid, componentCount/vertexFormat do not fit\n");
 
                     } break;
                     default: break;
                 }
             }
         }
-        else RRES_LOG("WARNING: Vertex provided data must be decompressed/decrypted\n");
+        else RRES_LOG("RRES: WARNING: Vertex provided data must be decompressed/decrypted\n");
     }
 
     return mesh;
@@ -544,7 +544,7 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
             result = 1;         // Decryption algorithm not supported
 #endif
         }
-        if (chunk->cipherType == RRES_CIPHER_XCHACHA20_POLY1305)    // rrespacker implements XChaCha20-Poly1305
+        else if (chunk->cipherType == RRES_CIPHER_XCHACHA20_POLY1305)    // rrespacker implements XChaCha20-Poly1305
         {
 #if defined(RRES_SUPPORT_ENCRYPTION_MONOCYPHER)
             // WARNING: Implementation dependant!
@@ -630,7 +630,7 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
             else result = 4;    // Decompression process failed
 
             // Security check, uncompDataSize must match the provided chunk->baseSize
-            if (uncompDataSize != chunk->baseSize) RRES_LOG("WARNING: Decompressed data could be corrupted, unexpected size\n");
+            if (uncompDataSize != chunk->baseSize) RRES_LOG("RRES: WARNING: Decompressed data could be corrupted, unexpected size\n");
         }
         else if (chunk->compType == RRES_COMP_LZ4)
         {
@@ -647,7 +647,7 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
             else result = 4;    // Decompression process failed
 
             // WARNING: Decompression could be successful but not the original message size returned
-            if (uncompDataSize != chunk->baseSize) RRES_LOG("WARNING: Decompressed data could be corrupted, unexpected size\n");
+            if (uncompDataSize != chunk->baseSize) RRES_LOG("RRES: WARNING: Decompressed data could be corrupted, unexpected size\n");
 #else
             result = 3;         // Compression algorithm not supported
 #endif
@@ -667,7 +667,7 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
             }
             else result = 4;    // Decompression process failed
 
-            if (uncompDataSize != chunk->baseSize) RRES_LOG("WARNING: Decompressed data could be corrupted, unexpected size\n");
+            if (uncompDataSize != chunk->baseSize) RRES_LOG("RRES: WARNING: Decompressed data could be corrupted, unexpected size\n");
         }
         else result = 3;        // Compression algorithm not supported
 
@@ -684,12 +684,11 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
     // Show some log info about the decompression/decryption process
     switch (result)
     {
-    case 0: RRES_LOG("INFO: %s: Chunk data decompressed/decrypted successfully\n", GetFourCCFromType(chunk->type)); break;
-    case 1: RRES_LOG("WARNING: %s: Chunk data encryption algorithm not supported\n", GetFourCCFromType(chunk->type)); break;
-    case 2: RRES_LOG("WARNING: %s: Chunk data decryption failed, wrong password provided\n", GetFourCCFromType(chunk->type)); break;
-    case 3: RRES_LOG("WARNING: %s: Chunk data compression algorithm not supported\n", GetFourCCFromType(chunk->type)); break;
-    case 4: RRES_LOG("WARNING: %s: Chunk data decompression failed\n", GetFourCCFromType(chunk->type)); break;
-    default: break;
+        case 1: RRES_LOG("RRES: WARNING: %s: Chunk data encryption algorithm not supported\n", GetFourCCFromType(chunk->type)); break;
+        case 2: RRES_LOG("RRES: WARNING: %s: Chunk data decryption failed, wrong password provided\n", GetFourCCFromType(chunk->type)); break;
+        case 3: RRES_LOG("RRES: WARNING: %s: Chunk data compression algorithm not supported\n", GetFourCCFromType(chunk->type)); break;
+        case 4: RRES_LOG("RRES: WARNING: %s: Chunk data decompression failed\n", GetFourCCFromType(chunk->type)); break;
+        default: break;
     }
 
     // Update chunk->data.propCount and chunk->data.props if required
@@ -749,7 +748,7 @@ static void *LoadDataFromResourceLink(rresResourceChunk chunk, int *size)
         }
         else data = LoadFileData(fullFilePath, size);
     }
-    else RRES_LOG("WARNING: [%s] Linked external file could not be found\n", linkFilePath);
+    else RRES_LOG("RRES: WARNING: [%s] Linked external file could not be found\n", linkFilePath);
 
     return data;
 }
@@ -766,7 +765,7 @@ static void *LoadDataFromResourceChunk(rresResourceChunk chunk, int *size)
         if (rawData != NULL) memcpy(rawData, chunk.data.raw, chunk.data.props[0]);
         *size = chunk.data.props[0];
     }
-    else RRES_LOG("WARNING: Provided data must be decompressed/decrypted\n");
+    else RRES_LOG("RRES: WARNING: Provided data must be decompressed/decrypted\n");
 
     return rawData;
 }
@@ -787,7 +786,7 @@ static char *LoadTextFromResourceChunk(rresResourceChunk chunk, int *codeLang)
         *codeLang = chunk.data.props[2];
         //chunks.props[3]:cultureCode could be useful for localized text
     }
-    else RRES_LOG("WARNING: Provided text data must be decompressed/decrypted\n");
+    else RRES_LOG("RRES: WARNING: Provided text data must be decompressed/decrypted\n");
 
     return text;
 }
@@ -843,9 +842,9 @@ static Image LoadImageFromResourceChunk(rresResourceChunk chunk)
             image.data = RL_CALLOC(size, 1);
             if (image.data != NULL) memcpy(image.data, chunk.data.raw, size);
         }
-        else RRES_LOG("WARNING: IMGE: Chunk data size do not match expected image data size\n");
+        else RRES_LOG("RRES: WARNING: IMGE: Chunk data size do not match expected image data size\n");
     }
-    else RRES_LOG("WARNING: Provided image data must be decompressed/decrypted\n");
+    else RRES_LOG("RRES: WARNING: Provided image data must be decompressed/decrypted\n");
 
     return image;
 }

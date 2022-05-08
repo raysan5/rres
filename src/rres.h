@@ -564,7 +564,7 @@ rresResourceMulti rresLoadResourceMulti(const char *fileName, int rresId)
 
     FILE *rresFile = fopen(fileName, "rb");
 
-    if (rresFile == NULL) RRES_LOG("WARNING: [%s] rres file could not be opened\n", fileName);
+    if (rresFile == NULL) RRES_LOG("RRES: WARNING: [%s] rres file could not be opened\n", fileName);
     else
     {
         rresFileHeader header = { 0 };
@@ -611,7 +611,7 @@ rresResourceMulti rresLoadResourceMulti(const char *fileName, int rresId)
                     RRES_FREE(data);
 
                     // Check if there are more chunks to read
-                    if (rres.count > 1) RRES_LOG("INFO: [%s][ID %i] Multiple resource chunks detected: %i chunks\n", fileName, (int)info.id, rres.count);
+                    if (rres.count > 1) RRES_LOG("RRES: [%s][ID %i] Multiple resource chunks detected: %i chunks\n", fileName, (int)info.id, rres.count);
 
                     int i = 1;
 
@@ -638,7 +638,7 @@ rresResourceMulti rresLoadResourceMulti(const char *fileName, int rresId)
                 }
             }
         }
-        else RRES_LOG("WARNING: The provided file is not a valid rres file, file signature or version not valid\n");
+        else RRES_LOG("RRES: WARNING: The provided file is not a valid rres file, file signature or version not valid\n");
 
         fclose(rresFile);
     }
@@ -661,7 +661,7 @@ rresResourceChunk rresLoadResourceChunk(const char *fileName, int rresId)
 
     FILE *rresFile = fopen(fileName, "rb");
 
-    if (rresFile == NULL) RRES_LOG("WARNING: [%s] rres file could not be opened\n", fileName);
+    if (rresFile == NULL) RRES_LOG("RRES: WARNING: [%s] rres file could not be opened\n", fileName);
     else
     {
         rresFileHeader header = { 0 };
@@ -685,7 +685,7 @@ rresResourceChunk rresLoadResourceChunk(const char *fileName, int rresId)
                 {
                     // NOTE: We only load first matching id resource chunk found but
                     // we show a message if additional chunks are detected
-                    if (info.nextOffset != 0) RRES_LOG("WARNING: Multiple linked resource chunks available for the provided id");
+                    if (info.nextOffset != 0) RRES_LOG("RRES: WARNING: Multiple linked resource chunks available for the provided id");
 
                     /*
                     // Variables required to check multiple chunks
@@ -720,7 +720,7 @@ rresResourceChunk rresLoadResourceChunk(const char *fileName, int rresId)
                 }
             }
         }
-        else RRES_LOG("WARNING: The provided file is not a valid rres file, file signature or version not valid\n");
+        else RRES_LOG("RRES: WARNING: The provided file is not a valid rres file, file signature or version not valid\n");
 
         fclose(rresFile);
     }
@@ -752,10 +752,10 @@ rresCentralDir rresLoadCentralDirectory(const char *fileName)
         if (((header.id[0] == 'r') && (header.id[1] == 'r') && (header.id[2] == 'e') && (header.id[3] == 's')) && (header.version == 100))
         {
             // Check if there is a Central Directory available
-            if (header.cdOffset == 0) RRES_LOG("WARNING: CDIR: No central directory found\n");
+            if (header.cdOffset == 0) RRES_LOG("RRES: WARNING: CDIR: No central directory found\n");
             else
             {
-                RRES_LOG("INFO: CDIR: Expected to be found at offset: %08x\n", header.cdOffset);
+                RRES_LOG("RRES: CDIR: Expected to be found at offset: %08x\n", header.cdOffset);
 
                 rresResourceChunkInfo info = { 0 };
 
@@ -765,7 +765,7 @@ rresCentralDir rresLoadCentralDirectory(const char *fileName)
                 // Verify resource type is CDIR
                 if ((info.type[0] == 'C') && (info.type[1] == 'D') && (info.type[2] == 'I') && (info.type[3] == 'R'))
                 {
-                    RRES_LOG("INFO: CDIR: Valid Central Directory found. Size: %i bytes\n", info.packedSize);
+                    RRES_LOG("RRES: CDIR: Valid Central Directory found. Size: %i bytes\n", info.packedSize);
 
                     void *data = RRES_MALLOC(info.packedSize);
                     fread(data, info.packedSize, 1, rresFile);
@@ -797,7 +797,7 @@ rresCentralDir rresLoadCentralDirectory(const char *fileName)
                 }
             }
         }
-        else RRES_LOG("WARNING: The provided file is not a valid rres file, file signature or version not valid\n");
+        else RRES_LOG("RRES: WARNING: The provided file is not a valid rres file, file signature or version not valid\n");
 
         fclose(rresFile);
     }
@@ -933,7 +933,7 @@ static rresResourceChunk rresLoadResourceChunkData(rresResourceChunkInfo info, v
         }
     }
 
-    if (crc32 != info.crc32) RRES_LOG("WARNING: [ID %i] CRC32 does not match, data can be corrupted\n", info.id);
+    if (crc32 != info.crc32) RRES_LOG("RRES: WARNING: [ID %i] CRC32 does not match, data can be corrupted\n", info.id);
 
     return chunk;
 }
