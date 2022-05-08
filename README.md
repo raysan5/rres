@@ -20,8 +20,8 @@
 4. [File Structure](#file-structure)
 5. [File Header: `rresFileHeader`](#file-header-rresfileheader)
 6. [Resource Chunk: `rresResourceChunk`](#resource-chunk-rresresourcechunk)
-    1. [Resource Info Header: `rresResourceChunkInfo`](#resource-info-header-rresresourceinfoheader)
-    2. [Resource Data Chunk: `rresResourceChunkData`](#resource-data-chunk-rresresourcedatachunk)
+    1. [Resource Chunk Info: `rresResourceChunkInfo`](#resource-chunk-info-rresresourcechunkinfo)
+    2. [Resource Chunk Data: `rresResourceChunkData`](#resource-chunk-data-rresresourcechunkdata)
     3. [Resource Data Type: `rresResourceDataType`](#resource-data-type-rresresourcedatatype)
     4. [Resource Chunk: Central Directory: `rresCentralDir`](#resource-chunk-central-directory-rrescentraldir)
 7. [Custom Engine Implementation](#custom-engine-implementation)
@@ -81,7 +81,7 @@ rres file format consists of a file header (`rresFileHeader`) followed by a numb
 
 _Fig 01. rres v1.0 file structure._
 
-_NOTE: rresResourceChunk(s) are usually generated from input files. It's important to note that resources could not be mapped to files 1:1, one input file could generate multiple resource chunks. For example, a .ttf input file could generate an image resource chunk (`RRES_DATA_IMAGE` type) plus a font glyph info resource chunk (`RRES_DATA_GLYPH_INFO` type)._
+_NOTE: rresResourceChunk(s) are generated from input files. It's important to note that resources could not be mapped to files 1:1, one input file could generate multiple resource chunks. For example, a .ttf input file could generate an image resource chunk (`RRES_DATA_IMAGE` type) plus a font glyph info resource chunk (`RRES_DATA_GLYPH_INFO` type)._
 
 
 ```c
@@ -94,7 +94,7 @@ rresFileHeader               (16 bytes)
 
 rresResourceChunk[]
 {
-    rresResourceChunkInfo   (32 bytes)
+    rresResourceChunkInfo    (32 bytes)
         Type                  (4 bytes)     // Resource type (FourCC)
         Id                    (4 bytes)     // Resource identifier (CRC32 filename hash or custom)
         Compressor            (1 byte)      // Data compression algorithm
@@ -104,7 +104,7 @@ rresResourceChunk[]
         Base data Size        (4 bytes)     // Base data size (uncompressed/decrypted)
         Next Offset           (4 bytes)     // Next resource chunk offset (if required)
         Reserved              (4 bytes)     // <reserved>
-        CRC32                 (4 bytes)     // Resource Data Chunk CRC32
+        CRC32                 (4 bytes)     // Resource Chunk Data CRC32
                              
     rresResourceChunkData     (n bytes)     // Packed data
         Property Count        (4 bytes)     // Number of properties contained
@@ -153,7 +153,7 @@ On `rres` creation, `rres` packer could create an additional resource chunk of t
 
 Every resource chunk is divided in two part: `rresResourceChunkInfo` + `rresResourceData`.
 
-### Resource Info Header: `rresResourceChunkInfo`
+### Resource Chunk Info: `rresResourceChunkInfo`
 
 The following C struct defines the `rresResourceChunkInfo`:
 
@@ -188,13 +188,13 @@ typedef struct rresResourceChunkInfo {
 
 _Table 02. `rresResourceChunkInfo` fields description and details_
 
-### Resource Data Chunk: `rresResourceChunkData`
+### Resource Chunk Data: `rresResourceChunkData`
 
 `rresResourceChunkData` contains the following data:
 
  - `Property Count`: Number of properties contained, depends on resource `type`
  - `Properties[]`: Resource data required properties, depend on resource `type`
- - `Data`: Resource data, depend on resource `type`
+ - `Data`: Resource raw data, depend on resource `type`
 
 _NOTE: rresResourceChunkData could contain additional user data, in those cases additional data size must be considered in `packedSize`._
  
@@ -286,15 +286,15 @@ In case a `rres` file is generated with no `Central Directory`, a secondary head
 
 ## Custom Engine Implementation
 
-`rres` is designed as an **engine-agnostic file format**, processed data is treated as generic data, common to any game engine. Developers can implement a custom abstraction layers to **map `rres` generic data to their own engines data structures** and also **custom `rres` packaging tools**.
+`rres` is designed as an **engine-agnostic file format** that can be used with any game engine. Developers adopting `rres` can implement a custom library and a custom abstraction to **map `rres` generic data to their own engines data structures** and also **custom `rres` packaging tools**.
 
 The following diagram shows a sample implementation of `rres` for [`raylib`](https://github.com/raysan5/raylib) library.
 
 ![rres v1.0](https://raw.githubusercontent.com/raysan5/rres/master/design/rres_implementation.png)
 
-_Fig 02. rres sample implementation: custom engine lib and tool._
+_Fig 02. rres sample implementation: custom engine libs and tool._
 
-`rres` implementation consist of several pieces:
+`rres` implementation consist of several parts:
 
  - [Base library: `rres.h`](#base-library-rresh)
  - [Engine mapping library: `rres-raylib.h`](#engine-mapping-library-rres-raylibh)
@@ -302,11 +302,19 @@ _Fig 02. rres sample implementation: custom engine lib and tool._
 
 ### Base library: `rres.h`
 
-Base `rres` library is in charge of reading `rres` files resource chunks into generic resource structures, returned to the user. In our implementation the user exposed resource structures (`rresResourceChunk`, `rresResource`) are different than the ones used internally to process the `rres` file data (`rresFileHeader`, `rresResourceChunkInfo`). This design decision is due to the returned data for the user consist of a combination of the resource data info and resource data, and user does not need to have all the information after being properly processed. Our implementation does not include resource file writing, that functionality has been implemented directly in `rrespacker` tool.
+Base `rres` library is in charge of reading `rres` files resource chunks into a generic resource structure, returned to the user. In our implementation the user exposed resource structures (`rresResourceChunk`, `rresResource`) are different than the ones used internally to process the `rres` file data (`rresFileHeader`, `rresResourceChunkInfo`). This is design decision, user does not need all the info contained in `rresResourceChunkInfo` so only the required info has been directly exposed in `rresResourceChunk`. This implementation does not include resource file writing, that functionality has been implemented directly in `rrespacker` tool.
 
-`rresResource` is provided by `rres.h` along functions to load it and contains an array of `rresResourceChunk`, defined as following:
+ - `rresResource` contains all related `rresResourceChunks` for a processed input file
+ - `rresResourceChunk` contains the individual chunks user-required info and data, note that it does not expose `rresResourceChunkInfo` directly but only some of its values, this is a design decision and could change in other implementations.
+ - `rresResourceChunkData` contains the actual data for the resource: the requried properties and the raw data. It's important to note that in the case data was compressed/encrypted, it's up to the user-library (`rres-raylib.h`) to process that data; in those cases `chunk.data.raw` contains the compressed/encrypted data and `chunk.data.propCount = 0` and `chunk.data.props = NULL`; it's up to the user library to fill properties after decompression/decryption.
 
 ```c
+// rres resource
+typedef struct rresResource {
+    unsigned int count;             // Resource chunks count
+    rresResourceChunk *chunks;      // Resource chunks
+} rresResource;
+
 // rres resource chunk
 typedef struct rresResourceChunk {
     unsigned int type;              // Resource chunk data type
@@ -314,25 +322,24 @@ typedef struct rresResourceChunk {
     unsigned short cipherType;      // Resource cipher algorythm
     unsigned int packedSize;        // Packed data size (including props, compressed and/or encripted + additional data appended)
     unsigned int baseSize;          // Base data size (including propCount, props and uncompressed/decrypted data)
-    unsigned int propCount;         // Resource chunk properties count
-    int *props;                     // Resource chunk properties
-    void *data;                     // Resource chunk data
+    rresResourceChunkData data;     // Resource chunk packed data, contains propCount, props[] and raw data
 } rresResourceChunk;
 
-// rres resource
-typedef struct rresResource {
-    unsigned int count;             // Resource chunks count
-    rresResourceChunk *chunks;      // Resource chunks
-} rresResource;
+// rres resource chunk data
+typedef struct rresResourceChunkData {
+    unsigned int propCount;         // Resource chunk properties count
+    int *props;                     // Resource chunk properties
+    void *raw;                      // Resource chunk raw data
+} rresResourceChunkData;
 ```
 
-A `rresResource` could be loaded from the `.rres` file with the provided function: **`rresLoadResource()`**.
+A full `rresResource` could be loaded from the `.rres` file with the provided function: **`rresLoadResource()`**.
 
-After data has been copied to the destination structure it can be unloaded with function: **`rresUnloadResource()`**.
+After data has been copied to the destination structures it can be unloaded with function: **`rresUnloadResource()`**.
 
 ### Engine mapping library: `rres-raylib.h`
 
-The mapping library includes `rres.h` and provides functionality to load the generic resource data loaded from the `rres` file into `raylib` structures. The API provided is simple and intuitive, following `raylib` conventions:
+The mapping library includes `rres.h` and provides functionality to map the resource chunks data loaded from the `rres` file into `raylib` structures. The API provided is simple and intuitive, following `raylib` conventions:
 
 ```c
 RLAPI void *LoadDataFromResource(rresResource rres, int *size);     // Load raw data from rres resource
@@ -343,7 +350,7 @@ RLAPI Font LoadFontFromResource(rresResource rres);                 // Load Font
 RLAPI Mesh LoadMeshFromResource(rresResource rres);                 // Load Mesh data from rres resource
 ```
 
-Note that data decompression/decryption should be implemented in this custom mapping library, `rres` only provides compressor/cipher identifier values for convenience. Compressors and ciphers support depends on user implementation and it must be aligned with the packaging tool.
+Note that data decompression/decryption should be implemented in this custom mapping library, `rresResourceChunk` contains compressor/cipher identifier values for convenience. Compressors and ciphers support depends on user implementation and it must be aligned with the packaging tool (`rrespacker`).
 
 `rres` file-format is engine-agnostic and a mapping library can be created for any engine/framework in any programming language.
 
