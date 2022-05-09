@@ -270,8 +270,8 @@ typedef enum rresResourceDataType {
     RRES_DATA_NULL         = 0,             // FourCC: NULL - Reserved for empty chunks, no props/data
     RRES_DATA_RAW          = 1,             // FourCC: RAWD - Raw file data, 4 properties
                                             //    props[0]:size (bytes)
-                                            //    props[1]:extension01
-                                            //    props[2]:extension02
+                                            //    props[1]:extension01 (big-endian: ".png" = 0x2e706e67)
+                                            //    props[2]:extension02 (additional part, extensions with +3 letters)
                                             //    props[3]:reserved
                                             //    data: raw bytes
     RRES_DATA_TEXT         = 2,             // FourCC: TEXT - Text file data, 4 properties
@@ -931,12 +931,12 @@ static rresResourceChunk rresLoadResourceChunkData(rresResourceChunkInfo info, v
         if ((info.compType == RRES_COMP_NONE) && (info.cipherType == RRES_CIPHER_NONE))
         {
             // Data is not compressed/encrypted (info.packedSize = info.baseSize)
-            chunk.data.propCount = ((int *)data)[0];
+            chunk.data.propCount = ((unsigned int *)data)[0];
 
             if (chunk.data.propCount > 0)
             {
-                chunk.data.props = (int *)RRES_CALLOC(chunk.data.propCount, sizeof(int));
-                for (unsigned int i = 0; i < chunk.data.propCount; i++) chunk.data.props[i] = ((int *)data)[1 + i];
+                chunk.data.props = (unsigned int *)RRES_CALLOC(chunk.data.propCount, sizeof(unsigned int));
+                for (unsigned int i = 0; i < chunk.data.propCount; i++) chunk.data.props[i] = ((unsigned int *)data)[i + 1];
             }
 
             chunk.data.raw = RRES_MALLOC(info.baseSize);

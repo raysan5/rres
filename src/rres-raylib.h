@@ -137,13 +137,14 @@ const char *baseDir = NULL;
 
 // Load simple data chunks that are later required by multi-chunk resources
 // NOTE: Chunk data must be provided uncompressed/unencrypted
-static void *LoadDataFromResourceLink(rresResourceChunk chunk, int *size);      // Load chunk: RRES_DATA_LINK
-static void *LoadDataFromResourceChunk(rresResourceChunk chunk, int *size);     // Load chunk: RRES_DATA_RAW
-static char *LoadTextFromResourceChunk(rresResourceChunk chunk, int *codeLang); // Load chunk: RRES_DATA_TEXT
-static Image LoadImageFromResourceChunk(rresResourceChunk chunk);               // Load chunk: RRES_DATA_IMAGE
+static void *LoadDataFromResourceLink(rresResourceChunk chunk, unsigned int *size);      // Load chunk: RRES_DATA_LINK
+static void *LoadDataFromResourceChunk(rresResourceChunk chunk, unsigned int *size);     // Load chunk: RRES_DATA_RAW
+static char *LoadTextFromResourceChunk(rresResourceChunk chunk, unsigned int *codeLang); // Load chunk: RRES_DATA_TEXT
+static Image LoadImageFromResourceChunk(rresResourceChunk chunk);                        // Load chunk: RRES_DATA_IMAGE
 
-static const char *GetFourCCFromType(unsigned int type);            // Get FourCC 4-char code from resource type, useful for log info
-static unsigned int *ComputeMD5(unsigned char *data, int size);     // Compute MD5 hash code, returns 4 integers array (static)
+static const char *GetFourCCFromType(unsigned int type);                                 // Get FourCC 4-char code from resource type, useful for log info
+static const char *GetExtensionFromProps(unsigned int ext01, unsigned int ext02);        // Get file extension from RRES_DATA_RAW properties (unsigned int) 
+static unsigned int *ComputeMD5(unsigned char *data, int size);                          // Compute MD5 hash code, returns 4 integers array (static)
 
 //----------------------------------------------------------------------------------
 // Module Functions Definition
@@ -185,12 +186,17 @@ char *LoadTextFromResource(rresResourceChunk chunk)
 
         // TODO: Consider text code language to load shader or code scripts
     }
+    else if (chunk.type == RRES_DATA_RAW)   // Raw text file
+    {
+        int dataSize = 0;
+        void *data = LoadDataFromResourceChunk(chunk, dataSize);
+        text = data;
+    }
     else if (chunk.type == RRES_DATA_LINK)  // Link to external file
     {
         // Get raw data from external linked file
         unsigned int dataSize = 0;
         void *data = LoadDataFromResourceLink(chunk, &dataSize);
-
         text = data;
     }
 
@@ -211,10 +217,7 @@ Image LoadImageFromResource(rresResourceChunk chunk)
         int dataSize = 0;
         void *rawData = LoadDataFromResourceChunk(chunk, dataSize);
         
-        unsigned char ext[8] = { 0 };
-        // TODO: Get extension from chunk.props[1] + chunk.props[2]
-
-        image = LoadImageFromMemory(ext, rawData, dataSize);
+        image = LoadImageFromMemory(GetExtensionFromProps(chunk.data.props[1], chunk.data.props[2]), rawData, dataSize);
 
         RRES_FREE(rawData);
     }
@@ -238,7 +241,7 @@ Wave LoadWaveFromResource(rresResourceChunk chunk)
 {
     Wave wave = { 0 };
 
-    if (chunk.type == RRES_DATA_WAVE)      // Wave data
+    if (chunk.type == RRES_DATA_WAVE)       // Wave data
     {
         if ((chunk.compType == RRES_COMP_NONE) && (chunk.cipherType == RRES_CIPHER_NONE))
         {
@@ -253,7 +256,16 @@ Wave LoadWaveFromResource(rresResourceChunk chunk)
         }
         else RRES_LOG("RRES: WARNING: Wave provided data must be decompressed/decrypted\n");
     }
-    else if (chunk.type == RRES_DATA_LINK) // Link to external file
+    else if (chunk.type == RRES_DATA_RAW)   // Raw wave file
+    {
+        int dataSize = 0;
+        void *rawData = LoadDataFromResourceChunk(chunk, dataSize);
+
+        wave = LoadWaveFromMemory(GetExtensionFromProps(chunk.data.props[1], chunk.data.props[2]), rawData, dataSize);
+
+        RRES_FREE(rawData);
+    }
+    else if (chunk.type == RRES_DATA_LINK)  // Link to external file
     {
         // Get raw data from external linked file
         unsigned int dataSize = 0;
@@ -317,17 +329,31 @@ Font LoadFontFromResource(rresResourceMulti multi)
             UnloadImage(image);
         }
     }
-    else if ((multi.count == 1) && (multi.chunks[1].type == RRES_DATA_LINK))  // Link to external font file
+    else    // One chunk of data: RRES_DATA_RAW or RRES_DATA_LINK?
     {
-        // Get raw data from external linked file
-        unsigned int dataSize = 0;
-        void *data = LoadDataFromResourceLink(multi.chunks[0], &dataSize);
+        if (multi.chunks[0].type == RRES_DATA_RAW)      // Raw font file
+        {
+            int dataSize = 0;
+            void *rawData = LoadDataFromResourceChunk(multi.chunks[0], dataSize);
 
-        // Load image from linked file data
-        // NOTE 1: Loading font at 32px base size and default charset (95 glyphs)
-        // NOTE 2: Function checks internally if the file extension is supported to
-        // properly load the data, if it fails it logs the result and font.texture.id = 0
-        font = LoadFontFromMemory(GetFileExtension(multi.chunks[0].data.raw), data, dataSize, 32, NULL, 0);
+            font = LoadFontFromMemory(GetExtensionFromProps(multi.chunks[0].data.props[1], multi.chunks[0].data.props[2]), rawData, dataSize, 32, NULL, 0);
+
+            RRES_FREE(rawData);
+        }
+        if (multi.chunks[0].type == RRES_DATA_LINK)     // Link to external font file
+        {
+            // Get raw data from external linked file
+            int dataSize = 0;
+            void *rawData = LoadDataFromResourceLink(multi.chunks[0], &dataSize);
+
+            // Load image from linked file data
+            // NOTE 1: Loading font at 32px base size and default charset (95 glyphs)
+            // NOTE 2: Function checks internally if the file extension is supported to
+            // properly load the data, if it fails it logs the result and font.texture.id = 0
+            font = LoadFontFromMemory(GetFileExtension(multi.chunks[0].data.raw), rawData, dataSize, 32, NULL, 0);
+
+            RRES_FREE(rawData);
+        }
     }
 
     return font;
@@ -741,7 +767,7 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
 //----------------------------------------------------------------------------------
 
 // Load data chunk: RRES_DATA_LINK
-static void *LoadDataFromResourceLink(rresResourceChunk chunk, int *size)
+static void *LoadDataFromResourceLink(rresResourceChunk chunk, unsigned int *size)
 {
     unsigned char fullFilePath[2048] = { 0 };
     void *data = NULL;
@@ -779,7 +805,7 @@ static void *LoadDataFromResourceLink(rresResourceChunk chunk, int *size)
 
 // Load data chunk: RRES_DATA_RAW
 // NOTE: This chunk can be used raw files embedding or other binary blobs
-static void *LoadDataFromResourceChunk(rresResourceChunk chunk, int *size)
+static void *LoadDataFromResourceChunk(rresResourceChunk chunk, unsigned int *size)
 {
     void *rawData = NULL;
 
@@ -796,7 +822,7 @@ static void *LoadDataFromResourceChunk(rresResourceChunk chunk, int *size)
 
 // Load data chunk: RRES_DATA_TEXT
 // NOTE: This chunk can be used for shaders or other text data elements (materials?)
-static char *LoadTextFromResourceChunk(rresResourceChunk chunk, int *codeLang)
+static char *LoadTextFromResourceChunk(rresResourceChunk chunk, unsigned int *codeLang)
 {
     void *text = NULL;
 
@@ -889,6 +915,28 @@ static const char *GetFourCCFromType(unsigned int type)
         case RRES_DATA_DIRECTORY: return "CDIR";    // Central directory for input files relation to resource chunks
         default: break;
     }
+}
+
+// Get file extension from RRES_DATA_RAW properties (unsigned int) 
+static const char *GetExtensionFromProps(unsigned int ext01, unsigned int ext02)
+{
+    static char extension[8] = { 0 };
+    memset(extension, 0, 8);
+
+    // Convert file extension provided as 2 unsigned int properties, to a char[] array 
+    // NOTE: Extension is defined as 2 unsigned int big-endian values (4 bytes each), 
+    // starting with a dot, i.e 0x2e706e67 => ".png"
+    extension[0] = (unsigned char)((ext01 & 0xff000000) >> 24);
+    extension[1] = (unsigned char)((ext01 & 0x00ff0000) >> 16);
+    extension[2] = (unsigned char)((ext01 & 0x0000ff00) >> 8);
+    extension[3] = (unsigned char)(ext01 & 0x000000ff);
+
+    extension[4] = (unsigned char)((ext02 & 0xff000000) >> 24);
+    extension[5] = (unsigned char)((ext02 & 0x00ff0000) >> 16);
+    extension[6] = (unsigned char)((ext02 & 0x0000ff00) >> 8);
+    extension[7] = (unsigned char)(ext02 & 0x000000ff);
+
+    return extension;
 }
 
 // Compute MD5 hash code, returns 4 integers array (static)
