@@ -75,7 +75,7 @@ int main(void)
                     // List all files contained on central directory
                     for (unsigned int i = 0; i < dir.count; i++)
                     {
-                        TraceLog(LOG_INFO, "CDIR: %s - Resource id: [0x%08x] - Offset: 0x%08x", dir.entries[i].fileName, dir.entries[i].id, dir.entries[i].offset);
+                        TraceLog(LOG_INFO, "CDIR: File entry %03i: %s | Resource(s) id: 0x%08x | Offset: 0x%08x", i, dir.entries[i].fileName, dir.entries[i].id, dir.entries[i].offset);
                     
                         // TODO: List all contained resources info
                     }
@@ -136,7 +136,7 @@ int main(void)
 
                 // TEST 05: Load wave data (RRES_DATA_WAVE)
                 //------------------------------------------------------------------------------------------------------
-                chunk = rresLoadResourceChunk(droppedFiles[0], rresGetIdFromFileName(dir, "resources/audio/target.ogg"));
+                chunk = rresLoadResourceChunk(droppedFiles[0], rresGetIdFromFileName(dir, "tanatana.ogg"));
                 result = UnpackResourceChunk(&chunk);       // Decompres/decipher resource data (if required)
 
                 if (result == 0)    // Data decompressed/decrypted successfully

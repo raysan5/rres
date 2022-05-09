@@ -575,6 +575,8 @@ rresResourceMulti rresLoadResourceMulti(const char *fileName, int rresId)
         // Verify file signature: "rres" and file version: 100
         if (((header.id[0] == 'r') && (header.id[1] == 'r') && (header.id[2] == 'e') && (header.id[3] == 's')) && (header.version == 100))
         {
+            bool found = false;
+
             // Check all available chunks looking for the requested id
             for (int i = 0; i < header.chunkCount; i++)
             {
@@ -586,6 +588,11 @@ rresResourceMulti rresLoadResourceMulti(const char *fileName, int rresId)
                 // Check if resource id is the requested one
                 if (info.id == rresId)
                 {
+                    found = true;
+                    
+                    RRES_LOG("RRES: INFO: Found requested resource chunk id: 0x%08x\n", info.id);
+                    RRES_LOG("RRES: %c%c%c%c: Id: 0x%08x | Base size: %i | Packed size: %i\n", info.type[0], info.type[1], info.type[2], info.type[3], info.id, info.baseSize, info.packedSize);
+
                     rres.count = 1;
 
                     long currentFileOffset = ftell(rresFile);               // Store current file position
@@ -609,9 +616,6 @@ rresResourceMulti rresLoadResourceMulti(const char *fileName, int rresId)
                     fread(data, info.packedSize, 1, rresFile);              // Read data: propsCount + props[] + data (+additional_data)
                     rres.chunks[0] = rresLoadResourceChunkData(info, data); // Get chunk.data properly organized (only if uncompressed/unencrypted)
                     RRES_FREE(data);
-
-                    // Check if there are more chunks to read
-                    if (rres.count > 1) RRES_LOG("RRES: [%s][ID %i] Multiple resource chunks detected: %i chunks\n", fileName, (int)info.id, rres.count);
 
                     int i = 1;
 
@@ -637,6 +641,8 @@ rresResourceMulti rresLoadResourceMulti(const char *fileName, int rresId)
                     fseek(rresFile, info.packedSize, SEEK_CUR);
                 }
             }
+            
+            if (!found) RRES_LOG("RRES: WARNING: Requested resource not found: 0x%08x\n", rresId);
         }
         else RRES_LOG("RRES: WARNING: The provided file is not a valid rres file, file signature or version not valid\n");
 
@@ -664,6 +670,8 @@ rresResourceChunk rresLoadResourceChunk(const char *fileName, int rresId)
     if (rresFile == NULL) RRES_LOG("RRES: WARNING: [%s] rres file could not be opened\n", fileName);
     else
     {
+        RRES_LOG("RRES: INFO: Loading resource from file: %s\n", fileName);
+
         rresFileHeader header = { 0 };
 
         // Read rres file header
@@ -672,6 +680,8 @@ rresResourceChunk rresLoadResourceChunk(const char *fileName, int rresId)
         // Verify file signature: "rres" and file version: 100
         if (((header.id[0] == 'r') && (header.id[1] == 'r') && (header.id[2] == 'e') && (header.id[3] == 's')) && (header.version == 100))
         {
+            bool found = false;
+            
             // Check all available chunks looking for the requested id
             for (int i = 0; i < header.chunkCount; i++)
             {
@@ -683,6 +693,11 @@ rresResourceChunk rresLoadResourceChunk(const char *fileName, int rresId)
                 // Check if resource id is the requested one
                 if (info.id == rresId)
                 {
+                    found = true;
+                    
+                    RRES_LOG("RRES: INFO: Found requested resource chunk id: 0x%08x\n", info.id);
+                    RRES_LOG("RRES: %c%c%c%c: Id: 0x%08x | Base size: %i | Packed size: %i\n", info.type[0], info.type[1], info.type[2], info.type[3], info.id, info.baseSize, info.packedSize);
+
                     // NOTE: We only load first matching id resource chunk found but
                     // we show a message if additional chunks are detected
                     if (info.nextOffset != 0) RRES_LOG("RRES: WARNING: Multiple linked resource chunks available for the provided id");
@@ -719,6 +734,8 @@ rresResourceChunk rresLoadResourceChunk(const char *fileName, int rresId)
                     fseek(rresFile, info.packedSize, SEEK_CUR);
                 }
             }
+        
+            if (!found) RRES_LOG("RRES: WARNING: Requested resource not found: 0x%08x\n", rresId);
         }
         else RRES_LOG("RRES: WARNING: The provided file is not a valid rres file, file signature or version not valid\n");
 
@@ -755,17 +772,15 @@ rresCentralDir rresLoadCentralDirectory(const char *fileName)
             if (header.cdOffset == 0) RRES_LOG("RRES: WARNING: CDIR: No central directory found\n");
             else
             {
-                RRES_LOG("RRES: CDIR: Expected to be found at offset: %08x\n", header.cdOffset);
-
                 rresResourceChunkInfo info = { 0 };
 
-                fseek(rresFile, header.cdOffset, SEEK_CUR);         // Move to central directory position
-                fread(&info, sizeof(rresResourceChunkInfo), 1, rresFile);  // Read resource info
+                fseek(rresFile, header.cdOffset, SEEK_CUR); // Move to central directory position
+                fread(&info, sizeof(rresResourceChunkInfo), 1, rresFile); // Read resource info
 
                 // Verify resource type is CDIR
                 if ((info.type[0] == 'C') && (info.type[1] == 'D') && (info.type[2] == 'I') && (info.type[3] == 'R'))
                 {
-                    RRES_LOG("RRES: CDIR: Valid Central Directory found. Size: %i bytes\n", info.packedSize);
+                    RRES_LOG("RRES: CDIR: Central Directory found at offset: 0x%08x\n", header.cdOffset);
 
                     void *data = RRES_MALLOC(info.packedSize);
                     fread(data, info.packedSize, 1, rresFile);
@@ -775,6 +790,8 @@ rresCentralDir rresLoadCentralDirectory(const char *fileName)
                     RRES_FREE(data);
 
                     dir.count = chunk.data.props[0];     // File entries count
+                    
+                    RRES_LOG("RRES: CDIR: Central Directory file entries count: %i\n", dir.count);
 
                     unsigned char *ptr = chunk.data.raw;
                     dir.entries = (rresDirEntry *)RRES_CALLOC(dir.count, sizeof(rresDirEntry));

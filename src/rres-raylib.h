@@ -538,6 +538,7 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
             if (memcmp(decryptMD5, md5, 4*sizeof(unsigned int)) == 0)    // Decrypted successfully!
             {
                 chunk->packedSize -= (16 + 16);    // We remove additional data size from packed size (salt[16] + MD5[16])
+                RRES_LOG("RRES: %s: Data decrypted successfully (AES)\n", GetFourCCFromType(chunk->type));
             }
             else
             {
@@ -594,6 +595,7 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
             if (decryptResult == 0)    // Decrypted successfully!
             {
                 chunk->packedSize -= (16 + 24 + 16);    // We remove additional data size from packed size
+                RRES_LOG("RRES: %s: Data decrypted successfully (XChaCha20)\n", GetFourCCFromType(chunk->type));
             }
             else if (decryptResult == -1)
             {
@@ -615,8 +617,6 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
         // Data is not encrypted any more, register it
         chunk->cipherType = RRES_CIPHER_NONE;
         updateProps = true;
-
-        RRES_LOG("RRES: %s: Chunk data decrypted successfully\n", GetFourCCFromType(chunk->type));
     }
 
     // STEP 2: Data decompression (if decryption was successful)
@@ -639,6 +639,7 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
                 {
                     unpackedData = uncompData;
                     chunk->packedSize = uncompDataSize;
+                    RRES_LOG("RRES: %s: Data decompressed successfully (DEFLATE)\n", GetFourCCFromType(chunk->type));
                 }
                 else
                 {
@@ -660,6 +661,7 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
                 {
                     unpackedData = uncompData;
                     chunk->packedSize = uncompDataSize;
+                    RRES_LOG("RRES: %s: Data decompressed successfully (LZ4)\n", GetFourCCFromType(chunk->type));
                 }
                 else
                 {
@@ -684,6 +686,7 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
                 {
                     unpackedData = uncompData;
                     chunk->packedSize = uncompDataSize;
+                    RRES_LOG("RRES: %s: Data decompressed successfully (QOI)\n", GetFourCCFromType(chunk->type));
                 }
                 else
                 {
@@ -706,8 +709,6 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
         // Data is not encrypted any more, register it
         chunk->compType = RRES_COMP_NONE;
         updateProps = true;
-
-        RRES_LOG("RRES: %s: Chunk data decompressed successfully\n", GetFourCCFromType(chunk->type));
     }
 
     // Update chunk->data.propCount and chunk->data.props if required
@@ -756,6 +757,8 @@ static void *LoadDataFromResourceLink(rresResourceChunk chunk, int *size)
     strcpy(fullFilePath, baseDir);
     strcat(fullFilePath, linkFilePath);
 
+    RRES_LOG("RRES: %s: Data file linked externally: %s\n", GetFourCCFromType(chunk.type), linkFilePath);
+
     if (FileExists(fullFilePath))
     {
         // Load external file as raw data
@@ -766,6 +769,8 @@ static void *LoadDataFromResourceLink(rresResourceChunk chunk, int *size)
             *size = TextLength(data);
         }
         else data = LoadFileData(fullFilePath, size);
+
+        if ((data != NULL) && (*size > 0)) RRES_LOG("RRES: %s: External linked file loaded successfully\n", GetFourCCFromType(chunk.type));
     }
     else RRES_LOG("RRES: WARNING: [%s] Linked external file could not be found\n", linkFilePath);
 
