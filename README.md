@@ -230,7 +230,7 @@ The currently defined data `types` consist of the following properties and data:
 | resource type      |  FourCC  |  propsCount  |    props     |      data        |
 | :----------------: | :------: | :----------: | :----------- | :--------------: |
 | `RRES_DATA_NULL`   |  `NULL`  |      0       |      -       |        -         |
-| `RRES_DATA_RAW`    |  `RAWD`  |      1       | `props[0]`:size  |  raw file bytes  |
+| `RRES_DATA_RAW`    |  `RAWD`  |      4       | `props[0]`:size<br>`props[1]`:`extension01`<br>`props[2]`:`extension02`<br>`props[3]`:_reserved_  |  raw file bytes  |
 | `RRES_DATA_TEXT`   |  `TEXT`  |      4       | `props[0]`:size<br>`props[1]`:`rresTextEncoding`<br>`props[2]`:`rresCodeLang`<br>`props[3]`:cultureCode  |  text data   |
 | `RRES_DATA_IMAGE`  |  `IMGE`  |      4       | `props[0]`:width<br>`props[1]`:height<br>`props[2]`:`rresPixelFormat`<br>`props[3]`:mipmaps |  pixel data         |
 | `RRES_DATA_WAVE`   |  `WAVE`  |      4       | `props[0]`:frameCount<br>`props[1]`:sampleRate<br>`props[2]`:sampleSize<br>`props[3]`:channels | audio samples data |
@@ -240,6 +240,8 @@ The currently defined data `types` consist of the following properties and data:
 | `RRES_DATA_DIRECTORY` | `CDIR`|      1       | `props[0]`:entryCount | `rresDirEntry[0..entryCount]` |
 
 _Table 03. `rresResourceDataType` defined values and details_
+
+**NOTE:** `RRES_DATA_RAW` contains the packaged file extension as part of its properties, `char` extension is converted a 4-byte `unsigned int` big-endian value, starting with a dot. i.e `".png"` => `0x2e706e67`. In case the extension was not relevant, the user implementation could decide to set those properties to `0`.  
 
 `rres.h` defines the following `enums` for convenience to assign some of the properties:
 
