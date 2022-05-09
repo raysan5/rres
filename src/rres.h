@@ -592,7 +592,7 @@ rresResourceMulti rresLoadResourceMulti(const char *fileName, int rresId)
                 {
                     found = true;
                     
-                    RRES_LOG("RRES: INFO: Found requested resource chunk id: 0x%08x\n", info.id);
+                    RRES_LOG("RRES: INFO: Found requested resource id: 0x%08x\n", info.id);
                     RRES_LOG("RRES: %c%c%c%c: Id: 0x%08x | Base size: %i | Packed size: %i\n", info.type[0], info.type[1], info.type[2], info.type[3], info.id, info.baseSize, info.packedSize);
 
                     rres.count = 1;
@@ -626,6 +626,8 @@ rresResourceMulti rresLoadResourceMulti(const char *fileName, int rresId)
                     {
                         fseek(rresFile, info.nextOffset, SEEK_SET);         // Jump to next resource
                         fread(&info, sizeof(rresResourceChunkInfo), 1, rresFile); // Read next resource info header
+
+                        RRES_LOG("RRES: %c%c%c%c: Id: 0x%08x | Base size: %i | Packed size: %i\n", info.type[0], info.type[1], info.type[2], info.type[3], info.id, info.baseSize, info.packedSize);
 
                         void *data = RRES_MALLOC(info.packedSize);          // Allocate enough memory to store resource data chunk
                         fread(data, info.packedSize, 1, rresFile);          // Read data: propsCount + props[] + data (+additional_data)
@@ -697,7 +699,7 @@ rresResourceChunk rresLoadResourceChunk(const char *fileName, int rresId)
                 {
                     found = true;
                     
-                    RRES_LOG("RRES: INFO: Found requested resource chunk id: 0x%08x\n", info.id);
+                    RRES_LOG("RRES: INFO: Found requested resource id: 0x%08x\n", info.id);
                     RRES_LOG("RRES: %c%c%c%c: Id: 0x%08x | Base size: %i | Packed size: %i\n", info.type[0], info.type[1], info.type[2], info.type[3], info.id, info.baseSize, info.packedSize);
 
                     // NOTE: We only load first matching id resource chunk found but

@@ -253,7 +253,7 @@ Wave LoadWaveFromResource(rresResourceChunk chunk)
             wave.data = RL_CALLOC(size, 1);
             memcpy(wave.data, chunk.data.raw, size);
         }
-        else RRES_LOG("RRES: WARNING: Wave provided data must be decompressed/decrypted\n");
+        RRES_LOG("RRES: %s: WARNING: Data must be decompressed/decrypted\n", GetFourCCFromType(chunk.type));
     }
     else if (chunk.type == RRES_DATA_RAW)   // Raw wave file
     {
@@ -317,15 +317,19 @@ Font LoadFontFromResource(rresResourceMulti multi)
                     // NOTE: font.glyphs[i].image is not loaded
                 }
             }
-            else RRES_LOG("RRES: WARNING: Font glyph provided data must be decompressed/decrypted\n");
+            else RRES_LOG("RRES: %s: WARNING: Data must be decompressed/decrypted\n", GetFourCCFromType(multi.chunks[0].type));
         }
 
         // Load font image chunk
         if (multi.chunks[1].type == RRES_DATA_IMAGE)
         {
-            Image image = LoadImageFromResourceChunk(multi.chunks[1]);
-            font.texture = LoadTextureFromImage(image);
-            UnloadImage(image);
+            if ((multi.chunks[0].compType == RRES_COMP_NONE) && (multi.chunks[0].cipherType == RRES_CIPHER_NONE))
+            {
+                Image image = LoadImageFromResourceChunk(multi.chunks[1]);
+                font.texture = LoadTextureFromImage(image);
+                UnloadImage(image);
+            }
+            else RRES_LOG("RRES: %s: WARNING: Data must be decompressed/decrypted\n", GetFourCCFromType(multi.chunks[1].type));
         }
     }
     else    // One chunk of data: RRES_DATA_RAW or RRES_DATA_LINK?
@@ -814,7 +818,7 @@ static void *LoadDataFromResourceChunk(rresResourceChunk chunk, unsigned int *si
         if (rawData != NULL) memcpy(rawData, chunk.data.raw, chunk.data.props[0]);
         *size = chunk.data.props[0];
     }
-    else RRES_LOG("RRES: WARNING: Provided data must be decompressed/decrypted\n");
+    else RRES_LOG("RRES: %s: WARNING: Data must be decompressed/decrypted\n", GetFourCCFromType(chunk.type));
 
     return rawData;
 }
@@ -835,7 +839,7 @@ static char *LoadTextFromResourceChunk(rresResourceChunk chunk, unsigned int *co
         *codeLang = chunk.data.props[2];
         //chunks.props[3]:cultureCode could be useful for localized text
     }
-    else RRES_LOG("RRES: WARNING: Provided text data must be decompressed/decrypted\n");
+    else RRES_LOG("RRES: %s: WARNING: Data must be decompressed/decrypted\n", GetFourCCFromType(chunk.type));
 
     return text;
 }
@@ -893,7 +897,7 @@ static Image LoadImageFromResourceChunk(rresResourceChunk chunk)
         }
         else RRES_LOG("RRES: WARNING: IMGE: Chunk data size do not match expected image data size\n");
     }
-    else RRES_LOG("RRES: WARNING: Provided image data must be decompressed/decrypted\n");
+    else RRES_LOG("RRES: %s: WARNING: Data must be decompressed/decrypted\n", GetFourCCFromType(chunk.type));
 
     return image;
 }

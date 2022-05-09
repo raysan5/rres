@@ -116,6 +116,7 @@ int main(void)
                 rresUnloadResourceChunk(chunk);
                 //------------------------------------------------------------------------------------------------------
                 */
+                /*
                 // TEST 04: Load image data (RRES_DATA_IMAGE)
                 //------------------------------------------------------------------------------------------------------
                 chunk = rresLoadResourceChunk(droppedFiles[0], rresGetIdFromFileName(dir, "fudesumi.png"));
@@ -148,13 +149,13 @@ int main(void)
 
                 rresUnloadResourceChunk(chunk);
                 //------------------------------------------------------------------------------------------------------
-                /*
+                */
                 // TEST 06: Load font data, multiples chunks (RRES_DATA_GLYPH_INFO + RRE_DATA_IMAGE)
                 //------------------------------------------------------------------------------------------------------
-                multi = rresLoadResourceMulti(droppedFiles[0], rresGetIdFromFileName(dir, "resources/fonts/pixantiqua.ttf"));
+                multi = rresLoadResourceMulti(droppedFiles[0], rresGetIdFromFileName(dir, "pixantiqua.ttf"));
                 for (int i = 0; i < multi.count; i++)
                 {
-                    result = UnpackResourceChunk(&chunk);   // Decompres/decipher resource data (if required)
+                    result = UnpackResourceChunk(&multi.chunks[i]);   // Decompres/decipher resource data (if required)
                     if (result != 0) break;
                 }
 
@@ -165,7 +166,7 @@ int main(void)
                 
                 rresUnloadResourceMulti(multi);
                 //------------------------------------------------------------------------------------------------------
-
+                /*
                 // TEST 07: Load mesh data, multiples chunks (RRES_DATA_VERTEX x n)
                 //------------------------------------------------------------------------------------------------------
                 multi = rresLoadResourceMulti(droppedFiles[0], rresGetIdFromFileName(dir, "resources/models/castle.obj"));
@@ -205,6 +206,8 @@ int main(void)
             ClearBackground(RAYWHITE);
 
             DrawText("rres file loading: drag & drop a .rres file", 10, 10, 10, DARKGRAY);
+
+            DrawTextEx(font, "THIS IS a TEST!", (Vector2){ 10, 50 }, font.baseSize, 0, RED);
 
             DrawTexture(texture, 0, 0, WHITE);
             DrawTextEx(font, text, (Vector2){ 300, 20 }, 40, 2, BLUE);
