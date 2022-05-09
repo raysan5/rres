@@ -477,18 +477,20 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
     // NOTE 1: If data is compressed/encrypted the properties are not loaded by rres.h because
     // it's up to the user to process the data; *chunk must be properly updated by this function
     // NOTE 2: rres-raylib should support the same algorithms and libraries used by rrespacker tool
-    void *unpackedData = NULL;
-    unsigned char *uncompData = NULL;
-    unsigned char *decryptedData = NULL;        // TODO: Review encryption
+    void *unpackedData = NULL;    
 
-    // STEP 1. Decrypt message if encrypted
-    if (chunk->cipherType != RRES_CIPHER_NONE)
+    // STEP 1. Data decryption
+    //-------------------------------------------------------------------------------------
+    unsigned char *decryptedData = NULL;
+
+    switch (chunk->cipherType)
     {
-        if (chunk->cipherType == RRES_CIPHER_AES)   // rrespacker implements AES-CTR 256 bit
-        {
+        case RRES_CIPHER_NONE: decryptedData = chunk->data.raw; break;
 #if defined(RRES_SUPPORT_ENCRYPTION_AES)
+        case RRES_CIPHER_AES:
+        {
             // WARNING: Implementation dependant!
-            // rrespacker tool appends (salt + MD5) to encrypted data for convenience,
+            // rrespacker tool appends (salt[16] + MD5[16]) to encrypted data for convenience,
             // Actually, chunk->packedSize considers those additional elements
 
             // Get some memory for the possible message output
@@ -535,20 +537,21 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
 
             if (memcmp(decryptMD5, md5, 4*sizeof(unsigned int)) == 0)    // Decrypted successfully!
             {
-                RRES_FREE(chunk->data.raw);
-                chunk->data.raw = decryptedData;
-                chunk->packedSize -= (16 + 16);    // We remove additional data size from packed size
+                chunk->packedSize -= (16 + 16);    // We remove additional data size from packed size (salt[16] + MD5[16])
             }
-            else result = 2;    // Data was not decrypted as expected, wrong password or message corrupted
-#else
-            result = 1;         // Decryption algorithm not supported
+            else
+            {
+                result = 2;    // Data was not decrypted as expected, wrong password or message corrupted
+                RRES_LOG("RRES: WARNING: %s: Data decryption failed, wrong password or corrupted data\n", GetFourCCFromType(chunk->type));
+            }
+
+        } break;
 #endif
-        }
-        else if (chunk->cipherType == RRES_CIPHER_XCHACHA20_POLY1305)    // rrespacker implements XChaCha20-Poly1305
-        {
 #if defined(RRES_SUPPORT_ENCRYPTION_MONOCYPHER)
+        case RRES_CIPHER_XCHACHA20_POLY1305:
+        {
             // WARNING: Implementation dependant!
-            // rrespacker tool appends (salt + nonce + MAC) to encrypted data for convenience,
+            // rrespacker tool appends (salt[16] + nonce[24] + MAC[16]) to encrypted data for convenience,
             // Actually, chunk->packedSize considers those additional elements
 
             // Get some memory for the possible message output
@@ -590,111 +593,121 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
 
             if (decryptResult == 0)    // Decrypted successfully!
             {
-                RRES_FREE(chunk->data.raw);
-                chunk->data.raw = decryptedData;
                 chunk->packedSize -= (16 + 24 + 16);    // We remove additional data size from packed size
             }
-            else if (decryptResult == -1) result = 2;   // Wrong password or message corrupted
-#else
-            result = 1;     // Decryption algorithm not supported
+            else if (decryptResult == -1)
+            {
+                result = 2;   // Wrong password or message corrupted
+                RRES_LOG("RRES: WARNING: %s: Data decryption failed, wrong password or corrupted data\n", GetFourCCFromType(chunk->type));
+            }
+        } break;
 #endif
-        }
-        else result = 1;    // Decryption algorithm not supported
-
-        if (result == 0)
+        default: 
         {
-            // Data is not encrypted any more, register it
-            chunk->cipherType = RRES_CIPHER_NONE;
-            updateProps = true;
+            result = 1;    // Decryption algorithm not supported
+            RRES_LOG("RRES: WARNING: %s: Chunk data encryption algorithm not supported\n", GetFourCCFromType(chunk->type));
 
-            RRES_LOG("RRES: %s: Chunk data decrypted successfully\n", GetFourCCFromType(chunk->type));
+        } break;
+    }
+
+    if ((result == 0) && (chunk->cipherType != RRES_CIPHER_NONE))
+    {
+        // Data is not encrypted any more, register it
+        chunk->cipherType = RRES_CIPHER_NONE;
+        updateProps = true;
+
+        RRES_LOG("RRES: %s: Chunk data decrypted successfully\n", GetFourCCFromType(chunk->type));
+    }
+
+    // STEP 2: Data decompression (if decryption was successful)
+    //-------------------------------------------------------------------------------------
+    unsigned char *uncompData = NULL;
+
+    if (result == 0)
+    {
+        switch (chunk->compType)
+        {
+            case RRES_COMP_NONE: unpackedData = decryptedData; break;
+            case RRES_COMP_DEFLATE:
+            {
+                int uncompDataSize = 0;
+
+                // TODO: WARNING: Possible issue with allocators: RL_CALLOC() vs RRES_CALLOC()
+                uncompData = DecompressData(decryptedData, chunk->packedSize, &uncompDataSize);
+
+                if ((uncompData != NULL) && (uncompDataSize > 0))     // Decompression successful
+                {
+                    unpackedData = uncompData;
+                    chunk->packedSize = uncompDataSize;
+                }
+                else
+                {
+                    result = 4;    // Decompression process failed
+                    RRES_LOG("RRES: WARNING: %s: Chunk data decompression failed\n", GetFourCCFromType(chunk->type));
+                }
+
+                // Security check, uncompDataSize must match the provided chunk->baseSize
+                if (uncompDataSize != chunk->baseSize) RRES_LOG("RRES: WARNING: Decompressed data could be corrupted, unexpected size\n");
+            } break;
+#if defined(RRES_SUPPORT_COMPRESSION_LZ4)
+            case RRES_COMP_LZ4:
+            {
+                int uncompDataSize = 0;
+                uncompData = (unsigned char *)RRES_CALLOC(chunk->baseSize, 1);
+                uncompDataSize = LZ4_decompress_safe(decryptedData, uncompData, chunk->packedSize, chunk->baseSize);
+
+                if ((uncompData != NULL) && (uncompDataSize > 0))     // Decompression successful
+                {
+                    unpackedData = uncompData;
+                    chunk->packedSize = uncompDataSize;
+                }
+                else
+                {
+                    result = 4;    // Decompression process failed
+                    RRES_LOG("RRES: WARNING: %s: Chunk data decompression failed\n", GetFourCCFromType(chunk->type));
+                }
+
+                // WARNING: Decompression could be successful but not the original message size returned
+                if (uncompDataSize != chunk->baseSize) RRES_LOG("RRES: WARNING: Decompressed data could be corrupted, unexpected size\n");
+            } break;
+#endif
+            case RRES_COMP_QOI:
+            {
+                int uncompDataSize = 0;
+                qoi_desc desc = { 0 };
+
+                // TODO: WARNING: Possible issue with allocators: QOI_MALLOC() vs RRES_MALLOC()
+                uncompData = qoi_decode(decryptedData, chunk->packedSize, &desc, 0);
+                uncompDataSize = (desc.width*desc.height*desc.channels) + 20;   // Add the 20 bytes of (propCount + props[4])
+
+                if ((uncompData != NULL) && (uncompDataSize > 0))     // Decompression successful
+                {
+                    unpackedData = uncompData;
+                    chunk->packedSize = uncompDataSize;
+                }
+                else
+                {
+                    result = 4;    // Decompression process failed
+                    RRES_LOG("RRES: WARNING: %s: Chunk data decompression failed\n", GetFourCCFromType(chunk->type));
+                }
+
+                if (uncompDataSize != chunk->baseSize) RRES_LOG("RRES: WARNING: Decompressed data could be corrupted, unexpected size\n");
+            } break;
+            default:
+            {
+                result = 3;
+                RRES_LOG("RRES: WARNING: %s: Chunk data compression algorithm not supported\n", GetFourCCFromType(chunk->type));
+            } break;
         }
     }
-    else decryptedData = chunk->data.raw;
-    //else RRES_LOG("RRES: %s: Chunk does not require data decryption\n", GetFourCCFromType(chunk->type));
 
-
-    // STEP 2: If decryption was successful, try to decompress data
     if ((result == 0) && (chunk->compType != RRES_COMP_NONE))
     {
-        // Decompress data
-        if (chunk->compType == RRES_COMP_DEFLATE)
-        {
-            int uncompDataSize = 0;
+        // Data is not encrypted any more, register it
+        chunk->compType = RRES_COMP_NONE;
+        updateProps = true;
 
-            // TODO: WARNING: Possible issue with allocators! RL_CALLOC() vs RRES_CALLOC()
-            uncompData = DecompressData(decryptedData, chunk->packedSize, &uncompDataSize);
-
-            if ((uncompData != NULL) && (uncompDataSize > 0))     // Decompression successful
-            {
-                unpackedData = uncompData;
-                chunk->packedSize = uncompDataSize;
-            }
-            else result = 4;    // Decompression process failed
-
-            // Security check, uncompDataSize must match the provided chunk->baseSize
-            if (uncompDataSize != chunk->baseSize) RRES_LOG("RRES: WARNING: Decompressed data could be corrupted, unexpected size\n");
-        }
-        else if (chunk->compType == RRES_COMP_LZ4)
-        {
-#if defined(RRES_SUPPORT_COMPRESSION_LZ4)
-            int uncompDataSize = 0;
-            uncompData = (unsigned char *)RRES_CALLOC(chunk->baseSize, 1);
-            uncompDataSize = LZ4_decompress_safe(decryptedData, uncompData, chunk->packedSize, chunk->baseSize);
-
-            if ((uncompData != NULL) && (uncompDataSize > 0))     // Decompression successful
-            {
-                unpackedData = uncompData;
-                chunk->packedSize = uncompDataSize;
-            }
-            else result = 4;    // Decompression process failed
-
-            // WARNING: Decompression could be successful but not the original message size returned
-            if (uncompDataSize != chunk->baseSize) RRES_LOG("RRES: WARNING: Decompressed data could be corrupted, unexpected size\n");
-#else
-            result = 3;         // Compression algorithm not supported
-#endif
-        }
-        else if (chunk->compType == RRES_COMP_QOI)
-        {
-            int uncompDataSize = 0;
-            qoi_desc desc = { 0 };
-            // TODO: WARNING: Possible issue with allocators! QOI_MALLOC() vs RRES_MALLOC()
-            uncompData = qoi_decode(decryptedData, chunk->packedSize, &desc, 0);
-            uncompDataSize = (desc.width*desc.height*desc.channels) + 20;   // Add the 20 bytes of (propCount + props[4])
-
-            if ((uncompData != NULL) && (uncompDataSize > 0))     // Decompression successful
-            {
-                unpackedData = uncompData;
-                chunk->packedSize = uncompDataSize;
-            }
-            else result = 4;    // Decompression process failed
-
-            if (uncompDataSize != chunk->baseSize) RRES_LOG("RRES: WARNING: Decompressed data could be corrupted, unexpected size\n");
-        }
-        else result = 3;        // Compression algorithm not supported
-
-        if (result == 0)
-        {
-            // Data is not encrypted any more, register it
-            chunk->compType = RRES_COMP_NONE;
-            updateProps = true;
-
-            RRES_LOG("RRES: %s: Chunk data decompressed successfully\n", GetFourCCFromType(chunk->type));
-        }
-        else updateProps = false;
-    }
-    else unpackedData = decryptedData;
-    //else RRES_LOG("RRES: %s: Chunk does not require data decompression\n", GetFourCCFromType(chunk->type));
-
-    // Show some log info about the decompression/decryption process
-    switch (result)
-    {
-        case 1: RRES_LOG("RRES: WARNING: %s: Chunk data encryption algorithm not supported\n", GetFourCCFromType(chunk->type)); break;
-        case 2: RRES_LOG("RRES: WARNING: %s: Chunk data decryption failed, wrong password provided\n", GetFourCCFromType(chunk->type)); break;
-        case 3: RRES_LOG("RRES: WARNING: %s: Chunk data compression algorithm not supported\n", GetFourCCFromType(chunk->type)); break;
-        case 4: RRES_LOG("RRES: WARNING: %s: Chunk data decompression failed\n", GetFourCCFromType(chunk->type)); break;
-        default: break;
+        RRES_LOG("RRES: %s: Chunk data decompressed successfully\n", GetFourCCFromType(chunk->type));
     }
 
     // Update chunk->data.propCount and chunk->data.props if required
@@ -715,7 +728,7 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
         if (raw != NULL) memcpy(raw, ((unsigned char *)unpackedData) + 20, chunk->baseSize - 20);
         RRES_FREE(chunk->data.raw);
         chunk->data.raw = raw;
-        //RL_FREE(unpackedData);    // TODO: CRASH: Review
+        RL_FREE(unpackedData);
     }
 
     return result;
