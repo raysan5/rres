@@ -188,9 +188,8 @@ char *LoadTextFromResource(rresResourceChunk chunk)
     }
     else if (chunk.type == RRES_DATA_RAW)   // Raw text file
     {
-        int dataSize = 0;
-        void *data = LoadDataFromResourceChunk(chunk, dataSize);
-        text = data;
+        unsigned int size = 0;
+        text = LoadDataFromResourceChunk(chunk, &size);
     }
     else if (chunk.type == RRES_DATA_LINK)  // Link to external file
     {
@@ -214,12 +213,12 @@ Image LoadImageFromResource(rresResourceChunk chunk)
     }
     else if (chunk.type == RRES_DATA_RAW)       // Raw image file
     {
-        int dataSize = 0;
-        void *rawData = LoadDataFromResourceChunk(chunk, dataSize);
-        
-        image = LoadImageFromMemory(GetExtensionFromProps(chunk.data.props[1], chunk.data.props[2]), rawData, dataSize);
+        unsigned int dataSize = 0;
+        unsigned char *data = LoadDataFromResourceChunk(chunk, &dataSize);
 
-        RRES_FREE(rawData);
+        image = LoadImageFromMemory(GetExtensionFromProps(chunk.data.props[1], chunk.data.props[2]), data, dataSize);
+
+        RL_FREE(data);
     }
     else if (chunk.type == RRES_DATA_LINK)      // Link to external file
     {
@@ -258,12 +257,12 @@ Wave LoadWaveFromResource(rresResourceChunk chunk)
     }
     else if (chunk.type == RRES_DATA_RAW)   // Raw wave file
     {
-        int dataSize = 0;
-        void *rawData = LoadDataFromResourceChunk(chunk, dataSize);
+        unsigned int dataSize = 0;
+        unsigned char *data = LoadDataFromResourceChunk(chunk, &dataSize);
 
-        wave = LoadWaveFromMemory(GetExtensionFromProps(chunk.data.props[1], chunk.data.props[2]), rawData, dataSize);
+        wave = LoadWaveFromMemory(GetExtensionFromProps(chunk.data.props[1], chunk.data.props[2]), data, dataSize);
 
-        RRES_FREE(rawData);
+        RL_FREE(data);
     }
     else if (chunk.type == RRES_DATA_LINK)  // Link to external file
     {
@@ -334,11 +333,11 @@ Font LoadFontFromResource(rresResourceMulti multi)
         if (multi.chunks[0].type == RRES_DATA_RAW)      // Raw font file
         {
             int dataSize = 0;
-            void *rawData = LoadDataFromResourceChunk(multi.chunks[0], dataSize);
+            unsigned char *rawData = LoadDataFromResourceChunk(multi.chunks[0], dataSize);
 
             font = LoadFontFromMemory(GetExtensionFromProps(multi.chunks[0].data.props[1], multi.chunks[0].data.props[2]), rawData, dataSize, 32, NULL, 0);
 
-            RRES_FREE(rawData);
+            RL_FREE(rawData);
         }
         if (multi.chunks[0].type == RRES_DATA_LINK)     // Link to external font file
         {

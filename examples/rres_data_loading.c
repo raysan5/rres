@@ -133,7 +133,7 @@ int main(void)
 
                 rresUnloadResourceChunk(chunk);
                 //------------------------------------------------------------------------------------------------------
-                
+
                 // TEST 05: Load wave data (RRES_DATA_WAVE)
                 //------------------------------------------------------------------------------------------------------
                 chunk = rresLoadResourceChunk(droppedFiles[0], rresGetIdFromFileName(dir, "tanatana.ogg"));
