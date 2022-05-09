@@ -26,8 +26,8 @@ int main(void)
 {
     // Initialization
     //--------------------------------------------------------------------------------------
-    const int screenWidth = 800;
-    const int screenHeight = 450;
+    const int screenWidth = 384;
+    const int screenHeight = 512;
 
     InitWindow(screenWidth, screenHeight, "raylib [rres] example - rres data loading");
 
@@ -75,13 +75,13 @@ int main(void)
                     // List all files contained on central directory
                     for (unsigned int i = 0; i < dir.count; i++)
                     {
-                        TraceLog(LOG_INFO, "CDIR: File entry %03i: %s | Resource(s) id: 0x%08x | Offset: 0x%08x", i, dir.entries[i].fileName, dir.entries[i].id, dir.entries[i].offset);
+                        TraceLog(LOG_INFO, "CDIR: File entry %03i: %s | Resource(s) id: 0x%08x | Offset: 0x%08x", i + 1, dir.entries[i].fileName, dir.entries[i].id, dir.entries[i].offset);
                     
                         // TODO: List all contained resources info
                     }
                 }
                 //------------------------------------------------------------------------------------------------------
-
+                /*
                 // TEST 02: Loading raw data (RRES_DATA_RAW)
                 //------------------------------------------------------------------------------------------------------
                 chunk = rresLoadResourceChunk(droppedFiles[0], rresGetIdFromFileName(dir, "resources/image.png.raw"));
@@ -115,7 +115,7 @@ int main(void)
 
                 rresUnloadResourceChunk(chunk);
                 //------------------------------------------------------------------------------------------------------
-                
+                */
                 // TEST 04: Load image data (RRES_DATA_IMAGE)
                 //------------------------------------------------------------------------------------------------------
                 chunk = rresLoadResourceChunk(droppedFiles[0], rresGetIdFromFileName(dir, "fudesumi.png"));
@@ -133,7 +133,7 @@ int main(void)
 
                 rresUnloadResourceChunk(chunk);
                 //------------------------------------------------------------------------------------------------------
-
+                
                 // TEST 05: Load wave data (RRES_DATA_WAVE)
                 //------------------------------------------------------------------------------------------------------
                 chunk = rresLoadResourceChunk(droppedFiles[0], rresGetIdFromFileName(dir, "tanatana.ogg"));
@@ -148,7 +148,7 @@ int main(void)
 
                 rresUnloadResourceChunk(chunk);
                 //------------------------------------------------------------------------------------------------------
-
+                /*
                 // TEST 06: Load font data, multiples chunks (RRES_DATA_GLYPH_INFO + RRE_DATA_IMAGE)
                 //------------------------------------------------------------------------------------------------------
                 multi = rresLoadResourceMulti(droppedFiles[0], rresGetIdFromFileName(dir, "resources/fonts/pixantiqua.ttf"));
@@ -184,7 +184,7 @@ int main(void)
 
                 rresUnloadResourceMulti(multi);
                 //------------------------------------------------------------------------------------------------------
-
+                */
                 // Unload central directory info, not required any more
                 rresUnloadCentralDirectory(dir);
             }
@@ -204,9 +204,9 @@ int main(void)
 
             ClearBackground(RAYWHITE);
 
-            DrawText("rres file loading: drag & drop a .rres file", 10, 10, 20, DARKGRAY);
+            DrawText("rres file loading: drag & drop a .rres file", 10, 10, 10, DARKGRAY);
 
-            DrawTexture(texture, 20, 20, WHITE);
+            DrawTexture(texture, 0, 0, WHITE);
             DrawTextEx(font, text, (Vector2){ 300, 20 }, 40, 2, BLUE);
 
         EndDrawing();

@@ -202,23 +202,23 @@ Image LoadImageFromResource(rresResourceChunk chunk)
 {
     Image image = { 0 };
 
-    if (chunk.type == RRES_DATA_IMAGE)         // Image data
+    if (chunk.type == RRES_DATA_IMAGE)          // Image data
     {
         image = LoadImageFromResourceChunk(chunk);
     }
-    /*
-    // TODO: Support image file providd as RRES_DATA_RAW?
-    else if (rres.chunks[0].type == RRES_DATA_RAW)      // Raw image file
+    else if (chunk.type == RRES_DATA_RAW)       // Raw image file
     {
         int dataSize = 0;
-        void *rawData = LoadDataFromResourceChunk(rres.chunks[0], dataSize);
+        void *rawData = LoadDataFromResourceChunk(chunk, dataSize);
+        
+        unsigned char ext[8] = { 0 };
+        // TODO: Get extension from chunk.props[1] + chunk.props[2]
 
-        image = LoadImageFromMemory("???", rawData, dataSize);
+        image = LoadImageFromMemory(ext, rawData, dataSize);
 
         RRES_FREE(rawData);
     }
-    */
-    else if (chunk.type == RRES_DATA_LINK)     // Link to external file
+    else if (chunk.type == RRES_DATA_LINK)      // Link to external file
     {
         // Get raw data from external linked file
         unsigned int dataSize = 0;
@@ -720,7 +720,7 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
 
         if (chunk->data.propCount > 0)
         {
-            chunk->data.props = (int *)RRES_CALLOC(chunk->data.propCount, sizeof(int));
+            chunk->data.props = (unsigned int *)RRES_CALLOC(chunk->data.propCount, sizeof(int));
             for (unsigned int i = 0; i < chunk->data.propCount; i++) chunk->data.props[i] = ((int *)unpackedData)[1 + i];
         }
 

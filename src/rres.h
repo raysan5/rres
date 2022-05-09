@@ -189,7 +189,7 @@
 // rres resource chunk data
 typedef struct rresResourceChunkData {
     unsigned int propCount;         // Resource chunk properties count
-    int *props;                     // Resource chunk properties
+    unsigned int *props;            // Resource chunk properties
     void *raw;                      // Resource chunk raw data
 } rresResourceChunkData;
 
@@ -268,9 +268,11 @@ typedef struct rresFontGlyphInfo {
 //   - [VRTX] rres[n]: RRES_DATA_VERTEX
 typedef enum rresResourceDataType {
     RRES_DATA_NULL         = 0,             // FourCC: NULL - Reserved for empty chunks, no props/data
-    RRES_DATA_RAW          = 1,             // FourCC: RAWD - Raw file data, 1 property
+    RRES_DATA_RAW          = 1,             // FourCC: RAWD - Raw file data, 4 properties
                                             //    props[0]:size (bytes)
-                                            //    props[1]: file extension?
+                                            //    props[1]:extension01
+                                            //    props[2]:extension02
+                                            //    props[3]:reserved
                                             //    data: raw bytes
     RRES_DATA_TEXT         = 2,             // FourCC: TEXT - Text file data, 4 properties
                                             //    props[0]:size (bytes)
