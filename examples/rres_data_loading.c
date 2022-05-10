@@ -116,7 +116,7 @@ int main(void)
                 rresUnloadResourceChunk(chunk);
                 //------------------------------------------------------------------------------------------------------
                 */
-                /*
+                
                 // TEST 04: Load image data (RRES_DATA_IMAGE)
                 //------------------------------------------------------------------------------------------------------
                 chunk = rresLoadResourceChunk(droppedFiles[0], rresGetIdFromFileName(dir, "fudesumi.png"));
@@ -149,7 +149,7 @@ int main(void)
 
                 rresUnloadResourceChunk(chunk);
                 //------------------------------------------------------------------------------------------------------
-                */
+                
                 // TEST 06: Load font data, multiples chunks (RRES_DATA_FONT_GLYPHS + RRE_DATA_IMAGE)
                 //------------------------------------------------------------------------------------------------------
                 multi = rresLoadResourceMulti(droppedFiles[0], rresGetIdFromFileName(dir, "pixantiqua.ttf"));
@@ -166,7 +166,7 @@ int main(void)
                 
                 rresUnloadResourceMulti(multi);
                 //------------------------------------------------------------------------------------------------------
-
+                
                 // Unload central directory info, not required any more
                 rresUnloadCentralDirectory(dir);
             }
