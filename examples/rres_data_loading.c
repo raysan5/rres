@@ -35,7 +35,7 @@ int main(void)
     char *text = NULL;              // Store RRES_DATA_TEXT loaded data
     Texture2D texture = { 0 };      // Store RRES_DATA_IMAGE loaded data -> LoadTextureFromImage()
     Sound sound = { 0 };            // Store RRES_DATA_WAVE loaded data -> LoadSoundFromWave()
-    Font font = { 0 };              // Store RRES_DATA_GLYPH_INFO + RRES_DATA_IMAGE
+    Font font = { 0 };              // Store RRES_DATA_FONT_GLYPHS + RRES_DATA_IMAGE
     Model model = { 0 };            // Store RRES_DATA_VERTEX loaded data -> LoadModelFromMesh()
 
     // Load content from rres file
@@ -150,7 +150,7 @@ int main(void)
                 rresUnloadResourceChunk(chunk);
                 //------------------------------------------------------------------------------------------------------
                 */
-                // TEST 06: Load font data, multiples chunks (RRES_DATA_GLYPH_INFO + RRE_DATA_IMAGE)
+                // TEST 06: Load font data, multiples chunks (RRES_DATA_FONT_GLYPHS + RRE_DATA_IMAGE)
                 //------------------------------------------------------------------------------------------------------
                 multi = rresLoadResourceMulti(droppedFiles[0], rresGetIdFromFileName(dir, "pixantiqua.ttf"));
                 for (int i = 0; i < multi.count; i++)

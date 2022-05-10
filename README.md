@@ -81,7 +81,7 @@ rres file format consists of a file header (`rresFileHeader`) followed by a numb
 
 _Fig 01. rres v1.0 file structure._
 
-_NOTE: rresResourceChunk(s) are generated from input files. It's important to note that resources could not be mapped to files 1:1, one input file could generate multiple resource chunks. For example, a .ttf input file could generate an image resource chunk (`RRES_DATA_IMAGE` type) plus a font glyph info resource chunk (`RRES_DATA_GLYPH_INFO` type)._
+_NOTE: rresResourceChunk(s) are generated from input files. It's important to note that resources could not be mapped to files 1:1, one input file could generate multiple resource chunks. For example, a .ttf input file could generate an image resource chunk (`RRES_DATA_IMAGE` type) plus a font glyph info resource chunk (`RRES_DATA_FONT_GLYPHS` type)._
 
 
 ```c
@@ -147,7 +147,7 @@ Considerations:
 
 `rres` file contains a number of resource chunks. Every resource chunk represents a self-contained pack of data. Resource chunks are generated from input files on `rres` file creation by the `rres` packer tool; depending on the file extension, the `rres` packer tool extracts the required data from the file and generates one or more resource chunks. For example, for an image file, a resource chunk of `type` `RRES_DATA_IMAGE` is generated containing only the pixel data of the image and the required properties to read that data back from the resource file.
 
-It's important to note that one input file could generate several resource chunks when the `rres` file is created. For example, a `.ttf` input file could generate an `RRES_DATA_IMAGE` resource chunk plus a `RRES_DATA_GLYPH_INFO` resource chunk; it's also possible to just pack the file as a plain `RRES_DATA_RAW` resource chunk type, in that case the input file is not processed, just packed as raw data.
+It's important to note that one input file could generate several resource chunks when the `rres` file is created. For example, a `.ttf` input file could generate an `RRES_DATA_IMAGE` resource chunk plus a `RRES_DATA_FONT_GLYPHS` resource chunk; it's also possible to just pack the file as a plain `RRES_DATA_RAW` resource chunk type, in that case the input file is not processed, just packed as raw data.
 
 On `rres` creation, `rres` packer could create an additional resource chunk of type `RRES_DATA_DIRECTORY` containing data about the processed input files. It could be useful in some cases, for example to relate the input filename directly to the generated resource(s) id and also to extract the data in a similar file structure to the original input one.
 
@@ -176,7 +176,7 @@ typedef struct rresResourceChunkInfo {
 | Field | Description |
 | :---: | :---------- |
 | `type` | A [`FourCC`](https://en.wikipedia.org/wiki/FourCC) code and identifies the type of resource data contained in the `rresResourceChunkData`. Enum `rresResourceDataType` defines several data types, new ones could be added if requried. |
-| `id` | A global resource identifier, it's generated from input filename using a CRC32 hash and it's not unique. One input file can generate multiple resource chunks, all the generated chunks share the same identifier and they are loaded together when the resource is loaded. For example, a input .ttf could generate two resource chunks (`RRES_DATA_IMAGE` + `RRES_DATA_GLYPH_INFO`) with same identifier that will be loaded together when their identifier is requested. It's up to the user to decide what to do with loaded data. |
+| `id` | A global resource identifier, it's generated from input filename using a CRC32 hash and it's not unique. One input file can generate multiple resource chunks, all the generated chunks share the same identifier and they are loaded together when the resource is loaded. For example, a input .ttf could generate two resource chunks (`RRES_DATA_IMAGE` + `RRES_DATA_FONT_GLYPHS`) with same identifier that will be loaded together when their identifier is requested. It's up to the user to decide what to do with loaded data. |
 | `compType` | Defines the compression algorithm used for the resource chunk data. Compression depends on the middle library between rres and the engine, `rres.h` just defines some useful algorithm values to be used in case of implementing compression. Compression should always be applied before encryption and it compresses the full `rresResourceData` (`Property Count` + `Properties[]` + `Data`). If no data encryption is applied, `packedSize` defines the size of compressed data. |
 | `cipherType` | Defines the encryption algorithm used for the resource chunk data. Like compression, encryption depends on the middle library between rres and the engine, `rres.h` just defines some useful algorithm values to be used in case of implementing encryption. Encryption should be applied after compression. Depending on the encryption algorithm and encryption mode it could require some extra piece of data to be attached to the resource data (i.e encryption MAC), this is implementation dependant and the rres packer tool / rres middle library for the engines are the responsible to manage that extra data. It's recommended to be just appended to resource data and considered on `packedSize`. |
 | `flags` | Reserved for additional flags, in case they are required by the implementation. |
@@ -216,7 +216,7 @@ typedef enum rresResourceDataType {
     RRES_DATA_IMAGE        = 3,     // FourCC: IMGE - Image file data, pixel data extracted from image file
     RRES_DATA_WAVE         = 4,     // FourCC: WAVE - Audio file data, samples data extracted from audio file
     RRES_DATA_VERTEX       = 5,     // FourCC: VRTX - Vertex file data, extracted from a mesh file
-    RRES_DATA_GLYPH_INFO   = 6,     // FourCC: FNTG - Font glyphs info, generated from an input font file
+    RRES_DATA_FONT_GLYPHS  = 6,     // FourCC: FNTG - Font glyphs info, generated from an input font file
     RRES_DATA_LINK         = 99,    // FourCC: LINK - External linked file, filepath as provided on file input
     RRES_DATA_DIRECTORY    = 100,   // FourCC: CDIR - Central directory for input files relation to resource chunks
     
@@ -235,7 +235,7 @@ The currently defined data `types` consist of the following properties and data:
 | `RRES_DATA_IMAGE`  |  `IMGE`  |      4       | `props[0]`:width<br>`props[1]`:height<br>`props[2]`:`rresPixelFormat`<br>`props[3]`:mipmaps |  pixel data         |
 | `RRES_DATA_WAVE`   |  `WAVE`  |      4       | `props[0]`:frameCount<br>`props[1]`:sampleRate<br>`props[2]`:sampleSize<br>`props[3]`:channels | audio samples data |
 | `RRES_DATA_VERTEX` |  `VRTX`  |      4       | `props[0]`:vertexCount<br>`props[1]`:`rresVertexAttribute`<br>`props[2]`:componentCount<br>`props[3]`:`rresVertexFormat` | vertex data |
-| `RRES_DATA_GLYPH_INFO`| `FNTG`|      4       | `props[0]`:baseSize<br>`props[1]`:glyphCount<br>`props[2]`:glyphPadding<br>`props[3]`:`rresFontStyle` | `rresFontGlyphInfo[0..glyphCount]` |
+| `RRES_DATA_FONT_GLYPHS`|`FNTG`|      4       | `props[0]`:baseSize<br>`props[1]`:glyphCount<br>`props[2]`:glyphPadding<br>`props[3]`:`rresFontStyle` | `rresFontGlyphInfo[0..glyphCount]` |
 | `RRES_DATA_LINK`   |  `LINK`  |      1       | `props[0]`:size       | filepath data |
 | `RRES_DATA_DIRECTORY` | `CDIR`|      1       | `props[0]`:entryCount | `rresDirEntry[0..entryCount]` |
 

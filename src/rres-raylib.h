@@ -285,11 +285,11 @@ Font LoadFontFromResource(rresResourceMulti multi)
     Font font = { 0 };
 
     // Font resource consist of (2) chunks:
-    //  - RRES_DATA_GLYPH_INFO: Basic font and glyphs properties/data
+    //  - RRES_DATA_FONT_GLYPHS: Basic font and glyphs properties/data
     //  - RRES_DATA_IMAGE: Image atlas for the font characters
     if (multi.count >= 2)
     {
-        if (multi.chunks[0].type == RRES_DATA_GLYPH_INFO)
+        if (multi.chunks[0].type == RRES_DATA_FONT_GLYPHS)
         {
             if ((multi.chunks[0].compType == RRES_COMP_NONE) && (multi.chunks[0].cipherType == RRES_CIPHER_NONE))
             {
@@ -913,7 +913,7 @@ static const char *GetFourCCFromType(unsigned int type)
         case RRES_DATA_IMAGE: return "IMGE";        // Image file data, pixel data extracted from image file
         case RRES_DATA_WAVE: return "WAVE";         // Audio file data, samples data extracted from audio file
         case RRES_DATA_VERTEX: return "VRTX";       // Vertex file data, extracted from a mesh file
-        case RRES_DATA_GLYPH_INFO: return "FNTG";   // Font glyphs info, generated from an input font file
+        case RRES_DATA_FONT_GLYPHS: return "FNTG";  // Font glyphs info, generated from an input font file
         case RRES_DATA_LINK: return "LINK";         // External linked file, filepath as provided on file input
         case RRES_DATA_DIRECTORY: return "CDIR";    // Central directory for input files relation to resource chunks
         default: break;

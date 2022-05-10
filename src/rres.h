@@ -12,7 +12,7 @@
 *   FEATURES:
 * 
 *     - Multi-resource files: Some files could end-up generating multiple connected resources in
-*       the rres output file (i.e TTF files could generate RRES_DATA_GLYPH_INFO and RRES_DATA_IMAGE).
+*       the rres output file (i.e TTF files could generate RRES_DATA_FONT_GLYPHS and RRES_DATA_IMAGE).
 *     - File packaging as raw resource data: Avoid data processing and just package the file bytes.
 *     - Per-file data compression/encryption: Configure compression/encription for every input file.
 *     - Externally linked files: Package only the file path, to be loaded from external file when the
@@ -259,7 +259,7 @@ typedef struct rresFontGlyphInfo {
 // NOTE 2: This enum defines the basic resource data types,
 // some input files could generate multiple resource chunks:
 //   Fonts processed could generate (2) resource chunks:
-//   - [FNTG] rres[0]: RRES_DATA_GLYPH_INFO
+//   - [FNTG] rres[0]: RRES_DATA_FONT_GLYPHS
 //   - [IMGE] rres[1]: RRES_DATA_IMAGE
 //
 //   Mesh processed could generate (n) resource chunks:
@@ -298,7 +298,7 @@ typedef enum rresResourceDataType {
                                             //    props[2]:componentCount
                                             //    props[3]:rresVertexFormat
                                             //    data: vertex
-    RRES_DATA_GLYPH_INFO   = 6,             // FourCC: FNTG - Font glyphs info data, 4 properties
+    RRES_DATA_FONT_GLYPHS  = 6,             // FourCC: FNTG - Font glyphs info data, 4 properties
                                             //    props[0]:baseSize
                                             //    props[1]:glyphCount
                                             //    props[2]:glyphPadding
@@ -312,7 +312,7 @@ typedef enum rresResourceDataType {
                                             //    data: rresDirEntry[0..entryCount]
     // TODO: Resource package types (v2.0)?
     // NOTE: They contains multiple rresResourceChunk in rresResourceData.raw
-    //RRES_DATA_PACK_FONT    = 110,         // FourCC: PFNT - Resources Pack: Font data, 1 property (2 resource chunks: RRES_DATA_GLYPH_INFO, RRES_DATA_IMAGE)
+    //RRES_DATA_PACK_FONT    = 110,         // FourCC: PFNT - Resources Pack: Font data, 1 property (2 resource chunks: RRES_DATA_GLYPHS, RRES_DATA_IMAGE)
                                             //    props[0]:chunkCount
     //RRES_DATA_PACK_MESH    = 120,         // FourCC: PMSH - Resources Pack: Mesh data, 1 property (n resource chunks: RRES_DATA_VERTEX)
                                             //    props[0]:chunkCount
@@ -920,15 +920,15 @@ static rresResourceChunk rresLoadResourceChunkData(rresResourceChunkInfo info, v
     chunk.cipherType = info.cipherType;
 
     // Assign rres.type (int) from info.type (FourCC)
-    if ((info.type[0] == 'N') && (info.type[1] == 'U') && (info.type[2] == 'L') && (info.type[3] == 'L')) chunk.type = RRES_DATA_NULL;            // NULL
-    if ((info.type[0] == 'R') && (info.type[1] == 'A') && (info.type[2] == 'W') && (info.type[3] == 'D')) chunk.type = RRES_DATA_RAW;             // RAWD
-    else if ((info.type[0] == 'T') && (info.type[1] == 'E') && (info.type[2] == 'X') && (info.type[3] == 'T')) chunk.type = RRES_DATA_TEXT;       // TEXT
-    else if ((info.type[0] == 'I') && (info.type[1] == 'M') && (info.type[2] == 'G') && (info.type[3] == 'E')) chunk.type = RRES_DATA_IMAGE;      // IMGE
-    else if ((info.type[0] == 'W') && (info.type[1] == 'A') && (info.type[2] == 'V') && (info.type[3] == 'E')) chunk.type = RRES_DATA_WAVE;       // WAVE
-    else if ((info.type[0] == 'V') && (info.type[1] == 'R') && (info.type[2] == 'T') && (info.type[3] == 'X')) chunk.type = RRES_DATA_VERTEX;     // VRTX
-    else if ((info.type[0] == 'F') && (info.type[1] == 'N') && (info.type[2] == 'T') && (info.type[3] == 'G')) chunk.type = RRES_DATA_GLYPH_INFO; // FNTG
-    else if ((info.type[0] == 'L') && (info.type[1] == 'I') && (info.type[2] == 'N') && (info.type[3] == 'K')) chunk.type = RRES_DATA_LINK;       // LINK
-    else if ((info.type[0] == 'C') && (info.type[1] == 'D') && (info.type[2] == 'I') && (info.type[3] == 'R')) chunk.type = RRES_DATA_DIRECTORY;  // CDIR
+    if ((info.type[0] == 'N') && (info.type[1] == 'U') && (info.type[2] == 'L') && (info.type[3] == 'L')) chunk.type = RRES_DATA_NULL;             // NULL
+    if ((info.type[0] == 'R') && (info.type[1] == 'A') && (info.type[2] == 'W') && (info.type[3] == 'D')) chunk.type = RRES_DATA_RAW;              // RAWD
+    else if ((info.type[0] == 'T') && (info.type[1] == 'E') && (info.type[2] == 'X') && (info.type[3] == 'T')) chunk.type = RRES_DATA_TEXT;        // TEXT
+    else if ((info.type[0] == 'I') && (info.type[1] == 'M') && (info.type[2] == 'G') && (info.type[3] == 'E')) chunk.type = RRES_DATA_IMAGE;       // IMGE
+    else if ((info.type[0] == 'W') && (info.type[1] == 'A') && (info.type[2] == 'V') && (info.type[3] == 'E')) chunk.type = RRES_DATA_WAVE;        // WAVE
+    else if ((info.type[0] == 'V') && (info.type[1] == 'R') && (info.type[2] == 'T') && (info.type[3] == 'X')) chunk.type = RRES_DATA_VERTEX;      // VRTX
+    else if ((info.type[0] == 'F') && (info.type[1] == 'N') && (info.type[2] == 'T') && (info.type[3] == 'G')) chunk.type = RRES_DATA_FONT_GLYPHS; // FNTG
+    else if ((info.type[0] == 'L') && (info.type[1] == 'I') && (info.type[2] == 'N') && (info.type[3] == 'K')) chunk.type = RRES_DATA_LINK;        // LINK
+    else if ((info.type[0] == 'C') && (info.type[1] == 'D') && (info.type[2] == 'I') && (info.type[3] == 'R')) chunk.type = RRES_DATA_DIRECTORY;   // CDIR
 
     // CRC32 data validation, verify packed data is not corrupted
     unsigned int crc32 = rresComputeCRC32(data, info.packedSize);
