@@ -36,11 +36,10 @@ int main(void)
     Texture2D texture = { 0 };      // Store RRES_DATA_IMAGE loaded data -> LoadTextureFromImage()
     Sound sound = { 0 };            // Store RRES_DATA_WAVE loaded data -> LoadSoundFromWave()
     Font font = { 0 };              // Store RRES_DATA_FONT_GLYPHS + RRES_DATA_IMAGE
-    Model model = { 0 };            // Store RRES_DATA_VERTEX loaded data -> LoadModelFromMesh()
 
     // Load content from rres file
-    rresResourceChunk chunk = { 0 };    // Single resource chunk
-    rresResourceMulti multi = { 0 };    // Multiple resource chunks
+    rresResourceChunk chunk = { 0 }; // Single resource chunk
+    rresResourceMulti multi = { 0 }; // Multiple resource chunks
 
     InitAudioDevice();              // Initialize audio device, useful for audio testing
 
@@ -75,9 +74,10 @@ int main(void)
                     // List all files contained on central directory
                     for (unsigned int i = 0; i < dir.count; i++)
                     {
-                        TraceLog(LOG_INFO, "CDIR: File entry %03i: %s | Resource(s) id: 0x%08x | Offset: 0x%08x", i + 1, dir.entries[i].fileName, dir.entries[i].id, dir.entries[i].offset);
+                        TraceLog(LOG_INFO, "RRES: CDIR: File entry %03i: %s | Resource(s) id: 0x%08x | Offset: 0x%08x", i + 1, dir.entries[i].fileName, dir.entries[i].id, dir.entries[i].offset);
                     
-                        // TODO: List all contained resources info
+                        // TODO: List contained resource chunks info
+                        //rresResourceChunkInfo info = rresGetResourceChunkInfo(droppedFiles[0], dir.entries[i]);
                     }
                 }
                 //------------------------------------------------------------------------------------------------------
@@ -166,26 +166,7 @@ int main(void)
                 
                 rresUnloadResourceMulti(multi);
                 //------------------------------------------------------------------------------------------------------
-                /*
-                // TEST 07: Load mesh data, multiples chunks (RRES_DATA_VERTEX x n)
-                //------------------------------------------------------------------------------------------------------
-                multi = rresLoadResourceMulti(droppedFiles[0], rresGetIdFromFileName(dir, "resources/models/castle.obj"));
-                for (int i = 0; i < multi.count; i++)
-                {
-                    result = UnpackResourceChunk(&chunk);   // Decompres/decipher resource data (if required)
-                    if (result != 0) break;
-                }
 
-                if (result == 0)    // All resources data decompressed/decrypted successfully
-                {
-                    Mesh mesh = LoadMeshFromResource(multi);
-                    Model model = LoadModelFromMesh(mesh);      
-                    //UnloadMesh(mesh);     // WARNING: Mesh is assigned, not copied
-                }
-
-                rresUnloadResourceMulti(multi);
-                //------------------------------------------------------------------------------------------------------
-                */
                 // Unload central directory info, not required any more
                 rresUnloadCentralDirectory(dir);
             }
@@ -196,6 +177,7 @@ int main(void)
 
         // Update
         //----------------------------------------------------------------------------------
+        // Play audio loaded from wave from .rres: RRES_DATA_WAVE
         if (IsKeyPressed(KEY_SPACE)) PlaySound(sound);
         //----------------------------------------------------------------------------------
 
@@ -207,10 +189,11 @@ int main(void)
 
             DrawText("rres file loading: drag & drop a .rres file", 10, 10, 10, DARKGRAY);
 
-            DrawTextEx(font, "THIS IS a TEST!", (Vector2){ 10, 50 }, font.baseSize, 0, RED);
-
+            // Draw texture loaded from image from .rres: RRES_DATA_IMAGE
             DrawTexture(texture, 0, 0, WHITE);
-            DrawTextEx(font, text, (Vector2){ 300, 20 }, 40, 2, BLUE);
+
+            // Draw text using font loaded from .rres: RRES_DATA_FONT_GLYPHS + RRES_DATA_IMAGE
+            DrawTextEx(font, "THIS IS a TEST!", (Vector2) { 10, 50 }, font.baseSize, 0, RED);
 
         EndDrawing();
         //----------------------------------------------------------------------------------
@@ -223,7 +206,6 @@ int main(void)
     UnloadTexture(texture);     // Unload texture (VRAM)
     UnloadSound(sound);         // Unload sound
     UnloadFont(font);           // Unload font
-    UnloadModel(model);         // Unload model
 
     CloseAudioDevice();         // Close audio device
 
