@@ -298,7 +298,7 @@ typedef enum rresResourceDataType {
                                             //    props[2]:componentCount
                                             //    props[3]:rresVertexFormat
                                             //    data: vertex
-    RRES_DATA_GLYPH_INFO   = 6,             // FourCC: FNTG - Font file processed, glyphs data, 4 properties
+    RRES_DATA_GLYPH_INFO   = 6,             // FourCC: FNTG - Font glyphs info data, 4 properties
                                             //    props[0]:baseSize
                                             //    props[1]:glyphCount
                                             //    props[2]:glyphPadding
@@ -310,6 +310,12 @@ typedef enum rresResourceDataType {
     RRES_DATA_DIRECTORY    = 100,           // FourCC: CDIR - Central directory for input files
                                             //    props[0]:entryCount, 1 property
                                             //    data: rresDirEntry[0..entryCount]
+    // TODO: Resource package types (v2.0)?
+    // NOTE: They contains multiple rresResourceChunk in rresResourceData.raw
+    //RRES_DATA_PACK_FONT    = 110,         // FourCC: PFNT - Resources Pack: Font data, 1 property (2 resource chunks: RRES_DATA_GLYPH_INFO, RRES_DATA_IMAGE)
+                                            //    props[0]:chunkCount
+    //RRES_DATA_PACK_MESH    = 120,         // FourCC: PMSH - Resources Pack: Mesh data, 1 property (n resource chunks: RRES_DATA_VERTEX)
+                                            //    props[0]:chunkCount
 
     // TODO: Add additional resource data types if required (define props + data)
 
