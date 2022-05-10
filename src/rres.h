@@ -198,7 +198,7 @@ typedef struct rresResourceChunkData {
 // note that only required resource info is returned to the user, istead of the full rresResourceChunkInfo
 // It just returns the minimal data required to process and load the resource by the engine library
 typedef struct rresResourceChunk {
-    // TODO: Include full rresResourceChunkInfo?
+    // TODO: 2.0: Include full rresResourceChunkInfo?
     unsigned int type;              // Resource chunk data type
     unsigned short compType;        // Resource compression algorithm
     unsigned short cipherType;      // Resource cipher algorithm
@@ -207,7 +207,7 @@ typedef struct rresResourceChunk {
     rresResourceChunkData data;     // Resource chunk packed data, contains propCount, props[] and raw data
 } rresResourceChunk;
 
-// TODO: Expose resource structures directly instead of a minimized version? 
+// TODO: 2.0: Expose resource info directly instead of a minimal version? 
 // rres resource chunk (info + chunk data)
 //typedef struct rresResourceChunk {
 //    rresResourceChunkInfo info;    // Resource chunk info header
@@ -310,7 +310,8 @@ typedef enum rresResourceDataType {
     RRES_DATA_DIRECTORY    = 100,           // FourCC: CDIR - Central directory for input files
                                             //    props[0]:entryCount, 1 property
                                             //    data: rresDirEntry[0..entryCount]
-    // TODO: Resource package types (v2.0)?
+
+    // TODO: 2.0: Support resource package types (muti-resource)
     // NOTE: They contains multiple rresResourceChunk in rresResourceData.raw
     //RRES_DATA_PACK_FONT    = 110,         // FourCC: PFNT - Resources Pack: Font data, 1 property (2 resource chunks: RRES_DATA_GLYPHS, RRES_DATA_IMAGE)
                                             //    props[0]:chunkCount
@@ -333,7 +334,7 @@ typedef enum rresCompressionType {
     RRES_COMP_LZ4           = 20,           // LZ4 compression
     RRES_COMP_LZMA2         = 30,           // LZMA2 compression
     RRES_COMP_QOI           = 40,           // QOI compression, useful for RGB(A) image data
-    // gzip, brotli, lzo, zstd...           // TODO: Add additional compression algorithms if required
+    // TODO: Add additional compression algorithms if required
 } rresCompressionType;
 
 // Encryption algoritms
@@ -358,7 +359,7 @@ typedef enum rresEncryptionType {
     RRES_CIPHER_CHACHA20    = 71,           // CHACHA20 encryption
     RRES_CIPHER_XCHACHA20   = 72,           // XCHACHA20 encryption
     RRES_CIPHER_XCHACHA20_POLY1305 = 73,    // XCHACHA20 with POLY1305 for message authentification (MAC)
-    // twofish, RC4, RC5, RC6               // TODO: Add additional encryption algorithm if required
+    // TODO: Add additional encryption algorithm if required
 } rresEncryptionType;
 
 // TODO: rres error codes (not used at this moment)
@@ -483,7 +484,7 @@ RRESAPI rresResourceMulti rresLoadResourceMulti(const char *fileName, int rresId
 RRESAPI void rresUnloadResourceMulti(rresResourceMulti multi);                      // Unload resource from memory (multiple resource chunks)
 //RRESAPI rresResourceChunk *rresLoadResourceChunkMulti(const char *fileName, int rresId, int *count); // Load multiple resource chunks for provided id
 
-// TODO: Support loading only one resource chunk?
+// Load only one resource chunk (first resource id found)
 RRESAPI rresResourceChunk rresLoadResourceChunk(const char *fileName, int rresId);  // Load one resource chunk for provided id
 RRESAPI void rresUnloadResourceChunk(rresResourceChunk chunk);                      // Unload resource chunk from memory
 
