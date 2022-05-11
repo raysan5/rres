@@ -15,7 +15,7 @@
 *   #define RRES_SUPPORT_ENCRYPTION_AES
 *       Support data encryption algorithm AES, provided by aes.h/aes.c library
 *
-*   #define RRES_SUPPORT_ENCRYPTION_MONOCYPHER
+*   #define RRES_SUPPORT_ENCRYPTION_XCHACHA20
 *       Support data encryption algorithm XChaCha20-Poly1305,
 *       provided by monocypher.h/monocypher.c library
 *
@@ -127,7 +127,7 @@ RLAPI void SetBaseDirectory(const char *baseDir);               // Set base dire
     #include "external/aes.h"               // Encryption algorithm: AES
     #include "external/aes.c"               // Encryption algorithm implementation: AES
 #endif
-#if defined(RRES_SUPPORT_ENCRYPTION_MONOCYPHER)
+#if defined(RRES_SUPPORT_ENCRYPTION_XCHACHA20)
     // https://github.com/LoupVaillant/Monocypher
     #include "external/monocypher.h"        // Encryption algorithm: XChaCha20-Poly1305
     #include "external/monocypher.c"        // Encryption algorithm implementation: XChaCha20-Poly1305
@@ -593,7 +593,7 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
 
         } break;
 #endif
-#if defined(RRES_SUPPORT_ENCRYPTION_MONOCYPHER)
+#if defined(RRES_SUPPORT_ENCRYPTION_XCHACHA20)
         case RRES_CIPHER_XCHACHA20_POLY1305:
         {
             // WARNING: Implementation dependant!

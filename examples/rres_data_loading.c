@@ -17,7 +17,7 @@
 #define RRES_RAYLIB_IMPLEMENTATION
 #define RRES_SUPPORT_COMPRESSION_LZ4
 #define RRES_SUPPORT_ENCRYPTION_AES
-#define RRES_SUPPORT_ENCRYPTION_MONOCYPHER
+#define RRES_SUPPORT_ENCRYPTION_XCHACHA20
 #include "../src/rres-raylib.h"     // Required to map rres data chunks into raylib structs
 
 #include <stdio.h>
