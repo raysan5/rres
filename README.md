@@ -304,35 +304,47 @@ _Fig 02. rres sample implementation: custom engine libs and tool._
 
 ### Base library: `rres.h`
 
-Base `rres` library is in charge of reading `rres` files resource chunks into a generic resource structure, returned to the user. In our implementation the user exposed resource structures (`rresResourceChunk`, `rresResource`) are different than the ones used internally to process the `rres` file data (`rresFileHeader`, `rresResourceChunkInfo`). This is design decision, user does not need all the info contained in `rresResourceChunkInfo` so only the required info has been directly exposed in `rresResourceChunk`. This implementation does not include resource file writing, that functionality has been implemented directly in `rrespacker` tool.
+Base `rres` library is in charge of reading `rres` files resource chunks into a generic resource structure, returned to the user. User exposed resource structure `rresResourceChunk`follows `rres` specs structure (`rresResourceChunkInfo` + `rresResourceChunkData`). The following structures are provided:
 
- - `rresResourceMulti` contains multiple `rresResourceChunks` for a processed input file
- - `rresResourceChunk` contains a single chunk with user-required info and data, note that it does not expose `rresResourceChunkInfo` directly but only some of its values, this is a design decision and could change in other implementations.
+ - `rresResourceChunk` contains a single chunk with user-required info and data: `rresResourceChunkInfo` + `rresResourceChunkData`
+ - `rresresourceChunkInfo` contains the information about the laoded resource chunk
  - `rresResourceChunkData` contains the actual data for the resource: the requried properties and the raw data. It's important to note that in the case data was compressed/encrypted, it's up to the user-library (`rres-raylib.h`) to process that data; in those cases `chunk.data.raw` contains the compressed/encrypted data and `chunk.data.propCount = 0` and `chunk.data.props = NULL`; it's up to the user library to fill properties after decompression/decryption.
+ - `rresResourceMulti` contains multiple `rresResourceChunks` for a processed input file
 
 ```c
-// rres resource
-typedef struct rresResourceMulti {
-    unsigned int count;             // Resource chunks count
-    rresResourceChunk *chunks;      // Resource chunks
-} rresResourceMulti;
-
 // rres resource chunk
 typedef struct rresResourceChunk {
-    unsigned int type;              // Resource chunk data type
-    unsigned short compType;        // Resource compression algorithm
-    unsigned short cipherType;      // Resource cipher algorythm
-    unsigned int packedSize;        // Packed data size (including props, compressed and/or encrypted + additional data appended)
-    unsigned int baseSize;          // Base data size (including propCount, props and uncompressed/unencrypted data)
+    rresResourceChunkInfo info;     // Resource chunk info
     rresResourceChunkData data;     // Resource chunk packed data, contains propCount, props[] and raw data
 } rresResourceChunk;
+
+// rres resource chunk info header (32 bytes)
+typedef struct rresResourceChunkInfo {
+    unsigned char type[4];          // Resource chunk type (FourCC)
+    unsigned int id;                // Resource chunk identifier (generated from filename CRC32 hash)
+    unsigned char compType;         // Data compression algorithm
+    unsigned char cipherType;       // Data encription algorithm
+    unsigned short flags;           // Data flags (if required)
+    unsigned int packedSize;        // Data chunk size (compressed/encrypted + custom data appended)
+    unsigned int baseSize;          // Data base size (uncompressed/unencrypted)
+    unsigned int nextOffset;        // Next resource chunk global offset (if resource has multiple chunks)
+    unsigned int reserved;          // <reserved>
+    unsigned int crc32;             // Data chunk CRC32 (propCount + props[] + data)
+} rresResourceChunkInfo;
 
 // rres resource chunk data
 typedef struct rresResourceChunkData {
     unsigned int propCount;         // Resource chunk properties count
-    int *props;                     // Resource chunk properties
+    unsigned int *props;            // Resource chunk properties
     void *raw;                      // Resource chunk raw data
 } rresResourceChunkData;
+
+// rres resource multi
+// NOTE: It supports multiple resource chunks
+typedef struct rresResourceMulti {
+    unsigned int count;             // Resource chunks count
+    rresResourceChunk *chunks;      // Resource chunks
+} rresResourceMulti;
 ```
 
 A single `rresResourceChunk` can be laoded from the `.rres` file with the provided function: **`rresLoadResourceChunk()`** and unloaded with **`rresUnloadResourceChunk()`**.
@@ -361,11 +373,16 @@ Note that data decompression/decryption is implemented in this custom library, *
 
 ### Packaging tool: `rrespacker`
 
-The `rres` packing tool is in charge of processing all the input files and creating the `rres` file following the specification. In case some compression/encryption algorythm is supported it must be implemented by this tool and same algorithm should be supported by the mapping library, in our case `rres-raylib.h`.
+`rrespacker` is the `rres` packing tool in charge of processing all the input files and creating the `rres` file, following the specification. In case some compression/encryption algorithms are supported it must be implemented by this tool and the same algorithms should be supported by the mapping library, in our case `rres-raylib.h`.
 
 ![rres v1.0](https://raw.githubusercontent.com/raysan5/rres/master/design/rrespacker_v100_dark_style.png)
 
 _Fig 03. rrespacker tool, GUI interface, it also supports CLI for batch processing._
+
+
+## Versions
+
+  - rres v1.0 (07-May-2022) - First release of the specification.
 
 ## License
 

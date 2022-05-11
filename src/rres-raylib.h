@@ -19,6 +19,19 @@
 *       Support data encryption algorithm XChaCha20-Poly1305,
 *       provided by monocypher.h/monocypher.c library
 *
+*   DEPENDENCIES:
+*
+*     - raylib.h: Data types definition and data loading from memory functions
+*                 WARNING: raylib.h MUST be included before including rres-raylib.h
+*     - rres.h:   Base implementation of rres specs, required to read rres files and resource chunks
+*     - lz4.h:    LZ4 compression support (optional)
+*     - aes.h:    AES-256 CTR encryption support (optional)
+*     - monocypher.h: for XChaCha20-Poly1305 encryption support (optional) 
+*
+*   VERSION HISTORY:
+*
+*     - 1.0 (11-May-2022): Initial implementation release
+*
 *
 *   LICENSE: MIT
 *
@@ -72,18 +85,22 @@
 
 // rres data loading to raylib data structures
 // NOTE: Chunk data must be provided uncompressed/unencrypted
-RLAPI void *LoadDataFromResource(rresResourceChunk chunk, int *size);   // Load raw data from rres resource chunk
-RLAPI char *LoadTextFromResource(rresResourceChunk chunk);              // Load text data from rres resource chunk
-RLAPI Image LoadImageFromResource(rresResourceChunk chunk);             // Load Image data from rres resource chunk
-RLAPI Wave LoadWaveFromResource(rresResourceChunk chunk);               // Load Wave data from rres resource chunk
-RLAPI Font LoadFontFromResource(rresResourceMulti multi);               // Load Font data from rres resource multiple chunks
-RLAPI Mesh LoadMeshFromResource(rresResourceMulti multi);               // Load Mesh data from rres resource multiple chunks
-//RLAPI Material LoadMaterialFromResource(rresResourceChunk chunk);     // TODO: Load Material data from rres resource chunk
-//RLAPI Model LoadModelFromResource(rresResourceMulti multi);           // TODO: Load Model data from rres resource multiple chunks
+RLAPI void *LoadDataFromResource(rresResourceChunk chunk, int *size); // Load raw data from rres resource chunk
+RLAPI char *LoadTextFromResource(rresResourceChunk chunk);      // Load text data from rres resource chunk
+RLAPI Image LoadImageFromResource(rresResourceChunk chunk);     // Load Image data from rres resource chunk
+RLAPI Wave LoadWaveFromResource(rresResourceChunk chunk);       // Load Wave data from rres resource chunk
+RLAPI Font LoadFontFromResource(rresResourceMulti multi);       // Load Font data from rres resource multiple chunks
+RLAPI Mesh LoadMeshFromResource(rresResourceMulti multi);       // Load Mesh data from rres resource multiple chunks
 
-RLAPI int UnpackResourceChunk(rresResourceChunk *chunk);                // Unpack resource chunk data (decompres/decrypt data)
-                                                                        // NOTE: Function return 0 on success or other value on failure
-RLAPI void SetBaseDirectory(const char *baseDir);                       // Set base directory for externally linked data
+// Unpack resource chunk data (decompres/decrypt data)
+// NOTE: Function return 0 on success or other value on failure
+RLAPI int UnpackResourceChunk(rresResourceChunk *chunk);        // Unpack resource chunk data (decompress/decrypt)
+                                                            
+// Set base directory for externally linked data
+// NOTE: When resource chunk contains an external link (FourCC: LINK, Type: RRES_DATA_LINK),
+// a base directory is required to be prepended to link path
+// If not provided, the application path is prepended to link by default 
+RLAPI void SetBaseDirectory(const char *baseDir);               // Set base directory for externally linked data
 
 #endif // RRES_RAYLIB_H
 
@@ -129,7 +146,7 @@ RLAPI void SetBaseDirectory(const char *baseDir);                       // Set b
 //----------------------------------------------------------------------------------
 // Global Variables Definition
 //----------------------------------------------------------------------------------
-const char *baseDir = NULL;
+static const char *baseDir = NULL;      // Base directory pointer, used on external linked data loading
 
 //----------------------------------------------------------------------------------
 // Module specific Functions Declaration
@@ -142,7 +159,6 @@ static void *LoadDataFromResourceChunk(rresResourceChunk chunk, unsigned int *si
 static char *LoadTextFromResourceChunk(rresResourceChunk chunk, unsigned int *codeLang); // Load chunk: RRES_DATA_TEXT
 static Image LoadImageFromResourceChunk(rresResourceChunk chunk);                        // Load chunk: RRES_DATA_IMAGE
 
-static const char *GetFourCCFromType(unsigned int type);                                 // Get FourCC 4-char code from resource type, useful for log info
 static const char *GetExtensionFromProps(unsigned int ext01, unsigned int ext02);        // Get file extension from RRES_DATA_RAW properties (unsigned int) 
 static unsigned int *ComputeMD5(unsigned char *data, int size);                          // Compute MD5 hash code, returns 4 integers array (static)
 
@@ -156,11 +172,11 @@ void *LoadDataFromResource(rresResourceChunk chunk, int *size)
     void *rawData = NULL;
 
     // Data can be provided in the resource or linked to an external file
-    if (chunk.type == RRES_DATA_RAW)       // Raw data
+    if (rresGetDataType(chunk.info.type) == RRES_DATA_RAW)       // Raw data
     {
         rawData = LoadDataFromResourceChunk(chunk, size);
     }
-    else if (chunk.type == RRES_DATA_LINK) // Link to external file
+    else if (rresGetDataType(chunk.info.type) == RRES_DATA_LINK) // Link to external file
     {
         // Get raw data from external linked file
         unsigned int dataSize = 0;
@@ -180,18 +196,18 @@ char *LoadTextFromResource(rresResourceChunk chunk)
     char *text = NULL;
     int codeLang = 0;
 
-    if (chunk.type == RRES_DATA_TEXT)       // Text data
+    if (rresGetDataType(chunk.info.type) == RRES_DATA_TEXT)       // Text data
     {
         text = LoadTextFromResourceChunk(chunk, &codeLang);
 
         // TODO: Consider text code language to load shader or code scripts
     }
-    else if (chunk.type == RRES_DATA_RAW)   // Raw text file
+    else if (rresGetDataType(chunk.info.type) == RRES_DATA_RAW)   // Raw text file
     {
         unsigned int size = 0;
         text = LoadDataFromResourceChunk(chunk, &size);
     }
-    else if (chunk.type == RRES_DATA_LINK)  // Link to external file
+    else if (rresGetDataType(chunk.info.type) == RRES_DATA_LINK)  // Link to external file
     {
         // Get raw data from external linked file
         unsigned int dataSize = 0;
@@ -207,11 +223,11 @@ Image LoadImageFromResource(rresResourceChunk chunk)
 {
     Image image = { 0 };
 
-    if (chunk.type == RRES_DATA_IMAGE)          // Image data
+    if (rresGetDataType(chunk.info.type) == RRES_DATA_IMAGE)          // Image data
     {
         image = LoadImageFromResourceChunk(chunk);
     }
-    else if (chunk.type == RRES_DATA_RAW)       // Raw image file
+    else if (rresGetDataType(chunk.info.type) == RRES_DATA_RAW)       // Raw image file
     {
         unsigned int dataSize = 0;
         unsigned char *data = LoadDataFromResourceChunk(chunk, &dataSize);
@@ -220,7 +236,7 @@ Image LoadImageFromResource(rresResourceChunk chunk)
 
         RL_FREE(data);
     }
-    else if (chunk.type == RRES_DATA_LINK)      // Link to external file
+    else if (rresGetDataType(chunk.info.type) == RRES_DATA_LINK)      // Link to external file
     {
         // Get raw data from external linked file
         unsigned int dataSize = 0;
@@ -240,9 +256,9 @@ Wave LoadWaveFromResource(rresResourceChunk chunk)
 {
     Wave wave = { 0 };
 
-    if (chunk.type == RRES_DATA_WAVE)       // Wave data
+    if (rresGetDataType(chunk.info.type) == RRES_DATA_WAVE)       // Wave data
     {
-        if ((chunk.compType == RRES_COMP_NONE) && (chunk.cipherType == RRES_CIPHER_NONE))
+        if ((chunk.info.compType == RRES_COMP_NONE) && (chunk.info.cipherType == RRES_CIPHER_NONE))
         {
             wave.frameCount = chunk.data.props[0];
             wave.sampleRate = chunk.data.props[1];
@@ -253,9 +269,9 @@ Wave LoadWaveFromResource(rresResourceChunk chunk)
             wave.data = RL_CALLOC(size, 1);
             memcpy(wave.data, chunk.data.raw, size);
         }
-        RRES_LOG("RRES: %s: WARNING: Data must be decompressed/decrypted\n", GetFourCCFromType(chunk.type));
+        RRES_LOG("RRES: %c%c%c%c: WARNING: Data must be decompressed/decrypted\n", chunk.info.type[0], chunk.info.type[1], chunk.info.type[2], chunk.info.type[3]);
     }
-    else if (chunk.type == RRES_DATA_RAW)   // Raw wave file
+    else if (rresGetDataType(chunk.info.type) == RRES_DATA_RAW)   // Raw wave file
     {
         unsigned int dataSize = 0;
         unsigned char *data = LoadDataFromResourceChunk(chunk, &dataSize);
@@ -264,7 +280,7 @@ Wave LoadWaveFromResource(rresResourceChunk chunk)
 
         RL_FREE(data);
     }
-    else if (chunk.type == RRES_DATA_LINK)  // Link to external file
+    else if (rresGetDataType(chunk.info.type) == RRES_DATA_LINK)  // Link to external file
     {
         // Get raw data from external linked file
         unsigned int dataSize = 0;
@@ -289,9 +305,9 @@ Font LoadFontFromResource(rresResourceMulti multi)
     //  - RRES_DATA_IMAGE: Image atlas for the font characters
     if (multi.count >= 2)
     {
-        if (multi.chunks[0].type == RRES_DATA_FONT_GLYPHS)
+        if (rresGetDataType(multi.chunks[0].info.type) == RRES_DATA_FONT_GLYPHS)
         {
-            if ((multi.chunks[0].compType == RRES_COMP_NONE) && (multi.chunks[0].cipherType == RRES_CIPHER_NONE))
+            if ((multi.chunks[0].info.compType == RRES_COMP_NONE) && (multi.chunks[0].info.cipherType == RRES_CIPHER_NONE))
             {
                 // Load font basic properties from chunk[0]
                 font.baseSize = multi.chunks[0].data.props[0];           // Base size (default chars height)
@@ -317,24 +333,24 @@ Font LoadFontFromResource(rresResourceMulti multi)
                     // NOTE: font.glyphs[i].image is not loaded
                 }
             }
-            else RRES_LOG("RRES: %s: WARNING: Data must be decompressed/decrypted\n", GetFourCCFromType(multi.chunks[0].type));
+            else RRES_LOG("RRES: %s: WARNING: Data must be decompressed/decrypted\n", multi.chunks[0].info.type);
         }
 
         // Load font image chunk
-        if (multi.chunks[1].type == RRES_DATA_IMAGE)
+        if (rresGetDataType(multi.chunks[1].info.type) == RRES_DATA_IMAGE)
         {
-            if ((multi.chunks[0].compType == RRES_COMP_NONE) && (multi.chunks[0].cipherType == RRES_CIPHER_NONE))
+            if ((multi.chunks[0].info.compType == RRES_COMP_NONE) && (multi.chunks[0].info.cipherType == RRES_CIPHER_NONE))
             {
                 Image image = LoadImageFromResourceChunk(multi.chunks[1]);
                 font.texture = LoadTextureFromImage(image);
                 UnloadImage(image);
             }
-            else RRES_LOG("RRES: %s: WARNING: Data must be decompressed/decrypted\n", GetFourCCFromType(multi.chunks[1].type));
+            else RRES_LOG("RRES: %s: WARNING: Data must be decompressed/decrypted\n", multi.chunks[1].info.type);
         }
     }
     else    // One chunk of data: RRES_DATA_RAW or RRES_DATA_LINK?
     {
-        if (multi.chunks[0].type == RRES_DATA_RAW)      // Raw font file
+        if (rresGetDataType(multi.chunks[0].info.type) == RRES_DATA_RAW)      // Raw font file
         {
             int dataSize = 0;
             unsigned char *rawData = LoadDataFromResourceChunk(multi.chunks[0], dataSize);
@@ -343,7 +359,7 @@ Font LoadFontFromResource(rresResourceMulti multi)
 
             RL_FREE(rawData);
         }
-        if (multi.chunks[0].type == RRES_DATA_LINK)     // Link to external font file
+        if (rresGetDataType(multi.chunks[0].info.type) == RRES_DATA_LINK)     // Link to external font file
         {
             // Get raw data from external linked file
             int dataSize = 0;
@@ -374,7 +390,7 @@ Mesh LoadMeshFromResource(rresResourceMulti multi)
     // Mesh resource consist of (n) chunks:
     for (int i = 0; i < multi.count; i++)
     {
-        if ((multi.chunks[0].compType == RRES_COMP_NONE) && (multi.chunks[0].cipherType == RRES_CIPHER_NONE))
+        if ((multi.chunks[0].info.compType == RRES_COMP_NONE) && (multi.chunks[0].info.cipherType == RRES_CIPHER_NONE))
         {
             // NOTE: raylib only supports vertex arrays with same vertex count,
             // rres.chunks[0] defined vertexCount will be the reference for the following chunks
@@ -382,7 +398,7 @@ Mesh LoadMeshFromResource(rresResourceMulti multi)
             if (mesh.vertexCount == 0) mesh.vertexCount = multi.chunks[0].data.props[0];
 
             // Verify chunk type and vertex count
-            if (multi.chunks[i].type == RRES_DATA_VERTEX)
+            if (rresGetDataType(multi.chunks[i].info.type) == RRES_DATA_VERTEX)
             {
                 // In case vertex count do not match we skip that resource chunk
                 if ((multi.chunks[i].data.props[1] != RRES_VERTEX_ATTRIBUTE_INDEX) && (multi.chunks[i].data.props[0] != mesh.vertexCount)) continue;
@@ -512,7 +528,7 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
     //-------------------------------------------------------------------------------------
     unsigned char *decryptedData = NULL;
 
-    switch (chunk->cipherType)
+    switch (chunk->info.cipherType)
     {
         case RRES_CIPHER_NONE: decryptedData = chunk->data.raw; break;
 #if defined(RRES_SUPPORT_ENCRYPTION_AES)
@@ -520,11 +536,11 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
         {
             // WARNING: Implementation dependant!
             // rrespacker tool appends (salt[16] + MD5[16]) to encrypted data for convenience,
-            // Actually, chunk->packedSize considers those additional elements
+            // Actually, chunk->info.packedSize considers those additional elements
 
             // Get some memory for the possible message output
-            decryptedData = (unsigned char *)RL_CALLOC(chunk->packedSize - 16 - 16, 1);
-            if (decryptedData != NULL) memcpy(decryptedData, chunk->data.raw, chunk->packedSize - 16 - 16);
+            decryptedData = (unsigned char *)RL_CALLOC(chunk->info.packedSize - 16 - 16, 1);
+            if (decryptedData != NULL) memcpy(decryptedData, chunk->data.raw, chunk->info.packedSize - 16 - 16);
 
             // Required variables for key stretching
             uint8_t key[32] = { 0 };                    // Encryption key
@@ -535,7 +551,7 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
 
             // Retrieve salt from chunk packed data
             // salt is stored at the end of packed data, before nonce and MAC: salt[16] + MD5[16]
-            memcpy(salt, ((unsigned char *)chunk->data.raw) + (chunk->packedSize - 16 - 16), 16);
+            memcpy(salt, ((unsigned char *)chunk->data.raw) + (chunk->info.packedSize - 16 - 16), 16);
 
             // Encryption key, generated from user password, using Argon2i algorithm for key stretching (256 bit)
             crypto_argon2i(key, 32, workArea, blocks, iterations, (uint8_t *)rresGetCipherPassword(), 16, salt, 16);
@@ -549,16 +565,16 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
 
             // Retrieve MD5 from chunk packed data
             // NOTE: MD5 is stored at the end of packed data, after salt: salt[16] + MD5[16]
-            memcpy(md5, ((unsigned char *)chunk->data.raw) + (chunk->packedSize - 16), 4*sizeof(unsigned int));
+            memcpy(md5, ((unsigned char *)chunk->data.raw) + (chunk->info.packedSize - 16), 4*sizeof(unsigned int));
 
             // Message decryption, requires key
             struct AES_ctx ctx = { 0 };
             AES_init_ctx(&ctx, key);
-            AES_CTR_xcrypt_buffer(&ctx, (uint8_t *)decryptedData, chunk->packedSize - 16 - 16);   // AES Counter mode, stream cipher
+            AES_CTR_xcrypt_buffer(&ctx, (uint8_t *)decryptedData, chunk->info.packedSize - 16 - 16);   // AES Counter mode, stream cipher
 
             // Verify MD5 to check if data decryption worked
             unsigned int decryptMD5[4] = { 0 };
-            unsigned int *md5Ptr = ComputeMD5(decryptedData, chunk->packedSize - 16 - 16);
+            unsigned int *md5Ptr = ComputeMD5(decryptedData, chunk->info.packedSize - 16 - 16);
             for (int i = 0; i < 4; i++) decryptMD5[i] = md5Ptr[i];
 
             // Wipe secrets if they are no longer needed
@@ -566,13 +582,13 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
 
             if (memcmp(decryptMD5, md5, 4*sizeof(unsigned int)) == 0)    // Decrypted successfully!
             {
-                chunk->packedSize -= (16 + 16);    // We remove additional data size from packed size (salt[16] + MD5[16])
-                RRES_LOG("RRES: %s: Data decrypted successfully (AES)\n", GetFourCCFromType(chunk->type));
+                chunk->info.packedSize -= (16 + 16);    // We remove additional data size from packed size (salt[16] + MD5[16])
+                RRES_LOG("RRES: %c%c%c%c: Data decrypted successfully (AES)\n", chunk->info.type[0], chunk->info.type[1], chunk->info.type[2], chunk->info.type[3]);
             }
             else
             {
                 result = 2;    // Data was not decrypted as expected, wrong password or message corrupted
-                RRES_LOG("RRES: WARNING: %s: Data decryption failed, wrong password or corrupted data\n", GetFourCCFromType(chunk->type));
+                RRES_LOG("RRES: WARNING: %c%c%c%c: Data decryption failed, wrong password or corrupted data\n", chunk->info.type[0], chunk->info.type[1], chunk->info.type[2], chunk->info.type[3]);
             }
 
         } break;
@@ -582,10 +598,10 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
         {
             // WARNING: Implementation dependant!
             // rrespacker tool appends (salt[16] + nonce[24] + MAC[16]) to encrypted data for convenience,
-            // Actually, chunk->packedSize considers those additional elements
+            // Actually, chunk->info.packedSize considers those additional elements
 
             // Get some memory for the possible message output
-            decryptedData = (unsigned char *)RL_CALLOC(chunk->packedSize - 16 - 24 - 16, 1);
+            decryptedData = (unsigned char *)RL_CALLOC(chunk->info.packedSize - 16 - 24 - 16, 1);
 
             // Required variables for key stretching
             uint8_t key[32] = { 0 };                    // Encryption key
@@ -596,7 +612,7 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
 
             // Retrieve salt from chunk packed data
             // salt is stored at the end of packed data, before nonce and MAC: salt[16] + nonce[24] + MAC[16]
-            memcpy(salt, ((unsigned char *)chunk->data.raw) + (chunk->packedSize - 16 - 24 - 16), 16);
+            memcpy(salt, ((unsigned char *)chunk->data.raw) + (chunk->info.packedSize - 16 - 24 - 16), 16);
 
             // Encryption key, generated from user password, using Argon2i algorithm for key stretching (256 bit)
             crypto_argon2i(key, 32, workArea, blocks, iterations, (uint8_t *)rresGetCipherPassword(), 16, salt, 16);
@@ -611,11 +627,11 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
 
             // Retrieve nonce and MAC from chunk packed data
             // nonce and MAC are stored at the end of packed data, after salt: salt[16] + nonce[24] + MAC[16]
-            memcpy(nonce, ((unsigned char *)chunk->data.raw) + (chunk->packedSize - 16 - 24), 24);
-            memcpy(mac, ((unsigned char *)chunk->data.raw) + (chunk->packedSize - 16), 16);
+            memcpy(nonce, ((unsigned char *)chunk->data.raw) + (chunk->info.packedSize - 16 - 24), 24);
+            memcpy(mac, ((unsigned char *)chunk->data.raw) + (chunk->info.packedSize - 16), 16);
 
             // Message decryption requires key, nonce and MAC
-            int decryptResult = crypto_unlock(decryptedData, key, nonce, mac, chunk->data.raw, (chunk->packedSize - 16 - 24 - 16));
+            int decryptResult = crypto_unlock(decryptedData, key, nonce, mac, chunk->data.raw, (chunk->info.packedSize - 16 - 24 - 16));
 
             // Wipe secrets if they are no longer needed
             crypto_wipe(nonce, 24);
@@ -623,28 +639,28 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
 
             if (decryptResult == 0)    // Decrypted successfully!
             {
-                chunk->packedSize -= (16 + 24 + 16);    // We remove additional data size from packed size
-                RRES_LOG("RRES: %s: Data decrypted successfully (XChaCha20)\n", GetFourCCFromType(chunk->type));
+                chunk->info.packedSize -= (16 + 24 + 16);    // We remove additional data size from packed size
+                RRES_LOG("RRES: %c%c%c%c: Data decrypted successfully (XChaCha20)\n", chunk->info.type[0], chunk->info.type[1], chunk->info.type[2], chunk->info.type[3]);
             }
             else if (decryptResult == -1)
             {
                 result = 2;   // Wrong password or message corrupted
-                RRES_LOG("RRES: WARNING: %s: Data decryption failed, wrong password or corrupted data\n", GetFourCCFromType(chunk->type));
+                RRES_LOG("RRES: WARNING: %c%c%c%c: Data decryption failed, wrong password or corrupted data\n", chunk->info.type[0], chunk->info.type[1], chunk->info.type[2], chunk->info.type[3]);
             }
         } break;
 #endif
         default: 
         {
             result = 1;    // Decryption algorithm not supported
-            RRES_LOG("RRES: WARNING: %s: Chunk data encryption algorithm not supported\n", GetFourCCFromType(chunk->type));
+            RRES_LOG("RRES: WARNING: %c%c%c%c: Chunk data encryption algorithm not supported\n", chunk->info.type[0], chunk->info.type[1], chunk->info.type[2], chunk->info.type[3]);
 
         } break;
     }
 
-    if ((result == 0) && (chunk->cipherType != RRES_CIPHER_NONE))
+    if ((result == 0) && (chunk->info.cipherType != RRES_CIPHER_NONE))
     {
         // Data is not encrypted any more, register it
-        chunk->cipherType = RRES_CIPHER_NONE;
+        chunk->info.cipherType = RRES_CIPHER_NONE;
         updateProps = true;
     }
 
@@ -654,7 +670,7 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
 
     if (result == 0)
     {
-        switch (chunk->compType)
+        switch (chunk->info.compType)
         {
             case RRES_COMP_NONE: unpackedData = decryptedData; break;
             case RRES_COMP_DEFLATE:
@@ -662,44 +678,44 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
                 int uncompDataSize = 0;
 
                 // TODO: WARNING: Possible issue with allocators: RL_CALLOC() vs RRES_CALLOC()
-                uncompData = DecompressData(decryptedData, chunk->packedSize, &uncompDataSize);
+                uncompData = DecompressData(decryptedData, chunk->info.packedSize, &uncompDataSize);
 
                 if ((uncompData != NULL) && (uncompDataSize > 0))     // Decompression successful
                 {
                     unpackedData = uncompData;
-                    chunk->packedSize = uncompDataSize;
-                    RRES_LOG("RRES: %s: Data decompressed successfully (DEFLATE)\n", GetFourCCFromType(chunk->type));
+                    chunk->info.packedSize = uncompDataSize;
+                    RRES_LOG("RRES: %c%c%c%c: Data decompressed successfully (DEFLATE)\n", chunk->info.type[0], chunk->info.type[1], chunk->info.type[2], chunk->info.type[3]);
                 }
                 else
                 {
                     result = 4;    // Decompression process failed
-                    RRES_LOG("RRES: WARNING: %s: Chunk data decompression failed\n", GetFourCCFromType(chunk->type));
+                    RRES_LOG("RRES: WARNING: %c%c%c%c: Chunk data decompression failed\n", chunk->info.type[0], chunk->info.type[1], chunk->info.type[2], chunk->info.type[3]);
                 }
 
                 // Security check, uncompDataSize must match the provided chunk->baseSize
-                if (uncompDataSize != chunk->baseSize) RRES_LOG("RRES: WARNING: Decompressed data could be corrupted, unexpected size\n");
+                if (uncompDataSize != chunk->info.baseSize) RRES_LOG("RRES: WARNING: Decompressed data could be corrupted, unexpected size\n");
             } break;
 #if defined(RRES_SUPPORT_COMPRESSION_LZ4)
             case RRES_COMP_LZ4:
             {
                 int uncompDataSize = 0;
-                uncompData = (unsigned char *)RRES_CALLOC(chunk->baseSize, 1);
-                uncompDataSize = LZ4_decompress_safe(decryptedData, uncompData, chunk->packedSize, chunk->baseSize);
+                uncompData = (unsigned char *)RRES_CALLOC(chunk->info.baseSize, 1);
+                uncompDataSize = LZ4_decompress_safe(decryptedData, uncompData, chunk->info.packedSize, chunk->info.baseSize);
 
                 if ((uncompData != NULL) && (uncompDataSize > 0))     // Decompression successful
                 {
                     unpackedData = uncompData;
-                    chunk->packedSize = uncompDataSize;
-                    RRES_LOG("RRES: %s: Data decompressed successfully (LZ4)\n", GetFourCCFromType(chunk->type));
+                    chunk->info.packedSize = uncompDataSize;
+                    RRES_LOG("RRES: %c%c%c%c: Data decompressed successfully (LZ4)\n", chunk->info.type[0], chunk->info.type[1], chunk->info.type[2], chunk->info.type[3]);
                 }
                 else
                 {
                     result = 4;    // Decompression process failed
-                    RRES_LOG("RRES: WARNING: %s: Chunk data decompression failed\n", GetFourCCFromType(chunk->type));
+                    RRES_LOG("RRES: WARNING: %c%c%c%c: Chunk data decompression failed\n", chunk->info.type[0], chunk->info.type[1], chunk->info.type[2], chunk->info.type[3]);
                 }
 
                 // WARNING: Decompression could be successful but not the original message size returned
-                if (uncompDataSize != chunk->baseSize) RRES_LOG("RRES: WARNING: Decompressed data could be corrupted, unexpected size\n");
+                if (uncompDataSize != chunk->info.baseSize) RRES_LOG("RRES: WARNING: Decompressed data could be corrupted, unexpected size\n");
             } break;
 #endif
             case RRES_COMP_QOI:
@@ -708,35 +724,35 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
                 qoi_desc desc = { 0 };
 
                 // TODO: WARNING: Possible issue with allocators: QOI_MALLOC() vs RRES_MALLOC()
-                uncompData = qoi_decode(decryptedData, chunk->packedSize, &desc, 0);
+                uncompData = qoi_decode(decryptedData, chunk->info.packedSize, &desc, 0);
                 uncompDataSize = (desc.width*desc.height*desc.channels) + 20;   // Add the 20 bytes of (propCount + props[4])
 
                 if ((uncompData != NULL) && (uncompDataSize > 0))     // Decompression successful
                 {
                     unpackedData = uncompData;
-                    chunk->packedSize = uncompDataSize;
-                    RRES_LOG("RRES: %s: Data decompressed successfully (QOI)\n", GetFourCCFromType(chunk->type));
+                    chunk->info.packedSize = uncompDataSize;
+                    RRES_LOG("RRES: %c%c%c%c: Data decompressed successfully (QOI)\n", chunk->info.type[0], chunk->info.type[1], chunk->info.type[2], chunk->info.type[3]);
                 }
                 else
                 {
                     result = 4;    // Decompression process failed
-                    RRES_LOG("RRES: WARNING: %s: Chunk data decompression failed\n", GetFourCCFromType(chunk->type));
+                    RRES_LOG("RRES: WARNING: %c%c%c%c: Chunk data decompression failed\n", chunk->info.type[0], chunk->info.type[1], chunk->info.type[2], chunk->info.type[3]);
                 }
 
-                if (uncompDataSize != chunk->baseSize) RRES_LOG("RRES: WARNING: Decompressed data could be corrupted, unexpected size\n");
+                if (uncompDataSize != chunk->info.baseSize) RRES_LOG("RRES: WARNING: Decompressed data could be corrupted, unexpected size\n");
             } break;
             default:
             {
                 result = 3;
-                RRES_LOG("RRES: WARNING: %s: Chunk data compression algorithm not supported\n", GetFourCCFromType(chunk->type));
+                RRES_LOG("RRES: WARNING: %c%c%c%c: Chunk data compression algorithm not supported\n", chunk->info.type[0], chunk->info.type[1], chunk->info.type[2], chunk->info.type[3]);
             } break;
         }
     }
 
-    if ((result == 0) && (chunk->compType != RRES_COMP_NONE))
+    if ((result == 0) && (chunk->info.compType != RRES_COMP_NONE))
     {
         // Data is not encrypted any more, register it
-        chunk->compType = RRES_COMP_NONE;
+        chunk->info.compType = RRES_COMP_NONE;
         updateProps = true;
     }
 
@@ -754,8 +770,8 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
         }
 
         // Move chunk->data.raw pointer (chunk->data.propCount*sizeof(int)) positions
-        void *raw = RRES_CALLOC(chunk->baseSize - 20, 1);
-        if (raw != NULL) memcpy(raw, ((unsigned char *)unpackedData) + 20, chunk->baseSize - 20);
+        void *raw = RRES_CALLOC(chunk->info.baseSize - 20, 1);
+        if (raw != NULL) memcpy(raw, ((unsigned char *)unpackedData) + 20, chunk->info.baseSize - 20);
         RRES_FREE(chunk->data.raw);
         chunk->data.raw = raw;
         RL_FREE(unpackedData);
@@ -763,7 +779,6 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
 
     return result;
 }
-
 
 //----------------------------------------------------------------------------------
 // Module specific Functions Definition
@@ -786,7 +801,7 @@ static void *LoadDataFromResourceLink(rresResourceChunk chunk, unsigned int *siz
     strcpy(fullFilePath, baseDir);
     strcat(fullFilePath, linkFilePath);
 
-    RRES_LOG("RRES: %s: Data file linked externally: %s\n", GetFourCCFromType(chunk.type), linkFilePath);
+    RRES_LOG("RRES: %c%c%c%c: Data file linked externally: %s\n", chunk.info.type[0], chunk.info.type[1], chunk.info.type[2], chunk.info.type[3], linkFilePath);
 
     if (FileExists(fullFilePath))
     {
@@ -799,7 +814,7 @@ static void *LoadDataFromResourceLink(rresResourceChunk chunk, unsigned int *siz
         }
         else data = LoadFileData(fullFilePath, size);
 
-        if ((data != NULL) && (*size > 0)) RRES_LOG("RRES: %s: External linked file loaded successfully\n", GetFourCCFromType(chunk.type));
+        if ((data != NULL) && (*size > 0)) RRES_LOG("RRES: %c%c%c%c: External linked file loaded successfully\n", chunk.info.type[0], chunk.info.type[1], chunk.info.type[2], chunk.info.type[3]);
     }
     else RRES_LOG("RRES: WARNING: [%s] Linked external file could not be found\n", linkFilePath);
 
@@ -812,13 +827,13 @@ static void *LoadDataFromResourceChunk(rresResourceChunk chunk, unsigned int *si
 {
     void *rawData = NULL;
 
-    if ((chunk.compType == RRES_COMP_NONE) && (chunk.cipherType == RRES_CIPHER_NONE))
+    if ((chunk.info.compType == RRES_COMP_NONE) && (chunk.info.cipherType == RRES_CIPHER_NONE))
     {
         rawData = RL_CALLOC(chunk.data.props[0], 1);
         if (rawData != NULL) memcpy(rawData, chunk.data.raw, chunk.data.props[0]);
         *size = chunk.data.props[0];
     }
-    else RRES_LOG("RRES: %s: WARNING: Data must be decompressed/decrypted\n", GetFourCCFromType(chunk.type));
+    else RRES_LOG("RRES: %c%c%c%c: WARNING: Data must be decompressed/decrypted\n", chunk.info.type[0], chunk.info.type[1], chunk.info.type[2], chunk.info.type[3]);
 
     return rawData;
 }
@@ -829,7 +844,7 @@ static char *LoadTextFromResourceChunk(rresResourceChunk chunk, unsigned int *co
 {
     void *text = NULL;
 
-    if ((chunk.compType == RRES_COMP_NONE) && (chunk.cipherType == RRES_CIPHER_NONE))
+    if ((chunk.info.compType == RRES_COMP_NONE) && (chunk.info.cipherType == RRES_CIPHER_NONE))
     {
         text = (char *)RL_CALLOC(chunk.data.props[0] + 1, 1);    // We add NULL terminator, just in case
         if (text != NULL) memcpy(text, chunk.data.raw, chunk.data.props[0]);
@@ -839,7 +854,7 @@ static char *LoadTextFromResourceChunk(rresResourceChunk chunk, unsigned int *co
         *codeLang = chunk.data.props[2];
         //chunks.props[3]:cultureCode could be useful for localized text
     }
-    else RRES_LOG("RRES: %s: WARNING: Data must be decompressed/decrypted\n", GetFourCCFromType(chunk.type));
+    else RRES_LOG("RRES: %c%c%c%c: WARNING: Data must be decompressed/decrypted\n", chunk.info.type[0], chunk.info.type[1], chunk.info.type[2], chunk.info.type[3]);
 
     return text;
 }
@@ -850,7 +865,7 @@ static Image LoadImageFromResourceChunk(rresResourceChunk chunk)
 {
     Image image = { 0 };
 
-    if ((chunk.compType == RRES_COMP_NONE) && (chunk.cipherType == RRES_CIPHER_NONE))
+    if ((chunk.info.compType == RRES_COMP_NONE) && (chunk.info.cipherType == RRES_CIPHER_NONE))
     {
         image.width = chunk.data.props[0];
         image.height = chunk.data.props[1];
@@ -890,34 +905,16 @@ static Image LoadImageFromResourceChunk(rresResourceChunk chunk)
         unsigned int size = GetPixelDataSize(image.width, image.height, image.format);
 
         // NOTE: Computed image data must match the data size of the chunk processed (minus propCount + props[4] size)
-        if (size == (chunk.baseSize - 20))
+        if (size == (chunk.info.baseSize - 20))
         {
             image.data = RL_CALLOC(size, 1);
             if (image.data != NULL) memcpy(image.data, chunk.data.raw, size);
         }
         else RRES_LOG("RRES: WARNING: IMGE: Chunk data size do not match expected image data size\n");
     }
-    else RRES_LOG("RRES: %s: WARNING: Data must be decompressed/decrypted\n", GetFourCCFromType(chunk.type));
+    else RRES_LOG("RRES: %c%c%c%c: WARNING: Data must be decompressed/decrypted\n", chunk.info.type[0], chunk.info.type[1], chunk.info.type[2], chunk.info.type[3]);
 
     return image;
-}
-
-// Return FourCC from resource type, useful for log info
-static const char *GetFourCCFromType(unsigned int type)
-{
-    switch (type)
-    {
-        case RRES_DATA_NULL: return "NULL";         // Reserved for empty chunks, no props/data
-        case RRES_DATA_RAW: return "RAWD";          // Raw file data, input file is not processed, just packed as is
-        case RRES_DATA_TEXT: return "TEXT";         // Text file data, byte data extracted from text file
-        case RRES_DATA_IMAGE: return "IMGE";        // Image file data, pixel data extracted from image file
-        case RRES_DATA_WAVE: return "WAVE";         // Audio file data, samples data extracted from audio file
-        case RRES_DATA_VERTEX: return "VRTX";       // Vertex file data, extracted from a mesh file
-        case RRES_DATA_FONT_GLYPHS: return "FNTG";  // Font glyphs info, generated from an input font file
-        case RRES_DATA_LINK: return "LINK";         // External linked file, filepath as provided on file input
-        case RRES_DATA_DIRECTORY: return "CDIR";    // Central directory for input files relation to resource chunks
-        default: break;
-    }
 }
 
 // Get file extension from RRES_DATA_RAW properties (unsigned int) 
