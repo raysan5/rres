@@ -5,7 +5,7 @@
 *   This example has been created using raylib 3.7 (www.raylib.com)
 *   raylib is licensed under an unmodified zlib/libpng license (View raylib.h for details)
 *
-*   Copyright (c) 2021 Ramon Santamaria (@raysan5)
+*   Copyright (c) 2022 Ramon Santamaria (@raysan5)
 *
 ********************************************************************************************/
 

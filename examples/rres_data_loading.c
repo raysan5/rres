@@ -84,7 +84,7 @@ int main(void)
                 /*
                 // TEST 02: Loading raw data (RRES_DATA_RAW)
                 //------------------------------------------------------------------------------------------------------
-                chunk = rresLoadResourceChunk(droppedFiles[0], rresGetIdFromFileName(dir, "resources/image.png.raw"));
+                chunk = rresLoadResourceChunk(droppedFiles[0], rresGetResourceId(dir, "resources/image.png.raw"));
                 result = UnpackResourceChunk(&chunk);               // Decompres/decipher resource data (if required)
 
                 if (result == 0)    // Data decompressed/decrypted successfully
@@ -105,7 +105,7 @@ int main(void)
 
                 // TEST 03: Load text data (RRES_DATA_TEXT)
                 //------------------------------------------------------------------------------------------------------
-                chunk = rresLoadResourceChunk(droppedFiles[0], rresGetIdFromFileName(dir, "resources/text_data.txt"));
+                chunk = rresLoadResourceChunk(droppedFiles[0], rresGetResourceId(dir, "resources/text_data.txt"));
                 result = UnpackResourceChunk(&chunk);       // Decompres/decipher resource data (if required)
 
                 if (result == 0)    // Data decompressed/decrypted successfully
@@ -119,7 +119,7 @@ int main(void)
                 
                 // TEST 04: Load image data (RRES_DATA_IMAGE)
                 //------------------------------------------------------------------------------------------------------
-                chunk = rresLoadResourceChunk(droppedFiles[0], rresGetIdFromFileName(dir, "fudesumi.png"));
+                chunk = rresLoadResourceChunk(droppedFiles[0], rresGetResourceId(dir, "fudesumi.png"));
                 result = UnpackResourceChunk(&chunk);       // Decompres/decipher resource data (if required)
 
                 if (result == 0)    // Data decompressed/decrypted successfully
@@ -137,7 +137,7 @@ int main(void)
 
                 // TEST 05: Load wave data (RRES_DATA_WAVE)
                 //------------------------------------------------------------------------------------------------------
-                chunk = rresLoadResourceChunk(droppedFiles[0], rresGetIdFromFileName(dir, "tanatana.ogg"));
+                chunk = rresLoadResourceChunk(droppedFiles[0], rresGetResourceId(dir, "tanatana.ogg"));
                 result = UnpackResourceChunk(&chunk);       // Decompres/decipher resource data (if required)
 
                 if (result == 0)    // Data decompressed/decrypted successfully
@@ -152,7 +152,7 @@ int main(void)
                 
                 // TEST 06: Load font data, multiples chunks (RRES_DATA_FONT_GLYPHS + RRE_DATA_IMAGE)
                 //------------------------------------------------------------------------------------------------------
-                multi = rresLoadResourceMulti(droppedFiles[0], rresGetIdFromFileName(dir, "pixantiqua.ttf"));
+                multi = rresLoadResourceMulti(droppedFiles[0], rresGetResourceId(dir, "pixantiqua.ttf"));
                 for (int i = 0; i < multi.count; i++)
                 {
                     result = UnpackResourceChunk(&multi.chunks[i]);   // Decompres/decipher resource data (if required)

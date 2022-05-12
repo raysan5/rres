@@ -35,7 +35,7 @@ int main(void)
     rresCentralDir dir = rresLoadCentralDirectory("resources.rres");
     
     // Get resource id from original fileName (stored in centra directory)
-    unsigned int id = rresGetIdFromFileName(dir, "resources/images/fudesumi.png");
+    unsigned int id = rresGetResourceId(dir, "resources/images/fudesumi.png");
     
     // Load resource chunk from file providing the id
     rresResourceChunk chunk = rresLoadResourceChunk("resources.rres", id);
