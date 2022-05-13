@@ -375,10 +375,11 @@ Note that data decompression/decryption is implemented in this custom library, *
 
 `rrespacker` is the `rres` packing tool in charge of processing all the input files and creating the `rres` file, following the specification. In case some compression/encryption algorithms are supported it must be implemented by this tool and the same algorithms should be supported by the mapping library, in our case `rres-raylib.h`.
 
-![rres v1.0](https://raw.githubusercontent.com/raysan5/rres/master/design/rrespacker_v100_dark_style.png)
+![rres v1.0](https://raw.githubusercontent.com/raysan5/rres/master/design/rrespacker_v100_shot01.png)
 
 _Fig 03. rrespacker tool, GUI interface, it also supports CLI for batch processing._
 
+`rrespacker` can be used online (or downloaded) from [itch.io](https://raylibtech.itch.io/rrespacker).
 
 ## Versions
 
