@@ -101,7 +101,7 @@
 *     - stdlib.h: Required for memory allocation: malloc(), calloc(), free()
 *                 NOTE: Allocators can be redefined with macros RRES_MALLOC, RRES_CALLOC, RRES_FREE
 *     - stdio.h:  Required for file access functionality: FILE, fopen(), fseek(), fread(), fclose()
-*     - string.h: Required for memory data mamagement: memcpy(), memcmp()
+*     - string.h: Required for memory data management: memcpy(), memcmp()
 *
 *   VERSION HISTORY:
 *
@@ -878,10 +878,12 @@ int rresGetResourceId(rresCentralDir dir, const char *fileName)
 {
     int id = 0;
 
-    for (unsigned int i = 0; i < dir.count; i++)
+    for (unsigned int i = 0, len = 0; i < dir.count; i++)
     {
+        len = strlen(fileName);
+
         // NOTE: entries[i].fileName is NULL terminated and padded to 4-bytes
-        if (strncmp((const char *)dir.entries[i].fileName, fileName, sizeof(fileName)) == 0)
+        if (strncmp((const char *)dir.entries[i].fileName, fileName, len) == 0)
         {
             id = dir.entries[i].id;
             break;
