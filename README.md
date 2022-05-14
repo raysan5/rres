@@ -383,7 +383,7 @@ _Fig 03. rrespacker tool, GUI interface, it also supports CLI for batch processi
 
 ## Versions
 
-  - rres v1.0 (07-May-2022) - First release of the specification.
+  - rres v1.0 (12-May-2022) - First release of the specification.
 
 ## License
 
