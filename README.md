@@ -6,7 +6,7 @@
 
 `rres` has been designed to package game assets (images, fonts, text, audio, models...) into a simple self-contained comprehensive format, easy to read and write, designed to load data in a fast and efficient way.
 
-`rres` is inspired by the followinf file-formats: [XNB](http://xbox.create.msdn.com/en-US/sample/xnb_format) (used by XNA/MonoGame), [RIFF](https://en.wikipedia.org/wiki/Resource_Interchange_File_Format), [PNG](https://en.wikipedia.org/wiki/Portable_Network_Graphics) and [ZIP](https://en.wikipedia.org/wiki/Zip_(file_format)).
+`rres` is inspired by the following file-formats: [XNB](http://xbox.create.msdn.com/en-US/sample/xnb_format) (used by XNA/MonoGame), [RIFF](https://en.wikipedia.org/wiki/Resource_Interchange_File_Format), [PNG](https://en.wikipedia.org/wiki/Portable_Network_Graphics) and [ZIP](https://en.wikipedia.org/wiki/Zip_(file_format)).
 
 <br>
 <br>
@@ -35,11 +35,11 @@
 
 - **Ease-of-use**: `rres` library to read `.rres` files is small with only the minimum required functions to read resource data from it's id. It only uses a small set of functions from the standard C library. An `rrespacker` tool with GUI/CLI is provided to easily create and view `.rres` files.
 
-- **Flexibility**: `rres` format support any kind of input file, if data is not classified as a basic data type it can be just packed as raw file data.
+- **Flexibility**: `rres` format supports any kind of input file, if data is not classified as a basic data type it can be just packed as raw file data.
 
-- **Portability**: `rres` file format is not tied to an specific engine, the base library just reads the resource data as packed and that data can be mapped to any engine structures. An usage example has been provided with the auxiliar library `rres-raylib.h` that maps rres data to raylib structures.
+- **Portability**: `rres` file format is not tied to a specific engine, the base library just reads the resource data as packed and that data can be mapped to any engine structures. A usage example has been provided with the auxiliary library `rres-raylib.h` that maps rres data to raylib structures.
 
-- **Security**: `rres` support per-resource compression and encryption if required. Still, despite the support provided by the file format is up to the user to implement it in the `rres` packer tool and the engine mapping library. `rres` does not force any specific compression/encryption algorithm by design
+- **Security**: `rres` support per-resource compression and encryption if required. Still, despite the support provided by the file format it is up to the user to implement it in the `rres` packer tool and the engine mapping library. `rres` does not force any specific compression/encryption algorithm by design
 
 - **Extensibility**: `rres` file format is extensible, supporting new data types, new features and custom data if required.
 
@@ -47,11 +47,11 @@
 
 ## Usage Benefits
 
-There are some important reasons to package game assets data into a format like `rres`, here some good reasons to do it.
+There are some important reasons to package game assets data into a format like `rres`, here are some good reasons to do it.
 
- - **Organization**: Avoid thousands of files distributed in hundreds of directories in the final game build. All the game files data could be organized in a single or a few `.rres` files. It keeps the game directory clean and well structured.
+ - **Organization**: Avoid thousands of files distributed in hundreds of directories in the final game build. All the game files data could be organized in a single or a few `.rres` files. It keeps the game directory clean and well-structured.
 
- - **Performance**: Keeping all required files for a level/map into a single `.rres` file reduces the need of file handles to access multiple files; file handles are an OS resource and the cost of opening a file is not insignificant, it may cause delays in the game. Data access times inside the `.rres` file are also important and depending how the files are organized it could also improve the loading times.
+ - **Performance**: Keeping all required files for a level/map into a single `.rres` file reduces the need of file handles to access multiple files; file handles are an OS resource and the cost of opening a file is not insignificant, it may cause delays in the game. Data access times inside the `.rres` file are also important and depending on how the files are organized it could also improve the loading times.
 
  - **Security**: Avoid exposing all the game assets directly to the user for easy copy or modification. Data packed into a `.rres` file will be more difficult to extract and modify for most users; protect your game copyrighted assets. `rres` also supports per-resource data compression and encryption, adding an extra level of security when required. 
 
@@ -63,13 +63,13 @@ There are some important reasons to package game assets data into a format like 
 
 `rres` file-format has gone through _at least_ **4 big redesigns**:
 
- - **First design** of the format was limited to packaging one resource after another, every resource consisted of one _resource info header_ followed by a fixed set of four possible parameters and the resource data. Along the `.rres` file, a `.h` header file was generated mapping with defines the `rresId` with a resource filename (usually the original filename of the un-processed data). This model was pretty simple and intuitive but it has some important downsides: it did not consider complex pieces of data that could require multiple chunks and there was no way to extract/retrieve original source files (or similar ones).
+ - **First design** of the format was limited to packaging one resource after another, every resource consisted of one _resource info header_ followed by a fixed set of four possible parameters and the resource data. Along the `.rres` file, a `.h` header file was generated mapping with defines the `rresId` with a resource filename (usually the original filename of the un-processed data). This model was pretty simple and intuitive, but it has some important downsides: it did not consider complex pieces of data that could require multiple chunks and there was no way to extract/retrieve original source files (or similar ones).
 
- - **Second design** was way more complex and tried to address first design shortcomings. In second design every resource could include multiple chunks of data in a kind of tree structure. Actually, that design was similar to [RIFF](https://en.wikipedia.org/wiki/Resource_Interchange_File_Format) file-format: every chunk could contain additional chunks, each one with its header and data. Some additional resource options were also added but the format become quite complex to understand and manage. Finally the testing implementation was discarded and a simpler alternative was investigated.
+ - **Second design** was way more complex and tried to address first design shortcomings. In the second design every resource could include multiple chunks of data in a kind of tree structure. Actually, that design was similar to [RIFF](https://en.wikipedia.org/wiki/Resource_Interchange_File_Format) file-format: every chunk could contain additional chunks, each one with its header and data. Some additional resource options were also added but the format became quite complex to understand and manage. Finally, the testing implementation was discarded and a simpler alternative was investigated.
 
- - **Third design** was a return to first design: simplicity but keeping some of the options for the individual resources. The problem of multiple resources generated from a single input file was solved using a simple offset field in the _resource info header_ pointing to next linked resource when required. Resources were loaded as an array of resource chunks. An optional Central Directory resource chunk was added to keep references for the input files. Format was good but it still required implementation and further investigation, it needed to be engine-agnostic and it was still dependant on raylib structures and functionality.
+ - **Third design** was a return to first design: simplicity but keeping some of the options for the individual resources. The problem of multiple resources generated from a single input file was solved using a simple offset field in the _resource info header_ pointing to the next linked resource when required. Resources were loaded as an array of resource chunks. An optional Central Directory resource chunk was added to keep references for the input files. Format was good but it still required implementation and further investigation, it needed to be engine-agnostic and it was still dependent on raylib structures and functionality.
 
- - **Fourth design** has been done along the implementation, almost all structures and fields have been reviewed and renamed for consistency and simplicity. A separare library has been created (`rres-raylib.h`) to map the loaded resources data into a custom library/engine data types, any depndency to raylib has been removed, making it a completely engine-agnostic file-format. Several usage examples for raylib has been implemented to illustrate the library-engine connection of `rres` and multiple types of resource loading have been implemented. `rrespacker` tool has been created from scratch to generate `rres` files, it supports a nive GUI interface with drag and drop support but also a powerful command-line for batch processing. Compression and encryption implementation has been moved to the user library implementation to be aligned with the packaging tool and keep the `rres` file-format cleaner and simpler.
+ - **Fourth design** has been done along the implementation, almost all structures and fields have been reviewed and renamed for consistency and simplicity. A separate library has been created (`rres-raylib.h`) to map the loaded resources data into a custom library/engine data types, any dependency to raylib has been removed, making it a completely engine-agnostic file-format. Several usage examples for raylib have been implemented to illustrate the library-engine connection of `rres` and multiple types of resource loading have been implemented. `rrespacker` tool has been created from scratch to generate `rres` files, it supports a nice GUI interface with drag and drop support but also a powerful command-line for batch processing. Compression and encryption implementation has been moved to the user library implementation to be aligned with the packaging tool and keep the `rres` file-format cleaner and simpler.
 
 It's been an **8 years project**, working on it on-and-off, with many redesigns and revisions but I'm personally very happy with the final result. `rres` is a resource packaging file-format at the level of any professional engine package format _BUT free and open-source_, available to any game developer that wants to use it, implement it or create a custom version.
 
@@ -151,7 +151,7 @@ It's important to note that one input file could generate several resource chunk
 
 On `rres` creation, `rres` packer could create an additional resource chunk of type `RRES_DATA_DIRECTORY` containing data about the processed input files. It could be useful in some cases, for example to relate the input filename directly to the generated resource(s) id and also to extract the data in a similar file structure to the original input one.
 
-Every resource chunk is divided in two part: `rresResourceChunkInfo` + `rresResourceData`.
+Every resource chunk is divided in two parts: `rresResourceChunkInfo` + `rresResourceData`.
 
 ### Resource Chunk Info: `rresResourceChunkInfo`
 
@@ -175,12 +175,12 @@ typedef struct rresResourceChunkInfo {
 
 | Field | Description |
 | :---: | :---------- |
-| `type` | A [`FourCC`](https://en.wikipedia.org/wiki/FourCC) code and identifies the type of resource data contained in the `rresResourceChunkData`. Enum `rresResourceDataType` defines several data types, new ones could be added if requried. |
-| `id` | A global resource identifier, it's generated from input filename using a CRC32 hash and it's not unique. One input file can generate multiple resource chunks, all the generated chunks share the same identifier and they are loaded together when the resource is loaded. For example, a input .ttf could generate two resource chunks (`RRES_DATA_IMAGE` + `RRES_DATA_FONT_GLYPHS`) with same identifier that will be loaded together when their identifier is requested. It's up to the user to decide what to do with loaded data. |
+| `type` | A [`FourCC`](https://en.wikipedia.org/wiki/FourCC) code and identifies the type of resource data contained in the `rresResourceChunkData`. Enum `rresResourceDataType` defines several data types, new ones could be added if required. |
+| `id` | A global resource identifier, it's generated from input filename using a CRC32 hash and it's not unique. One input file can generate multiple resource chunks, all the generated chunks share the same identifier and they are loaded together when the resource is loaded. For example, an input .ttf could generate two resource chunks (`RRES_DATA_IMAGE` + `RRES_DATA_FONT_GLYPHS`) with the same identifier that will be loaded together when their identifier is requested. It's up to the user to decide what to do with loaded data. |
 | `compType` | Defines the compression algorithm used for the resource chunk data. Compression depends on the middle library between rres and the engine, `rres.h` just defines some useful algorithm values to be used in case of implementing compression. Compression should always be applied before encryption and it compresses the full `rresResourceData` (`Property Count` + `Properties[]` + `Data`). If no data encryption is applied, `packedSize` defines the size of compressed data. |
-| `cipherType` | Defines the encryption algorithm used for the resource chunk data. Like compression, encryption depends on the middle library between rres and the engine, `rres.h` just defines some useful algorithm values to be used in case of implementing encryption. Encryption should be applied after compression. Depending on the encryption algorithm and encryption mode it could require some extra piece of data to be attached to the resource data (i.e encryption MAC), this is implementation dependant and the rres packer tool / rres middle library for the engines are the responsible to manage that extra data. It's recommended to be just appended to resource data and considered on `packedSize`. |
+| `cipherType` | Defines the encryption algorithm used for the resource chunk data. Like compression, encryption depends on the middle library between rres and the engine, `rres.h` just defines some useful algorithm values to be used in case of implementing encryption. Encryption should be applied after compression. Depending on the encryption algorithm and encryption mode it could require some extra piece of data to be attached to the resource data (i.e encryption MAC), this is implementation dependent and the rres packer tool / rres middle library for the engines are responsible to manage that extra data. It's recommended to be just appended to resource data and considered on `packedSize`. |
 | `flags` | Reserved for additional flags, in case they are required by the implementation. |
-| `packedSize` | Defines the packed size (compressed/encrypted + additional user data) of `rresResourceChunkData`. Packaged data could contain appended user data at the end, after compressed/encrypted data, for example the nonce/MAC for the encrypted data, but it is implementation dependant, managed by the `rres` packer tool and the user library to load the chunks data into target engine structures. |
+| `packedSize` | Defines the packed size (compressed/encrypted + additional user data) of `rresResourceChunkData`. Packaged data could contain appended user data at the end, after compressed/encrypted data, for example the nonce/MAC for the encrypted data, but it is implementation dependent, managed by the `rres` packer tool and the user library to load the chunks data into target engine structures. |
 | `baseSize` | Defines the base size (uncompressed/unencrypted) of `rresResourceChunkData`. |
 | `nextOffset` | Defines the global file position address for the next _related_ resource chunk, it's useful for input files that generate multiple resources, like fonts or meshes. |
 | `reserved` | This field is reserved for future additions if required. |
@@ -241,14 +241,14 @@ The currently defined data `types` consist of the following properties and data:
 
 _Table 03. `rresResourceDataType` defined values and details_
 
-**NOTE:** `RRES_DATA_RAW` contains the packaged file extension as part of its properties, `char` extension is converted a 4-byte `unsigned int` big-endian value, starting with a dot. i.e `".png"` => `0x2e706e67`. In case the extension was not relevant, the user implementation could decide to set those properties to `0`.  
+**NOTE:** `RRES_DATA_RAW` contains the packaged file extension as part of its properties, `char` extension is converted to a 4-byte `unsigned int` big-endian value, starting with a dot. i.e `".png"` => `0x2e706e67`. In case the extension was not relevant, the user implementation could decide to set those properties to `0`.  
 
 `rres.h` defines the following `enums` for convenience to assign some of the properties:
 
  - `rresTextEncoding`: Defines several possible text encodings, default value is 0 (UTF-8)
  - `rresCodeLang`: Defines several programming languages, useful in case of embedding code files or scripts
  - `rresPixelFormat`: Defines multiple pixel format values for image pixel data
- - `rresVertexAttribute`: Defines several vertex attibute types for convenience
+ - `rresVertexAttribute`: Defines several vertex attribute types for convenience
  - `rresVertexFormat`: Defines several data formats for vertex data
  - `rresFontStyle`: Defines several font styles (Regular, Bold, Italic...), default value is 0 (`RRES_FONT_STYLE_DEFAULT`) 
 
@@ -256,7 +256,7 @@ _Table 03. `rresResourceDataType` defined values and details_
 
 The `Central Directory` resource chunk is a special chunk that **could be present or not** in the `rres` file, it stores information about the input files processed to generate the multiple resource chunks and could be useful to:
 
- - **Reference the resources by its original filename.** This is very useful in terms of implementation to minimize the required code changes if `rres` packaging is done over an existing project or at the end of a project development, if all files loading has been done using directly the filenames. 
+ - **Reference the resources by its original filename.** This is very useful in terms of implementation to minimize the required code changes if `rres` packaging is done over an existing project or at the end of a project development, if all files loading has been done using the filenames directly. 
 
  - **Extract some of the resources to a similar input file.** It will be only possible if the input file has not been processed in a destructive way. For example, if  a.ttf file has been processed to generate a glyphs image atlas + glyphs data info, it won't be possible to retrieve the original .ttf file.
 
@@ -308,7 +308,7 @@ Base `rres` library is in charge of reading `rres` files resource chunks into a 
 
  - `rresResourceChunk` contains a single chunk with user-required info and data: `rresResourceChunkInfo` + `rresResourceChunkData`
  - `rresresourceChunkInfo` contains the information about the loaded resource chunk
- - `rresResourceChunkData` contains the actual data for the resource: the requried properties and the raw data. It's important to note that in the case data was compressed/encrypted, it's up to the user-library (`rres-raylib.h`) to process that data; in those cases `chunk.data.raw` contains the compressed/encrypted data and `chunk.data.propCount = 0` and `chunk.data.props = NULL`; it's up to the user library to fill properties after decompression/decryption.
+ - `rresResourceChunkData` contains the actual data for the resource: the required properties and the raw data. It's important to note that in the case data was compressed/encrypted, it's up to the user-library (`rres-raylib.h`) to process that data; in those cases `chunk.data.raw` contains the compressed/encrypted data and `chunk.data.propCount = 0` and `chunk.data.props = NULL`; it's up to the user library to fill properties after decompression/decryption.
  - `rresResourceMulti` contains multiple `rresResourceChunks` for a processed input file
 
 ```c
