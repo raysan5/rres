@@ -307,7 +307,7 @@ _Fig 02. rres sample implementation: custom engine libs and tool._
 Base `rres` library is in charge of reading `rres` files resource chunks into a generic resource structure, returned to the user. User exposed resource structure `rresResourceChunk`follows `rres` specs structure (`rresResourceChunkInfo` + `rresResourceChunkData`). The following structures are provided:
 
  - `rresResourceChunk` contains a single chunk with user-required info and data: `rresResourceChunkInfo` + `rresResourceChunkData`
- - `rresresourceChunkInfo` contains the information about the laoded resource chunk
+ - `rresresourceChunkInfo` contains the information about the loaded resource chunk
  - `rresResourceChunkData` contains the actual data for the resource: the requried properties and the raw data. It's important to note that in the case data was compressed/encrypted, it's up to the user-library (`rres-raylib.h`) to process that data; in those cases `chunk.data.raw` contains the compressed/encrypted data and `chunk.data.propCount = 0` and `chunk.data.props = NULL`; it's up to the user library to fill properties after decompression/decryption.
  - `rresResourceMulti` contains multiple `rresResourceChunks` for a processed input file
 
@@ -347,7 +347,7 @@ typedef struct rresResourceMulti {
 } rresResourceMulti;
 ```
 
-A single `rresResourceChunk` can be laoded from the `.rres` file with the provided function: **`rresLoadResourceChunk()`** and unloaded with **`rresUnloadResourceChunk()`**.
+A single `rresResourceChunk` can be loaded from the `.rres` file with the provided function: **`rresLoadResourceChunk()`** and unloaded with **`rresUnloadResourceChunk()`**.
 
 A full `rresResourceMulti` can be loaded from the `.rres` file with the provided function: **`rresLoadResourceMulti()`** and unloaded with **`rresUnloadResourceMulti()`**.
 
@@ -371,11 +371,11 @@ Note that data decompression/decryption is implemented in this custom library, *
 
 **`rres` file-format is engine-agnostic, libraries and tools can be created for any engine/framework in any programming language.**
 
-### Packaging tool: `rrespacker`
+### Packaging tool: [`rrespacker`](https://raylibtech.itch.io/rrespacker)
 
 `rrespacker` is the `rres` packing tool in charge of processing all the input files and creating the `rres` file, following the specification. In case some compression/encryption algorithms are supported it must be implemented by this tool and the same algorithms should be supported by the mapping library, in our case `rres-raylib.h`.
 
-![rres v1.0](https://raw.githubusercontent.com/raysan5/rres/master/design/rrespacker_v100_shot01.png)
+![rrespacker v1.0](https://raw.githubusercontent.com/raysan5/rres/master/design/rrespacker_v100_shot01.png)
 
 _Fig 03. rrespacker tool, GUI interface, it also supports CLI for batch processing._
 
