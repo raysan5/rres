@@ -12,13 +12,13 @@
 #include "raylib.h"
 
 #define RRES_IMPLEMENTATION
-#include "rres/rres.h"              // Required to read rres data chunks
+#include "../src/rres.h"              // Required to read rres data chunks
 
 #define RRES_RAYLIB_IMPLEMENTATION
 #define RRES_SUPPORT_COMPRESSION_LZ4
 #define RRES_SUPPORT_ENCRYPTION_AES
 #define RRES_SUPPORT_ENCRYPTION_XCHACHA20
-#include "rres/rres-raylib.h"       // Required to map rres data chunks into raylib structs
+#include "../src/rres-raylib.h"       // Required to map rres data chunks into raylib structs
 
 int main(void)
 {
@@ -41,7 +41,7 @@ int main(void)
     rresResourceChunk chunk = rresLoadResourceChunk("resources.rres", id);
     
     // Decompress/decipher resource data (if required)
-    result = UnpackResourceChunk(&chunk);
+    int result = UnpackResourceChunk(&chunk);
     
     if (result == RRES_SUCCESS)         // Data decompressed/decrypted successfully
     {
