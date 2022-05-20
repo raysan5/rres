@@ -41,7 +41,7 @@ int main(void)
     rresResourceChunk chunk = rresLoadResourceChunk("resources.rres", id);
     
     // Decompress/decipher resource data (if required)
-    result = UnpackResourceChunk(&chunk);
+    int result = UnpackResourceChunk(&chunk);
     
     if (result == RRES_SUCCESS)         // Data decompressed/decrypted successfully
     {
