@@ -625,7 +625,7 @@ rresResourceChunk rresLoadResourceChunk(const char *fileName, int rresId)
                 else
                 {
                     // Skip required data size to read next resource info header
-                    fseek(rresFile, chunk.info.packedSize, SEEK_CUR);
+                    fseek(rresFile, info.packedSize, SEEK_CUR);
                 }
             }
 
