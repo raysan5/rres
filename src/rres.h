@@ -492,6 +492,10 @@ RRESAPI void rresUnloadResourceChunk(rresResourceChunk chunk);                  
 RRESAPI rresResourceMulti rresLoadResourceMulti(const char *fileName, int rresId);  // Load resource for provided id (multiple resource chunks)
 RRESAPI void rresUnloadResourceMulti(rresResourceMulti multi);                      // Unload resource from memory (multiple resource chunks)
 
+// Load resource(s) chunk info from file
+RRESAPI rresResourceChunkInfo rresLoadResourceChunkInfo(const char *fileName, int rresId);  // Load resource chunk info for provided id
+RRESAPI rresResourceChunkInfo *rresLoadResourceChunkInfoAll(const char *fileName, unsigned int *chunkCount); // Load all resource chunks info
+
 RRESAPI rresCentralDir rresLoadCentralDirectory(const char *fileName);              // Load central directory resource chunk from file
 RRESAPI void rresUnloadCentralDirectory(rresCentralDir dir);                        // Unload central directory resource chunk
 
@@ -504,8 +508,8 @@ RRESAPI unsigned int rresComputeCRC32(unsigned char *data, int len);            
 // NOTE: The cipher password is kept as an internal pointer to provided string, it's up to the user to manage that sensible data properly
 // Password should be to allocate and set before loading an encrypted resource and it should be cleaned/wiped after the encrypted resource has been loaded
 // TODO: Move this functionality to engine-library, after all rres.h does not manage data decryption
-RLAPI void rresSetCipherPassword(const char *pass);                 // Set password to be used on data decryption
-RLAPI const char *rresGetCipherPassword(void);                      // Get password to be used on data decryption
+RRESAPI void rresSetCipherPassword(const char *pass);                 // Set password to be used on data decryption
+RRESAPI const char *rresGetCipherPassword(void);                      // Get password to be used on data decryption
 
 #ifdef __cplusplus
 }
@@ -521,6 +525,14 @@ RLAPI const char *rresGetCipherPassword(void);                      // Get passw
 ************************************************************************************/
 
 #if defined(RRES_IMPLEMENTATION)
+
+// Boolean type
+#if (defined(__STDC__) && __STDC_VERSION__ >= 199901L) || (defined(_MSC_VER) && _MSC_VER >= 1800)
+    #include <stdbool.h>
+#elif !defined(__cplusplus) && !defined(bool)
+    typedef enum bool { false = 0, true = !false } bool;
+    #define RL_BOOL_TYPE
+#endif
 
 #include <stdlib.h>                 // Required for: malloc(), free()
 #include <stdio.h>                  // Required for: FILE, fopen(), fseek(), fread(), fclose()
@@ -716,7 +728,7 @@ rresResourceMulti rresLoadResourceMulti(const char *fileName, int rresId)
                     // Load all linked resource chunks
                     while (info.nextOffset != 0)
                     {
-                        fseek(rresFile, info.nextOffset, SEEK_SET);         // Jump to next resource
+                        fseek(rresFile, info.nextOffset, SEEK_SET);         // Jump to next resource chunk
                         fread(&info, sizeof(rresResourceChunkInfo), 1, rresFile); // Read next resource info header
 
                         RRES_LOG("RRES: %c%c%c%c: Id: 0x%08x | Base size: %i | Packed size: %i\n", info.type[0], info.type[1], info.type[2], info.type[3], info.id, info.baseSize, info.packedSize);
@@ -758,6 +770,70 @@ void rresUnloadResourceMulti(rresResourceMulti multi)
     for (unsigned int i = 0; i < multi.count; i++) rresUnloadResourceChunk(multi.chunks[i]);
 
     RRES_FREE(multi.chunks);
+}
+
+// Load resource chunk info for provided id
+RRESAPI rresResourceChunkInfo rresLoadResourceChunkInfo(const char *fileName, int rresId)
+{
+    rresResourceChunkInfo info = { 0 };
+    
+    FILE *rresFile = fopen(fileName, "rb");
+
+    if (rresFile != NULL)
+    {
+        rresFileHeader header = { 0 };
+
+        fread(&header, sizeof(rresFileHeader), 1, rresFile);
+
+        // Verify file signature: "rres", file version: 100
+        if (((header.id[0] == 'r') && (header.id[1] == 'r') && (header.id[2] == 'e') && (header.id[3] == 's')) && (header.version == 100))
+        {
+            // TODO: Try to find provided resource chunk id and read info chunk
+        }
+        else RRES_LOG("RRES: WARNING: The provided file is not a valid rres file, file signature or version not valid\n");
+
+        fclose(rresFile);
+    }
+
+    return info;
+}
+
+// Load all resource chunks info
+RRESAPI rresResourceChunkInfo *rresLoadResourceChunkInfoAll(const char *fileName, unsigned int *chunkCount)
+{
+    rresResourceChunkInfo *infos = { 0 };
+    unsigned int count = 0;
+    
+    FILE *rresFile = fopen(fileName, "rb");
+
+    if (rresFile != NULL)
+    {
+        rresFileHeader header = { 0 };
+
+        fread(&header, sizeof(rresFileHeader), 1, rresFile);
+
+        // Verify file signature: "rres", file version: 100
+        if (((header.id[0] == 'r') && (header.id[1] == 'r') && (header.id[2] == 'e') && (header.id[3] == 's')) && (header.version == 100))
+        {
+            // Load all resource chunks info
+            infos = (rresResourceChunkInfo *)RRES_CALLOC(header.chunkCount, sizeof(rresResourceChunkInfo));
+            count = header.chunkCount;
+            
+            for (int i = 0; i < count; i++)
+            {
+                fread(&infos[i], sizeof(rresResourceChunkInfo), 1, rresFile); // Read resource chunk info
+
+                if (infos[i].nextOffset > 0) fseek(rresFile, infos[i].nextOffset, SEEK_SET); // Jump to next resource
+                else fseek(rresFile, infos[i].packedSize, SEEK_CUR); // Jump to next resource
+            }
+        }
+        else RRES_LOG("RRES: WARNING: The provided file is not a valid rres file, file signature or version not valid\n");
+
+        fclose(rresFile);
+    }
+
+    *chunkCount = count;
+    return infos;
 }
 
 // Load central directory data
