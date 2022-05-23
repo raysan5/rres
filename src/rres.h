@@ -788,7 +788,21 @@ RRESAPI rresResourceChunkInfo rresLoadResourceChunkInfo(const char *fileName, in
         // Verify file signature: "rres", file version: 100
         if (((header.id[0] == 'r') && (header.id[1] == 'r') && (header.id[2] == 'e') && (header.id[3] == 's')) && (header.version == 100))
         {
-            // TODO: Try to find provided resource chunk id and read info chunk
+            // Try to find provided resource chunk id and read info chunk
+            for (int i = 0; i < header.chunkCount; i++)
+            {
+                // Read resource chunk info
+                fread(&info, sizeof(rresResourceChunkInfo), 1, rresFile);
+
+                if (info.id == rresId)
+                {
+                    // TODO: Jump to next resource chunk for provided id
+                    //if (info.nextOffset > 0) fseek(rresFile, info.nextOffset, SEEK_SET);
+
+                    break; // If requested rresId is found, we return the read rresResourceChunkInfo
+                }   
+                else fseek(rresFile, info.packedSize, SEEK_CUR); // Jump to next resource
+            }
         }
         else RRES_LOG("RRES: WARNING: The provided file is not a valid rres file, file signature or version not valid\n");
 
