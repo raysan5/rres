@@ -2,7 +2,7 @@
 
 This file list some of the main concerns overcomed when designing rres file format and the decisions took on the process.
 
-## File Structure Concerns
+## 1. File Structure Concerns
 
 ### Input file processing or just packaging
 
@@ -57,7 +57,7 @@ Every resource also uses a `FourCC` code to identify the type of data contained,
  - Should data be compressed or encrypted first?
    It is better to compress before encrypting because any proven block cipher will reduce the data to a pseudo-random sequence of bytes that will typically yield little to no compression gain at all.
    
-## Data Types Concerns
+## 2. Data Types Concerns
 
 ### Raw data resources
 
@@ -112,7 +112,7 @@ Every resource also uses a `FourCC` code to identify the type of data contained,
 
 `DECISION`: At this moment they are not, it's up to the user to allocate an extra byte (`\0`) to zero-terminate the loaded data chunk.
 
-## Future Concerns / Improvements
+## 3. Future Concerns / Improvements
 
 Following concerns have arised after the `rres` first design and implementation and could be a foundation for an improvement of the format based on the experience.
 
