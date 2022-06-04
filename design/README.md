@@ -41,11 +41,11 @@ Every resource also uses a `FourCC` code to identify the type of data contained,
 
 `WARNING`: Maybe this decision should be reconsidered in a future.
 
-### Filename memory alignment in CDIR
+### Filename memory alignment in `CDIR`
 
 `CONCERN`: Should filename entries for CDIR be aligned to 4-byte or 8-byte memory bounds?
 
-`DECISION`: Filenames in CDIR are padded with '\0' to 4-byte alignment of entries
+`DECISION`: Filenames in `CDIR` chunk entries are terminated with `\0` and padded with `\0` to 4-byte alignment
 
 ### Compression/Encryption support
 
@@ -65,7 +65,7 @@ Every resource also uses a `FourCC` code to identify the type of data contained,
 
 `DECISION`: Define `RAWD` data type (`RRES_DATA_RAW`) for those situations. If an input file is defined to be embedded unprocessed, a `RAWD` type resource chunk is created containing the input file in raw data form. 
 
-IMPLICATIONS:
+`IMPLICATIONS`:
  - Support a `CDIR` resource type for `Central Directory` where the original input file name is referenced, in case the original input file needs to be extracted.
  - Central Directory is not mandatory on rres file, so, some mechanism is required to identify the type of raw data contained in the `RAWD` resource for that situation:
    DECISION: Use the `RAWD` properties to codify the input file extension to identify it, every `unsigned int` property will map 4 `char` values. 
@@ -105,3 +105,25 @@ IMPLICATIONS:
 `CONCERN`: Support a specific `CODE` (`RRES_DATA_CODE`) resource chunk type to identify input code files.
 
 `DECISION`: Not required. We will try to keep data as generic as possible, code files could be just embedded as `TEXT` (`RRES_DATA_TEXT`) resource chunks and an additional property could be added to identify the code language of the text data.
+
+### Zero-terminated `TEXT` resources
+
+`CONCERN`: Input files processed as `TEXT` type resources, should they be `\0` terminated when saved data?
+
+`DECISION`: At this moment they are not, it's up to the user to allocate an extra byte (`\0`) to zero-terminate the loaded data chunk.
+
+## Future Concerns / Improvements
+
+Following concerns have arised after the `rres` first design and implementation and could be a foundation for an improvement of the format based on the experience.
+
+### Multi-chunk resources
+
+`CONCERN`: Some input files could generate multiple resource chunks, all linked together through a `nextChunkOffset` parameter in the resource chunk info header. All chunks generated from a unique input file share the same id. Despite the result is quite elegant in file-format terms (one chunk after another), it really complicates the implementation to read/write that kind of multi-chunk resources. Specific functions are required to return multiple chunks array while most of the time users will probably only want to load a single chunk (more simple and intuitive approach). Multiple chunks sharing same id could also sound confusing.
+
+`DECISION`: Package multi-chunk resources into a special kind of resource and let the user load the chunks after loading the individual resource. Another approach could be similar to other packaging formats, just create an intermediate multi-chunk file and embed that file as `RAWD` type.
+
+### Number of data properties
+
+`CONCERN`: First `rres` design assumed a fixed number of 4 properties per resource chunk; it was changed later to support any number of properties, just storing the properties count as first parameter of data chunk. After implementing the libraries to write and read `rres` files just noted that most resource chunks do not need more than 4 properties to identify data properly, so, we end-up in most of the cases with 5 integers: propsCount + props[4]. Implementation implies dynamic memory loading of those properties that adds a level of complexity that, maybe, could be avoided,
+
+`DECISION`: Set a default number of 8 properties for each resource chunk, that way, all resource chunks data will always start with 32 bytes of properties, fixed size. It will simplify read/write processes and dynamic memory allocations could be avoided.
