@@ -3,7 +3,7 @@
 *   rres example - rres data loading
 *
 *   This example has been created using rres 1.0 (github.com/raysan5/rres)
-*   This example uses raylib 4.1-dev (www.raylib.com) to display loaded data
+*   This example uses raylib 4.2 (www.raylib.com) to display loaded data
 *
 *
 *   LICENSE: MIT
@@ -78,7 +78,7 @@ int main(void)
         if (IsFileDropped())
         {
             int dropsCount = 0;
-            char **droppedFiles = GetDroppedFiles(&dropsCount);
+            char **droppedFiles = LoadDroppedFiles(&dropsCount);
 
             if (IsFileExtension(droppedFiles[0], ".rres"))
             {
@@ -195,7 +195,7 @@ int main(void)
                 rresUnloadCentralDirectory(dir);
             }
 
-            ClearDroppedFiles();
+            UnloadDroppedFiles();
         }
         //----------------------------------------------------------------------------------
 
