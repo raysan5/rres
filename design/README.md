@@ -1,8 +1,15 @@
 # rres design concerns
 
-This file list some of the main concerns overcomed when designing rres file format and the decisions took on the process.
+This file list some of the main concerns overcomed when designing rres file format and the decisions taken on the process.
 
-## File Structure Concerns
+The type of concerns are organized into 4 categories:
+
+ - 1. File Structure Concerns
+ - 2. Data Types Concerns
+ - 3. Implementation Concerns
+ - 4. Future Concerns / Improvements
+
+## 1. File Structure Concerns
 
 ### Input file processing or just packaging
 
@@ -41,11 +48,11 @@ Every resource also uses a `FourCC` code to identify the type of data contained,
 
 `WARNING`: Maybe this decision should be reconsidered in a future.
 
-### Filename memory alignment in CDIR
+### Filename memory alignment in `CDIR`
 
 `CONCERN`: Should filename entries for CDIR be aligned to 4-byte or 8-byte memory bounds?
 
-`DECISION`: Filenames in CDIR are padded with '\0' to 4-byte alignment of entries
+`DECISION`: Filenames in `CDIR` chunk entries are terminated with `\0` and padded with `\0` to 4-byte alignment
 
 ### Compression/Encryption support
 
@@ -57,7 +64,7 @@ Every resource also uses a `FourCC` code to identify the type of data contained,
  - Should data be compressed or encrypted first?
    It is better to compress before encrypting because any proven block cipher will reduce the data to a pseudo-random sequence of bytes that will typically yield little to no compression gain at all.
    
-## Data Types Concerns
+## 2. Data Types Concerns
 
 ### Raw data resources
 
@@ -65,7 +72,7 @@ Every resource also uses a `FourCC` code to identify the type of data contained,
 
 `DECISION`: Define `RAWD` data type (`RRES_DATA_RAW`) for those situations. If an input file is defined to be embedded unprocessed, a `RAWD` type resource chunk is created containing the input file in raw data form. 
 
-IMPLICATIONS:
+`IMPLICATIONS`:
  - Support a `CDIR` resource type for `Central Directory` where the original input file name is referenced, in case the original input file needs to be extracted.
  - Central Directory is not mandatory on rres file, so, some mechanism is required to identify the type of raw data contained in the `RAWD` resource for that situation:
    DECISION: Use the `RAWD` properties to codify the input file extension to identify it, every `unsigned int` property will map 4 `char` values. 
@@ -105,3 +112,57 @@ IMPLICATIONS:
 `CONCERN`: Support a specific `CODE` (`RRES_DATA_CODE`) resource chunk type to identify input code files.
 
 `DECISION`: Not required. We will try to keep data as generic as possible, code files could be just embedded as `TEXT` (`RRES_DATA_TEXT`) resource chunks and an additional property could be added to identify the code language of the text data.
+
+### Zero-terminated `TEXT` resources
+
+`CONCERN`: Input files processed as `TEXT` type resources, should they be `\0` terminated when saved data?
+
+`DECISION`: At this moment they are not, it's up to the user to allocate an extra byte (`\0`) to zero-terminate the loaded data chunk.
+
+## 3. Implementation Concerns
+
+### Make rres file-format engine-agnostic
+
+`CONCERN`: `rres` file format is designed to work with any engine/framework but an actual implementation is required to read/write resource chunks data and map that data properly to the data structures provided by the different engines. Sooner or later a custom implementation is required.
+
+`DECISION`: Implement a base `rres.h` library (single-file, header-only, no-dependencies) to read resources chunk data as _raw_ data and also create an engine/framework specific library to map the read _raw_ and properties to the engine structures. (i.e. `rres-raylib.h`)
+
+### Compression/Encryption support
+
+`CONCERN`: `rres` is designed to support compression/encryption of data when required but compression/encryption algorithms could be highly dependant on user needs and the target engine/framework used.
+
+`DECISION`: Do not force any compression/encryption algorithm, just let the rres packer tool **and** the engine/framework specific library to implement desired compression/encryption schemes.
+
+`IMPLICATIONS`: Base library `rres.h` does not support decompression/decryption on resource chunk reading, it just returns the compressed/encrypted raw data to allow the engine/framework specific library to process using the supported algorithms.
+
+### Expose rres structures directly to the user
+
+`CONCERN`: Should base library `rres.h` provided data structures (`rresResourceChunkInfo` + `rresResourceChunkData`) be directly exposed to users.
+
+`DECISION`: After a first implementation not exposing them directly (only custom trimmed versions), I decided to expose them completely in a second implementation, it really simplifies the implementation and it becomes more intuitive for users, having a direct equivalence between the `rres` format specification and the implementation.
+
+`IMPLICATIONS`:
+
+Previous implementation just exposed some of the `rresResourceChunkInfo` properties and converted the `unsigned char type[4]` (FourCC) to a more user-friendly `unsigned int type`, but it added a level of confusion and miss-alignment between the exposed `rresResourceChunk` and the structure defined in the specs. Now both are aligned.
+ - The reasoning for previous implementation: Just expose the minimal required properties for the user and keep the non-required ones private to the library implementation.
+ - The reasoning for new implementation: Compression/encryption was moved to user library, so, several of the properties were already exposed. 
+   The fields `flags`, `nextOfsset` and `crc32` could also be useful for user at some point so, why not expose them? And definitely, 
+   rres is an open specification and `rres.h` implementation is open source, there is no need to hide information to the users! 
+   And also the alignment betweent the specs and what user gets. The only degradation is the `type`, the user now gets a `unsigned char type[4]` 
+   instead of a `unsigned int type`, but `rresGetDataType()` function has been added to help (a bit) on that line.
+
+## 4. Future Concerns / Improvements
+
+Following concerns have arised after the `rres` first design and implementation and could be a foundation for an improvement of the format based on the experience.
+
+### Multi-chunk resources
+
+`CONCERN`: Some input files could generate multiple resource chunks, all linked together through a `nextChunkOffset` parameter in the resource chunk info header. All chunks generated from a unique input file share the same id. Despite the result is quite elegant in file-format terms (one chunk after another), it really complicates the implementation to read/write that kind of multi-chunk resources. Specific functions are required to return multiple chunks array while most of the time users will probably only want to load a single chunk (more simple and intuitive approach). Multiple chunks sharing same id could also sound confusing.
+
+`DECISION`: Package multi-chunk resources into a special kind of resource and let the user load the chunks after loading the individual resource. Another approach could be similar to other packaging formats, just create an intermediate multi-chunk file and embed that file as `RAWD` type.
+
+### Number of data properties
+
+`CONCERN`: First `rres` design assumed a fixed number of 4 properties per resource chunk; it was changed later to support any number of properties, just storing the properties count as first parameter of data chunk. After implementing the libraries to write and read `rres` files just noted that most resource chunks do not need more than 4 properties to identify data properly, so, we end-up in most of the cases with 5 integers: propsCount + props[4]. Implementation implies dynamic memory loading of those properties that adds a level of complexity that, maybe, could be avoided,
+
+`DECISION`: Set a default number of 8 properties for each resource chunk, that way, all resource chunks data will always start with 32 bytes of properties, fixed size. It will simplify read/write processes and dynamic memory allocations could be avoided.
