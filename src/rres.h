@@ -208,15 +208,14 @@ typedef struct rresResourceChunkInfo {
 
 // rres resource chunk data
 typedef struct rresResourceChunkData {
-    unsigned int propCount;         // Resource chunk properties count
-    unsigned int *props;            // Resource chunk properties
+    unsigned int props[8];          // Resource chunk properties
     void *raw;                      // Resource chunk raw data
 } rresResourceChunkData;
 
 // rres resource chunk
 typedef struct rresResourceChunk {
     rresResourceChunkInfo info;     // Resource chunk info
-    rresResourceChunkData data;     // Resource chunk packed data, contains propCount, props[] and raw data
+    rresResourceChunkData data;     // Resource chunk packed data, contains props[8] and raw data
 } rresResourceChunk;
 
 // rres resource multi
@@ -654,8 +653,7 @@ rresResourceChunk rresLoadResourceChunk(const char *fileName, int rresId)
 // Unload resource chunk from memory
 void rresUnloadResourceChunk(rresResourceChunk chunk)
 {
-    RRES_FREE(chunk.data.props);  // Resource chunk properties
-    RRES_FREE(chunk.data.raw);    // Resource chunk raw data
+    RRES_FREE(chunk.data.raw);    // Free resource chunk raw data
 }
 
 // Load resource from file by id
@@ -908,7 +906,6 @@ rresCentralDir rresLoadCentralDirectory(const char *fileName)
                         ptr += (16 + dir.entries[i].fileNameSize);      // Move pointer for next entry
                     }
 
-                    RRES_FREE(chunkData.props);
                     RRES_FREE(chunkData.raw);
                 }
             }
@@ -1047,8 +1044,8 @@ const char *rresGetCipherPassword(void)
 // Module Internal Functions Definition
 //----------------------------------------------------------------------------------
 // Load user resource chunk from resource packed data (as contained in .rres file)
-// WARNING: Data can be compressed and/or encrypted, in those cases is up to the user to process it,
-// and chunk.data.propCount = 0, chunk.data.props = NULL and chunk.data.raw contains all resource packed data
+// WARNING: Data can be compressed and/or encrypted, in those cases is up to the user to process it;
+// chunk.data.props[] = { 0 } and chunk.data.raw contains all resource packed data (props + data)
 static rresResourceChunkData rresLoadResourceChunkData(rresResourceChunkInfo info, void *data)
 {
     rresResourceChunkData chunkData = { 0 };
@@ -1062,16 +1059,10 @@ static rresResourceChunkData rresLoadResourceChunkData(rresResourceChunkInfo inf
         if ((info.compType == RRES_COMP_NONE) && (info.cipherType == RRES_CIPHER_NONE))
         {
             // Data is not compressed/encrypted (info.packedSize = info.baseSize)
-            chunkData.propCount = ((unsigned int *)data)[0];
-
-            if (chunkData.propCount > 0)
-            {
-                chunkData.props = (unsigned int *)RRES_CALLOC(chunkData.propCount, sizeof(unsigned int));
-                for (unsigned int i = 0; i < chunkData.propCount; i++) chunkData.props[i] = ((unsigned int *)data)[i + 1];
-            }
+            for (unsigned int i = 0; i < RRES_MAX_PROPERTIES; i++) chunkData.props[i] = ((unsigned int *)data)[i];
 
             chunkData.raw = RRES_MALLOC(info.baseSize);
-            memcpy(chunkData.raw, ((unsigned char *)data) + sizeof(int) + (chunkData.propCount*sizeof(int)), info.baseSize);
+            memcpy(chunkData.raw, ((unsigned char *)data) + RRES_MAX_PROPERTIES*sizeof(int), info.baseSize);
         }
         else
         {

@@ -725,7 +725,7 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
 
                 // TODO: WARNING: Possible issue with allocators: QOI_MALLOC() vs RRES_MALLOC()
                 uncompData = qoi_decode(decryptedData, chunk->info.packedSize, &desc, 0);
-                uncompDataSize = (desc.width*desc.height*desc.channels) + 20;   // Add the 20 bytes of (propCount + props[4])
+                uncompDataSize = (desc.width*desc.height*desc.channels) + 32;   // Add the 32 bytes of props[8]
 
                 if ((uncompData != NULL) && (uncompDataSize > 0))     // Decompression successful
                 {
@@ -756,22 +756,16 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
         updateProps = true;
     }
 
-    // Update chunk->data.propCount and chunk->data.props if required
+    // Update chunk->data.props[8] if required
     if (updateProps && (unpackedData != NULL))
     {
-        // Data is decompressed/decrypted into chunk->data.raw but data.propCount and data.props[] are still empty, 
+        // Data is decompressed/decrypted into chunk->data.raw but data.props[8] are still empty, 
         // they must be filled with the just updated chunk->data.raw (that contains everything)
-        chunk->data.propCount = ((int *)unpackedData)[0];
+        for (unsigned int i = 0; i < RRES_MAX_PROPERTIES; i++) chunk->data.props[i] = ((int *)unpackedData)[i];
 
-        if (chunk->data.propCount > 0)
-        {
-            chunk->data.props = (unsigned int *)RRES_CALLOC(chunk->data.propCount, sizeof(int));
-            for (unsigned int i = 0; i < chunk->data.propCount; i++) chunk->data.props[i] = ((int *)unpackedData)[1 + i];
-        }
-
-        // Move chunk->data.raw pointer (chunk->data.propCount*sizeof(int)) positions
-        void *raw = RRES_CALLOC(chunk->info.baseSize - 20, 1);
-        if (raw != NULL) memcpy(raw, ((unsigned char *)unpackedData) + 20, chunk->info.baseSize - 20);
+        // Move chunk->data.raw pointer (chunk->data.props[8]*sizeof(int)) positions (32 bytes)
+        void *raw = RRES_CALLOC(chunk->info.baseSize - 32, 1);
+        if (raw != NULL) memcpy(raw, ((unsigned char *)unpackedData) + 32, chunk->info.baseSize - 32);
         RRES_FREE(chunk->data.raw);
         chunk->data.raw = raw;
         RL_FREE(unpackedData);
@@ -904,8 +898,8 @@ static Image LoadImageFromResourceChunk(rresResourceChunk chunk)
         // Image data size can be computed from image properties
         unsigned int size = GetPixelDataSize(image.width, image.height, image.format);
 
-        // NOTE: Computed image data must match the data size of the chunk processed (minus propCount + props[4] size)
-        if (size == (chunk.info.baseSize - 20))
+        // NOTE: Computed image data must match the data size of the chunk processed (minus props[8] size, 32 bytes)
+        if (size == (chunk.info.baseSize - 32))
         {
             image.data = RL_CALLOC(size, 1);
             if (image.data != NULL) memcpy(image.data, chunk.data.raw, size);
