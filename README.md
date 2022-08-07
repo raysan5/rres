@@ -77,7 +77,7 @@ It's been an **8 years project**, working on it on-and-off, with many redesigns 
 
 rres file format consists of a file header (`rresFileHeader`) followed by a number of resource chunks (`rresResourceChunk`). Every resource chunk has a resource info header (`rresResourceChunkInfo`) that includes a `FOURCC` data type code and resource data information. The resource data (`rresResourceChunkData`) contains a small set of properties to identify data, depending on the type and could contain some additional data at the end.
 
-![rres v1.0](https://raw.githubusercontent.com/raysan5/rres/master/design/rres_file_format_REV6.png)
+![rres v1.0](https://raw.githubusercontent.com/raysan5/rres/master/design/rres_file_format_REV6_v100.png)
 
 _Fig 01. rres v1.0 file structure._
 
