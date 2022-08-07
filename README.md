@@ -77,9 +77,9 @@ It's been an **8 years project**, working on it on-and-off, with many redesigns 
 
 rres file format consists of a file header (`rresFileHeader`) followed by a number of resource chunks (`rresResourceChunk`). Every resource chunk has a resource info header (`rresResourceChunkInfo`) that includes a `FOURCC` data type code and resource data information. The resource data (`rresResourceChunkData`) contains a small set of properties to identify data, depending on the type and could contain some additional data at the end.
 
-![rres v1.0](https://raw.githubusercontent.com/raysan5/rres/master/design/rres_file_format_REV6_v100.png)
+![rres v1.1](https://raw.githubusercontent.com/raysan5/rres/master/design/rres_file_format_REV7.png)
 
-_Fig 01. rres v1.0 file structure._
+_Fig 01. rres v1.1 file structure._
 
 _NOTE: rresResourceChunk(s) are generated from input files. It's important to note that resources could not be mapped to files 1:1, one input file could generate multiple resource chunks. For example, a .ttf input file could generate an image resource chunk (`RRES_DATA_IMAGE` type) plus a font glyph info resource chunk (`RRES_DATA_FONT_GLYPHS` type)._
 
@@ -107,8 +107,7 @@ rresResourceChunk[]
         CRC32                 (4 bytes)     // Resource Chunk Data CRC32
                              
     rresResourceChunkData     (n bytes)     // Packed data
-        Property Count        (4 bytes)     // Number of properties contained
-        Properties[]          (4*i bytes)   // Resource data required properties, depend on Type
+        Properties[8]        (32 bytes)     // Resource data required properties, depend on Type
         Data                  (m bytes)     // Resource data
 }
 ```
@@ -192,8 +191,7 @@ _Table 02. `rresResourceChunkInfo` fields description and details_
 
 `rresResourceChunkData` contains the following data:
 
- - `Property Count`: Number of properties contained, depends on resource `type`
- - `Properties[]`: Resource data required properties, depend on resource `type`
+ - `Properties[8]`: Resource data required properties, depend on resource `type`
  - `Data`: Resource raw data, depend on resource `type`
 
 _NOTE: rresResourceChunkData could contain additional user data, in those cases additional data size must be considered in `packedSize`._
@@ -334,8 +332,7 @@ typedef struct rresResourceChunkInfo {
 
 // rres resource chunk data
 typedef struct rresResourceChunkData {
-    unsigned int propCount;         // Resource chunk properties count
-    unsigned int *props;            // Resource chunk properties
+    unsigned int props[8];          // Resource chunk properties
     void *raw;                      // Resource chunk raw data
 } rresResourceChunkData;
 
@@ -383,6 +380,7 @@ _Fig 03. rrespacker tool, GUI interface, it also supports CLI for batch processi
 
 ## Versions
 
+  - rres v1.1 (xx-Sep-2022) - Redesign to use a fixed number of 8 properties per resource chunk
   - rres v1.0 (12-May-2022) - First release of the specification.
 
 ## License
