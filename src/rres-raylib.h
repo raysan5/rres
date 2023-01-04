@@ -82,6 +82,9 @@
 //----------------------------------------------------------------------------------
 // Module Functions Declaration
 //----------------------------------------------------------------------------------
+#if defined(__cplusplus)
+extern "C" {            // Prevents name mangling of functions
+#endif
 
 // rres data loading to raylib data structures
 // NOTE: Chunk data must be provided uncompressed/unencrypted
@@ -101,6 +104,10 @@ RLAPI int UnpackResourceChunk(rresResourceChunk *chunk);        // Unpack resour
 // a base directory is required to be prepended to link path
 // If not provided, the application path is prepended to link by default 
 RLAPI void SetBaseDirectory(const char *baseDir);               // Set base directory for externally linked data
+
+#if defined(__cplusplus)
+}
+#endif
 
 #endif // RRES_RAYLIB_H
 
