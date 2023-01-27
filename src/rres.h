@@ -833,7 +833,7 @@ RRESAPI rresResourceChunkInfo *rresLoadResourceChunkInfoAll(const char *fileName
             infos = (rresResourceChunkInfo *)RRES_CALLOC(header.chunkCount, sizeof(rresResourceChunkInfo));
             count = header.chunkCount;
             
-            for (int i = 0; i < count; i++)
+            for (unsigned int i = 0; i < count; i++)
             {
                 fread(&infos[i], sizeof(rresResourceChunkInfo), 1, rresFile); // Read resource chunk info
 
@@ -970,7 +970,7 @@ int rresGetResourceId(rresCentralDir dir, const char *fileName)
 
     for (unsigned int i = 0, len = 0; i < dir.count; i++)
     {
-        len = strlen(fileName);
+        len = (unsigned int)strlen(fileName);
 
         // NOTE: entries[i].fileName is NULL terminated and padded to 4-bytes
         if (strncmp((const char *)dir.entries[i].fileName, fileName, len) == 0)
