@@ -176,7 +176,7 @@ int main(void)
                 // TEST 06: Load font data, multiples chunks (RRES_DATA_FONT_GLYPHS + RRE_DATA_IMAGE)
                 //------------------------------------------------------------------------------------------------------
                 multi = rresLoadResourceMulti(droppedFiles.paths[0], rresGetResourceId(dir, "pixantiqua.ttf"));
-                for (int i = 0; i < multi.count; i++)
+                for (unsigned int i = 0; i < multi.count; i++)
                 {
                     result = UnpackResourceChunk(&multi.chunks[i]);   // Decompres/decipher resource data (if required)
                     if (result != 0) break;
@@ -216,7 +216,7 @@ int main(void)
             DrawTexture(texture, 0, 0, WHITE);
 
             // Draw text using font loaded from .rres: RRES_DATA_FONT_GLYPHS + RRES_DATA_IMAGE
-            DrawTextEx(font, "THIS IS a TEST!", (Vector2) { 10, 50 }, font.baseSize, 0, RED);
+            DrawTextEx(font, "THIS IS a TEST!", (Vector2) { 10, 50 }, (float)font.baseSize, 0, RED);
 
         EndDrawing();
         //----------------------------------------------------------------------------------

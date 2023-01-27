@@ -88,7 +88,7 @@ extern "C" {            // Prevents name mangling of functions
 
 // rres data loading to raylib data structures
 // NOTE: Chunk data must be provided uncompressed/unencrypted
-RLAPI void *LoadDataFromResource(rresResourceChunk chunk, int *size); // Load raw data from rres resource chunk
+RLAPI void *LoadDataFromResource(rresResourceChunk chunk, unsigned int *size); // Load raw data from rres resource chunk
 RLAPI char *LoadTextFromResource(rresResourceChunk chunk);      // Load text data from rres resource chunk
 RLAPI Image LoadImageFromResource(rresResourceChunk chunk);     // Load Image data from rres resource chunk
 RLAPI Wave LoadWaveFromResource(rresResourceChunk chunk);       // Load Wave data from rres resource chunk
@@ -174,7 +174,7 @@ static unsigned int *ComputeMD5(unsigned char *data, int size);                 
 //----------------------------------------------------------------------------------
 
 // Load raw data from rres resource
-void *LoadDataFromResource(rresResourceChunk chunk, int *size)
+void *LoadDataFromResource(rresResourceChunk chunk, unsigned int *size)
 {
     void *rawData = NULL;
 
@@ -359,8 +359,8 @@ Font LoadFontFromResource(rresResourceMulti multi)
     {
         if (rresGetDataType(multi.chunks[0].info.type) == RRES_DATA_RAW)      // Raw font file
         {
-            int dataSize = 0;
-            unsigned char *rawData = LoadDataFromResourceChunk(multi.chunks[0], dataSize);
+            unsigned int dataSize = 0;
+            unsigned char *rawData = LoadDataFromResourceChunk(multi.chunks[0], &dataSize);
 
             font = LoadFontFromMemory(GetExtensionFromProps(multi.chunks[0].data.props[1], multi.chunks[0].data.props[2]), rawData, dataSize, 32, NULL, 0);
 
@@ -369,7 +369,7 @@ Font LoadFontFromResource(rresResourceMulti multi)
         if (rresGetDataType(multi.chunks[0].info.type) == RRES_DATA_LINK)     // Link to external font file
         {
             // Get raw data from external linked file
-            int dataSize = 0;
+            unsigned int dataSize = 0;
             void *rawData = LoadDataFromResourceLink(multi.chunks[0], &dataSize);
 
             // Load image from linked file data
@@ -395,7 +395,7 @@ Mesh LoadMeshFromResource(rresResourceMulti multi)
     // TODO: Support externally linked mesh resource?
 
     // Mesh resource consist of (n) chunks:
-    for (int i = 0; i < multi.count; i++)
+    for (unsigned int i = 0; i < multi.count; i++)
     {
         if ((multi.chunks[0].info.compType == RRES_COMP_NONE) && (multi.chunks[0].info.cipherType == RRES_CIPHER_NONE))
         {
@@ -494,7 +494,7 @@ Mesh LoadMeshFromResource(rresResourceMulti multi)
                         // raylib expects 1 components per index and unsigned short vertex format
                         if ((multi.chunks[i].data.props[2] == 1) && (multi.chunks[i].data.props[3] == RRES_VERTEX_FORMAT_USHORT))
                         {
-                            mesh.indices = (unsigned char *)RL_CALLOC(multi.chunks[i].data.props[0], sizeof(unsigned short));
+                            mesh.indices = (unsigned short *)RL_CALLOC(multi.chunks[i].data.props[0], sizeof(unsigned short));
                             memcpy(mesh.indices, multi.chunks[i].data.raw, multi.chunks[i].data.props[0]*sizeof(unsigned short));
                         }
                         else RRES_LOG("RRES: WARNING: MESH: Vertex attribute index not valid, componentCount/vertexFormat do not fit\n");

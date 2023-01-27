@@ -60,9 +60,9 @@ int main(void)
     // Display resource chunks info
     // NOTE: Central Directory relates input files to rres resource chunks,
     // some input files could generate multiple rres resource chunks (Font files)
-    for (int i = 0; i < chunkCount; i++)
+    for (unsigned int i = 0; i < chunkCount; i++)
     {
-        for (int j = 0; j < dir.count; j++)
+        for (unsigned int j = 0; j < dir.count; j++)
         {
             if ((infos[i].id == dir.entries[j].id) && (infos[i].id != prevId))
             {
