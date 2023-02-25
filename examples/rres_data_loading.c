@@ -118,7 +118,7 @@ int main(void)
                     if ((data != NULL) && (dataSize > 0))
                     {
                         FILE *rawFile = fopen("export_data.raw", "wb");
-                        fwrite(data, dataSize, 1, rawFile);
+                        fwrite(data, 1, dataSize, rawFile);
                         fclose(rawFile);
                     }
                 }

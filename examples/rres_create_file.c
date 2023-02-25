@@ -108,7 +108,7 @@ int main(void)
 
     // Write resource chunk into rres file
     fwrite(&chunkInfo, sizeof(rresResourceChunkInfo), 1, rresFile);
-    fwrite(buffer, chunkInfo.packedSize, 1, rresFile);
+    fwrite(buffer, 1, chunkInfo.packedSize, rresFile);
     
     // Free required memory
     memset(&chunkInfo, 0, sizeof(rresResourceChunkInfo));
@@ -158,7 +158,7 @@ int main(void)
 
     // Write resource chunk into rres file
     fwrite(&chunkInfo, sizeof(rresResourceChunkInfo), 1, rresFile);
-    fwrite(buffer, chunkInfo.packedSize, 1, rresFile);
+    fwrite(buffer, 1, chunkInfo.packedSize, rresFile);
     
     // Free required memory
     memset(&chunkInfo, 0, sizeof(rresResourceChunkInfo));
@@ -207,7 +207,7 @@ int main(void)
 
     // Write resource chunk into rres file
     fwrite(&chunkInfo, sizeof(rresResourceChunkInfo), 1, rresFile);
-    fwrite(buffer, chunkInfo.packedSize, 1, rresFile);
+    fwrite(buffer, 1, chunkInfo.packedSize, rresFile);
     
     // Free required memory
     memset(&chunkInfo, 0, sizeof(rresResourceChunkInfo));
