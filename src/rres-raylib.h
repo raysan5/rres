@@ -1,6 +1,6 @@
 /**********************************************************************************************
 *
-*   rres-raylib v1.0 - rres loaders specific for raylib data structures
+*   rres-raylib v1.2 - rres loaders specific for raylib data structures
 *
 *   CONFIGURATION:
 *
@@ -30,12 +30,13 @@
 *
 *   VERSION HISTORY:
 *
+*     - 1.2 (15-Apr-2023): Updated to monocypher 4.0.1
 *     - 1.0 (11-May-2022): Initial implementation release
 *
 *
 *   LICENSE: MIT
 *
-*   Copyright (c) 2020-2022 Ramon Santamaria (@raysan5)
+*   Copyright (c) 2020-2023 Ramon Santamaria (@raysan5)
 *
 *   Permission is hereby granted, free of charge, to any person obtaining a copy
 *   of this software and associated documentation files (the "Software"), to deal
@@ -551,17 +552,31 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
 
             // Required variables for key stretching
             uint8_t key[32] = { 0 };                    // Encryption key
-            const uint32_t blocks = 16384;              // Key stretching blocks: 16 megabytes
-            const uint32_t iterations = 3;              // Key stretching iterations: 3 iterations
-            void *workArea = RL_MALLOC(blocks*1024);    // Key stretching work area
             uint8_t salt[16] = { 0 };                   // Key stretching salt
 
             // Retrieve salt from chunk packed data
             // salt is stored at the end of packed data, before nonce and MAC: salt[16] + MD5[16]
             memcpy(salt, ((unsigned char *)chunk->data.raw) + (chunk->info.packedSize - 16 - 16), 16);
+            
+            // Key stretching configuration
+            crypto_argon2_config config = {
+                .algorithm = CRYPTO_ARGON2_I,           // Algorithm: Argon2i
+                .nb_blocks = 16384,                     // Blocks: 16 MB
+                .nb_passes = 3,                         // Iterations
+                .nb_lanes  = 1                          // Single-threaded
+            };
+            crypto_argon2_inputs inputs = {
+                .pass = (const uint8_t *)rresGetCipherPassword(),     // User password
+                .pass_size = 16,                        // Password length
+                .salt = salt,                           // Salt for the password
+                .salt_size = 16
+            };
+            crypto_argon2_extras extras = { 0 };        // Extra parameters unused
 
-            // Encryption key, generated from user password, using Argon2i algorithm for key stretching (256 bit)
-            crypto_argon2i(key, 32, workArea, blocks, iterations, (uint8_t *)rresGetCipherPassword(), 16, salt, 16);
+            void *workArea = RL_MALLOC(config.nb_blocks*1024);    // Key stretching work area
+
+            // Generate strong encryption key, generated from user password using Argon2i algorithm (256 bit)
+            crypto_argon2(key, 32, workArea, config, inputs, extras);
 
             // Wipe key generation secrets, they are no longer needed
             crypto_wipe(salt, 16);
@@ -612,17 +627,31 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
 
             // Required variables for key stretching
             uint8_t key[32] = { 0 };                    // Encryption key
-            const uint32_t blocks = 16384;              // Key stretching blocks: 16 megabytes
-            const uint32_t iterations = 3;              // Key stretching iterations: 3 iterations
-            void *workArea = RL_MALLOC(blocks*1024);    // Key stretching work area
             uint8_t salt[16] = { 0 };                   // Key stretching salt
 
             // Retrieve salt from chunk packed data
             // salt is stored at the end of packed data, before nonce and MAC: salt[16] + nonce[24] + MAC[16]
             memcpy(salt, ((unsigned char *)chunk->data.raw) + (chunk->info.packedSize - 16 - 24 - 16), 16);
+            
+            // Key stretching configuration
+            crypto_argon2_config config = {
+                .algorithm = CRYPTO_ARGON2_I,           // Algorithm: Argon2i
+                .nb_blocks = 16384,                     // Blocks: 16 MB
+                .nb_passes = 3,                         // Iterations
+                .nb_lanes  = 1                          // Single-threaded
+            };
+            crypto_argon2_inputs inputs = {
+                .pass = (const uint8_t *)rresGetCipherPassword(),     // User password
+                .pass_size = 16,                        // Password length
+                .salt = salt,                           // Salt for the password
+                .salt_size = 16
+            };
+            crypto_argon2_extras extras = { 0 };        // Extra parameters unused
 
-            // Encryption key, generated from user password, using Argon2i algorithm for key stretching (256 bit)
-            crypto_argon2i(key, 32, workArea, blocks, iterations, (uint8_t *)rresGetCipherPassword(), 16, salt, 16);
+            void *workArea = RL_MALLOC(config.nb_blocks*1024);    // Key stretching work area
+
+            // Generate strong encryption key, generated from user password using Argon2i algorithm (256 bit)
+            crypto_argon2(key, 32, workArea, config, inputs, extras);
 
             // Wipe key generation secrets, they are no longer needed
             crypto_wipe(salt, 16);
@@ -638,7 +667,7 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
             memcpy(mac, ((unsigned char *)chunk->data.raw) + (chunk->info.packedSize - 16), 16);
 
             // Message decryption requires key, nonce and MAC
-            int decryptResult = crypto_unlock(decryptedData, key, nonce, mac, chunk->data.raw, (chunk->info.packedSize - 16 - 24 - 16));
+            int decryptResult = crypto_aead_unlock(decryptedData, mac, key, nonce, NULL, 0, chunk->data.raw, (chunk->info.packedSize - 16 - 24 - 16));
 
             // Wipe secrets if they are no longer needed
             crypto_wipe(nonce, 24);
