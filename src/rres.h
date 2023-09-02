@@ -891,7 +891,7 @@ rresCentralDir rresLoadCentralDirectory(const char *fileName)
                     
                     RRES_LOG("RRES: CDIR: Central Directory file entries count: %i\n", dir.count);
 
-                    unsigned char *ptr = chunkData.raw;
+                    unsigned char *ptr = (unsigned char *)chunkData.raw;
                     dir.entries = (rresDirEntry *)RRES_CALLOC(dir.count, sizeof(rresDirEntry));
 
                     for (unsigned int i = 0; i < dir.count; i++)
@@ -1054,7 +1054,7 @@ static rresResourceChunkData rresLoadResourceChunkData(rresResourceChunkInfo inf
     rresResourceChunkData chunkData = { 0 };
 
     // CRC32 data validation, verify packed data is not corrupted
-    unsigned int crc32 = rresComputeCRC32(data, info.packedSize);
+    unsigned int crc32 = rresComputeCRC32((unsigned char *)data, info.packedSize);
 
     if ((rresGetDataType(info.type) != RRES_DATA_NULL) && (crc32 == info.crc32))   // Make sure chunk contains data and data is not corrupted
     {
