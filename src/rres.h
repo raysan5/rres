@@ -1070,8 +1070,9 @@ static rresResourceChunkData rresLoadResourceChunkData(rresResourceChunkInfo inf
                 for (unsigned int i = 0; i < chunkData.propCount; i++) chunkData.props[i] = ((unsigned int *)data)[i + 1];
             }
 
-            chunkData.raw = RRES_MALLOC(info.baseSize);
-            memcpy(chunkData.raw, ((unsigned char *)data) + sizeof(int) + (chunkData.propCount*sizeof(int)), info.baseSize);
+            int rawSize = info.baseSize - sizeof(int) - (chunkData.propCount*sizeof(int));
+            chunkData.raw = RRES_MALLOC(rawSize);
+            memcpy(chunkData.raw, ((unsigned char *)data) + sizeof(int) + (chunkData.propCount*sizeof(int)), rawSize);
         }
         else
         {
