@@ -202,11 +202,11 @@ void *LoadDataFromResource(rresResourceChunk chunk, unsigned int *size)
 char *LoadTextFromResource(rresResourceChunk chunk)
 {
     char *text = NULL;
-    int codeLang = 0;
+    unsigned int codeLang = 0;
 
     if (rresGetDataType(chunk.info.type) == RRES_DATA_TEXT)       // Text data
     {
-        text = LoadTextFromResourceChunk(chunk, (unsigned int *)(&codeLang));
+        text = LoadTextFromResourceChunk(chunk, &codeLang);
 
         // TODO: Consider text code language to load shader or code scripts
     }
@@ -823,32 +823,32 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
 // Load data chunk: RRES_DATA_LINK
 static void *LoadDataFromResourceLink(rresResourceChunk chunk, unsigned int *size)
 {
-    unsigned char fullFilePath[2048] = { 0 };
+    char fullFilePath[2048] = { 0 };
     void *data = NULL;
     *size = 0;
 
     // Get external link filepath
-    unsigned char *linkFilePath = (unsigned char *)RL_CALLOC(chunk.data.props[0], 1);
+    char *linkFilePath = (char *)RL_CALLOC(chunk.data.props[0], 1);
     if (linkFilePath != NULL) memcpy(linkFilePath, chunk.data.raw, chunk.data.props[0]);
 
     // Get base directory to append filepath if not provided by user
     if (baseDir == NULL) baseDir = GetApplicationDirectory();
     
-    strcpy((char *)fullFilePath, baseDir);
-    strcat((char *)fullFilePath, (char *)linkFilePath);
+    strcpy(fullFilePath, baseDir);
+    strcat(fullFilePath, linkFilePath);
 
     RRES_LOG("RRES: %c%c%c%c: Data file linked externally: %s\n", chunk.info.type[0], chunk.info.type[1], chunk.info.type[2], chunk.info.type[3], linkFilePath);
 
-    if (FileExists((char *)fullFilePath))
+    if (FileExists(fullFilePath))
     {
         // Load external file as raw data
         // NOTE: We check if file is a text file to allow automatic line-endings processing
-        if (IsFileExtension((char *)linkFilePath, ".txt;.md;.vs;.fs;.info;.c;.h;.json;.xml;.glsl"))     // Text file
+        if (IsFileExtension(linkFilePath, ".txt;.md;.vs;.fs;.info;.c;.h;.json;.xml;.glsl"))     // Text file
         {
-            data = LoadFileText((char *)fullFilePath);
+            data = LoadFileText(fullFilePath);
             *size = TextLength((char *)data);
         }
-        else data = LoadFileData((char *)fullFilePath, (int *)size);
+        else data = LoadFileData(fullFilePath, (int *)size);
 
         if ((data != NULL) && (*size > 0)) RRES_LOG("RRES: %c%c%c%c: External linked file loaded successfully\n", chunk.info.type[0], chunk.info.type[1], chunk.info.type[2], chunk.info.type[3]);
     }
@@ -865,7 +865,7 @@ static void *LoadDataFromResourceChunk(rresResourceChunk chunk, unsigned int *si
 
     if ((chunk.info.compType == RRES_COMP_NONE) && (chunk.info.cipherType == RRES_CIPHER_NONE))
     {
-        rawData = (unsigned char *)RL_CALLOC(chunk.data.props[0], 1);
+        rawData = RL_CALLOC(chunk.data.props[0], 1);
         if (rawData != NULL) memcpy(rawData, chunk.data.raw, chunk.data.props[0]);
         *size = chunk.data.props[0];
     }
@@ -878,11 +878,11 @@ static void *LoadDataFromResourceChunk(rresResourceChunk chunk, unsigned int *si
 // NOTE: This chunk can be used for shaders or other text data elements (materials?)
 static char *LoadTextFromResourceChunk(rresResourceChunk chunk, unsigned int *codeLang)
 {
-    void *text = NULL;
+    char *text = NULL;
 
     if ((chunk.info.compType == RRES_COMP_NONE) && (chunk.info.cipherType == RRES_CIPHER_NONE))
     {
-        text = RL_CALLOC(chunk.data.props[0] + 1, 1);   // We add NULL terminator, just in case
+        text = (char *)RL_CALLOC(chunk.data.props[0] + 1, 1);   // We add NULL terminator, just in case
         if (text != NULL) memcpy(text, chunk.data.raw, chunk.data.props[0]);
 
         // TODO: We got some extra text properties, in case they could be useful for users:
@@ -892,7 +892,7 @@ static char *LoadTextFromResourceChunk(rresResourceChunk chunk, unsigned int *co
     }
     else RRES_LOG("RRES: %c%c%c%c: WARNING: Data must be decompressed/decrypted\n", chunk.info.type[0], chunk.info.type[1], chunk.info.type[2], chunk.info.type[3]);
 
-    return (char *)text;
+    return text;
 }
 
 // Load data chunk: RRES_DATA_IMAGE
