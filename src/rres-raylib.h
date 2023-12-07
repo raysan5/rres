@@ -736,7 +736,7 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
             {
                 int uncompDataSize = 0;
                 uncompData = (unsigned char *)RRES_CALLOC(chunk->info.baseSize, 1);
-                uncompDataSize = LZ4_decompress_safe(decryptedData, uncompData, chunk->info.packedSize, chunk->info.baseSize);
+                uncompDataSize = LZ4_decompress_safe((char *)decryptedData, (char *)uncompData, chunk->info.packedSize, chunk->info.baseSize);
 
                 if ((uncompData != NULL) && (uncompDataSize > 0))     // Decompression successful
                 {
