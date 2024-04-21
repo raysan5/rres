@@ -273,7 +273,7 @@ Wave LoadWaveFromResource(rresResourceChunk chunk)
             wave.sampleSize = chunk.data.props[2];
             wave.channels = chunk.data.props[3];
 
-            unsigned int size = wave.frameCount*wave.sampleSize/8;
+            unsigned int size = wave.frameCount*wave.sampleSize*wave.channels/8;
             wave.data = RL_CALLOC(size, 1);
             memcpy(wave.data, chunk.data.raw, size);
         }
