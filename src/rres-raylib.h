@@ -168,7 +168,7 @@ static char *LoadTextFromResourceChunk(rresResourceChunk chunk, unsigned int *co
 static Image LoadImageFromResourceChunk(rresResourceChunk chunk);                        // Load chunk: RRES_DATA_IMAGE
 
 static const char *GetExtensionFromProps(unsigned int ext01, unsigned int ext02);        // Get file extension from RRES_DATA_RAW properties (unsigned int) 
-static unsigned int *ComputeMD5(unsigned char *data, int size);                          // Compute MD5 hash code, returns 4 integers array (static)
+static unsigned int *ComputeMD5(const unsigned char *data, int size);                    // Compute MD5 hash code, returns 4 integers array (static)
 
 //----------------------------------------------------------------------------------
 // Module Functions Definition
@@ -976,7 +976,7 @@ static const char *GetExtensionFromProps(unsigned int ext01, unsigned int ext02)
 }
 
 // Compute MD5 hash code, returns 4 integers array (static)
-static unsigned int *ComputeMD5(unsigned char *data, int size)
+static unsigned int *ComputeMD5(const unsigned char *data, int size)
 {
 #define LEFTROTATE(x, c) (((x) << (c)) | ((x) >> (32 - (c))))
 
