@@ -36,7 +36,7 @@
 *
 *   LICENSE: MIT
 *
-*   Copyright (c) 2020-2024 Ramon Santamaria (@raysan5)
+*   Copyright (c) 2020-2025 Ramon Santamaria (@raysan5)
 *
 *   Permission is hereby granted, free of charge, to any person obtaining a copy
 *   of this software and associated documentation files (the "Software"), to deal
