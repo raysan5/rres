@@ -504,7 +504,7 @@ RRESAPI void rresUnloadCentralDirectory(rresCentralDir dir);                    
 RRESAPI unsigned int rresGetDataType(const unsigned char *fourCC);                  // Get rresResourceDataType from FourCC code
 RRESAPI int rresGetResourceId(rresCentralDir dir, const char *fileName);            // Get resource id for a provided filename
                                                                                     // NOTE: It requires CDIR available in the file (it's optinal by design)
-RRESAPI unsigned int rresComputeCRC32(const unsigned char *data, int len);          // Compute CRC32 for provided data
+RRESAPI unsigned int rresComputeCRC32(const char *data, int len);                   // Compute CRC32 for provided data
 
 // Manage password for data encryption/decryption
 // NOTE: The cipher password is kept as an internal pointer to provided string, it's up to the user to manage that sensible data properly
@@ -518,7 +518,6 @@ RRESAPI const char *rresGetCipherPassword(void);                      // Get pas
 #endif
 
 #endif // RRES_H
-
 
 /***********************************************************************************
 *
@@ -987,7 +986,7 @@ int rresGetResourceId(rresCentralDir dir, const char *fileName)
 
 // Compute CRC32 hash
 // NOTE: CRC32 is used as rres id, generated from original filename
-unsigned int rresComputeCRC32(const unsigned char *data, int len)
+unsigned int rresComputeCRC32(const char *data, int len)
 {
     static unsigned int crcTable[256] = {
         0x00000000, 0x77073096, 0xEE0E612C, 0x990951BA, 0x076DC419, 0x706AF48F, 0xE963A535, 0x9E6495A3,
@@ -1056,7 +1055,7 @@ static rresResourceChunkData rresLoadResourceChunkData(rresResourceChunkInfo inf
     rresResourceChunkData chunkData = { 0 };
 
     // CRC32 data validation, verify packed data is not corrupted
-    unsigned int crc32 = rresComputeCRC32((unsigned char *)data, info.packedSize);
+    unsigned int crc32 = rresComputeCRC32((char *)data, info.packedSize);
 
     if ((rresGetDataType(info.type) != RRES_DATA_NULL) && (crc32 == info.crc32))   // Make sure chunk contains data and data is not corrupted
     {
