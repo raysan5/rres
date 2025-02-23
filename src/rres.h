@@ -1055,7 +1055,7 @@ static rresResourceChunkData rresLoadResourceChunkData(rresResourceChunkInfo inf
     rresResourceChunkData chunkData = { 0 };
 
     // CRC32 data validation, verify packed data is not corrupted
-    unsigned int crc32 = rresComputeCRC32((char *)data, info.packedSize);
+    unsigned int crc32 = rresComputeCRC32((unsigned char *)data, info.packedSize);
 
     if ((rresGetDataType(info.type) != RRES_DATA_NULL) && (crc32 == info.crc32))   // Make sure chunk contains data and data is not corrupted
     {
@@ -1073,7 +1073,7 @@ static rresResourceChunkData rresLoadResourceChunkData(rresResourceChunkInfo inf
 
             int rawSize = info.baseSize - sizeof(int) - (chunkData.propCount*sizeof(int));
             chunkData.raw = RRES_MALLOC(rawSize);
-            memcpy(chunkData.raw, ((unsigned char *)data) + sizeof(int) + (chunkData.propCount*sizeof(int)), rawSize);
+            if (chunkData.raw != NULL) memcpy(chunkData.raw, ((unsigned char *)data) + sizeof(int) + (chunkData.propCount*sizeof(int)), rawSize);
         }
         else
         {
@@ -1081,7 +1081,7 @@ static rresResourceChunkData rresLoadResourceChunkData(rresResourceChunkInfo inf
             // We just return the loaded resource packed data from .rres file,
             // it's up to the user to manage decompression/decryption on user library
             chunkData.raw = RRES_MALLOC(info.packedSize);
-            memcpy(chunkData.raw, (unsigned char *)data, info.packedSize);
+            if (chunkData.raw != NULL) memcpy(chunkData.raw, (unsigned char *)data, info.packedSize);
         }
     }
 
