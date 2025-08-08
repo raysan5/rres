@@ -5,25 +5,25 @@
 *   CONFIGURATION:
 *
 *   #define RRES_IMPLEMENTATION
-*       Generates the implementation of the library into the included file.
+*       Generates the implementation of the library into the included file
 *       If not defined, the library is in header only mode and can be included in other headers
-*       or source files without problems. But only ONE file should hold the implementation.
+*       or source files without problems. But only ONE file should hold the implementation
 *
 *   FEATURES:
 *
 *     - Multi-resource files: Some files could end-up generating multiple connected resources in
-*       the rres output file (i.e TTF files could generate RRES_DATA_FONT_GLYPHS and RRES_DATA_IMAGE).
-*     - File packaging as raw resource data: Avoid data processing and just package the file bytes.
-*     - Per-file data compression/encryption: Configure compression/encription for every input file.
+*       the rres output file (i.e TTF files could generate RRES_DATA_FONT_GLYPHS and RRES_DATA_IMAGE)
+*     - File packaging as raw resource data: Avoid data processing and just package the file bytes
+*     - Per-file data compression/encryption: Configure compression/encription for every input file
 *     - Externally linked files: Package only the file path, to be loaded from external file when the
-*       specific id is requested. WARNING: Be careful with path, it should be relative to application dir.
+*       specific id is requested. WARNING: Be careful with path, it should be relative to application dir
 *     - Central Directory resource (optional): Create a central directory with the input filename relation
 *       to the resource(s) id. This is the default option but it can be avoided; in that case, a header
-*       file (.h) is generated with the file ids definitions.
+*       file (.h) is generated with the file ids definitions
 *
 *   FILE STRUCTURE:
 *
-*   rres files consist of a file header followed by a number of resource chunks.
+*   rres files consist of a file header followed by a number of resource chunks
 *
 *   Optionally it can contain a Central Directory resource chunk (usually at the end) with the info
 *   of all the files processed into the rres file.
@@ -92,7 +92,7 @@
 *     - Compression and Encryption. rres supports chunks data compression and encryption, it provides two fields in the rresResourceChunkInfo to
 *       note it, but in those cases is up to the user to implement the desired compressor/uncompressor and encryption/decryption mechanisms
 *       In case of data encryption, it's recommended that any additional resource data (i.e. MAC) to be appended to data chunk and properly
-*       noted in the packed data size field of rresResourceChunkInfo. Data compression should be applied before encryption.
+*       noted in the packed data size field of rresResourceChunkInfo. Data compression should be applied before encryption
 *
 *   DEPENDENCIES:
 *
@@ -375,7 +375,7 @@ typedef enum rresErrorType {
     RRES_SUCCESS = 0,                       // rres file loaded/saved successfully
     RRES_ERROR_FILE_NOT_FOUND,              // rres file can not be opened (spelling issues, file actually does not exist...)
     RRES_ERROR_FILE_FORMAT,                 // rres file format not a supported (wrong header, wrong identifier)
-    RRES_ERROR_MEMORY_ALLOC,                // Memory could not be allocated for operation.
+    RRES_ERROR_MEMORY_ALLOC,                // Memory could not be allocated for operation
 } rresErrorType;
 
 // Enums required by specific resource types for its properties
