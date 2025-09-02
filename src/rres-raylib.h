@@ -157,7 +157,7 @@ RLAPI void SetBaseDirectory(const char *baseDir);               // Set base dire
 static const char *baseDir = NULL;      // Base directory pointer, used on external linked data loading
 
 //----------------------------------------------------------------------------------
-// Module specific Functions Declaration
+// Module Internal Functions Declaration
 //----------------------------------------------------------------------------------
 
 // Load simple data chunks that are later required by multi-chunk resources
@@ -816,7 +816,7 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
 }
 
 //----------------------------------------------------------------------------------
-// Module specific Functions Definition
+// Module Internal Functions Definition
 //----------------------------------------------------------------------------------
 
 // Load data chunk: RRES_DATA_LINK

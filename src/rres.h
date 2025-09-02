@@ -545,7 +545,7 @@ RRESAPI const char *rresGetCipherPassword(void);                      // Get pas
 //...
 
 //----------------------------------------------------------------------------------
-// Types and Structures Definition
+// Module Types and Structures Definition
 //----------------------------------------------------------------------------------
 //...
 
