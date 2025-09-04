@@ -1,3 +1,8 @@
+# Ignore everything in rres submodule except src/
+*
+!src/
+!src/**
+
 # Prerequisites
 *.d
 
