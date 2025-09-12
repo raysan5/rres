@@ -487,15 +487,15 @@ extern "C" {            // Prevents name mangling of functions
 #endif
 
 // Load only one resource chunk (first resource id found)
-RRESAPI rresResourceChunk rresLoadResourceChunk(const char *fileName, int rresId);  // Load one resource chunk for provided id
+RRESAPI rresResourceChunk rresLoadResourceChunk(const char *fileName, unsigned int rresId);  // Load one resource chunk for provided id
 RRESAPI void rresUnloadResourceChunk(rresResourceChunk chunk);                      // Unload resource chunk from memory
 
 // Load multi resource chunks for a specified rresId
-RRESAPI rresResourceMulti rresLoadResourceMulti(const char *fileName, int rresId);  // Load resource for provided id (multiple resource chunks)
+RRESAPI rresResourceMulti rresLoadResourceMulti(const char *fileName, unsigned int rresId);  // Load resource for provided id (multiple resource chunks)
 RRESAPI void rresUnloadResourceMulti(rresResourceMulti multi);                      // Unload resource from memory (multiple resource chunks)
 
 // Load resource(s) chunk info from file
-RRESAPI rresResourceChunkInfo rresLoadResourceChunkInfo(const char *fileName, int rresId);  // Load resource chunk info for provided id
+RRESAPI rresResourceChunkInfo rresLoadResourceChunkInfo(const char *fileName, unsigned int rresId);  // Load resource chunk info for provided id
 RRESAPI rresResourceChunkInfo *rresLoadResourceChunkInfoAll(const char *fileName, unsigned int *chunkCount); // Load all resource chunks info
 
 RRESAPI rresCentralDir rresLoadCentralDirectory(const char *fileName);              // Load central directory resource chunk from file
@@ -504,7 +504,7 @@ RRESAPI void rresUnloadCentralDirectory(rresCentralDir dir);                    
 RRESAPI unsigned int rresGetDataType(const unsigned char *fourCC);                  // Get rresResourceDataType from FourCC code
 RRESAPI int rresGetResourceId(rresCentralDir dir, const char *fileName);            // Get resource id for a provided filename
                                                                                     // NOTE: It requires CDIR available in the file (it's optinal by design)
-RRESAPI unsigned int rresComputeCRC32(unsigned char *data, int len);                   // Compute CRC32 for provided data
+RRESAPI unsigned int rresComputeCRC32(const unsigned char *data, int len);          // Compute CRC32 for provided data
 
 // Manage password for data encryption/decryption
 // NOTE: The cipher password is kept as an internal pointer to provided string, it's up to the user to manage that sensible data properly
@@ -564,7 +564,7 @@ static rresResourceChunkData rresLoadResourceChunkData(rresResourceChunkInfo inf
 // Module Functions Definition
 //----------------------------------------------------------------------------------
 // Load one resource chunk for provided id
-rresResourceChunk rresLoadResourceChunk(const char *fileName, int rresId)
+rresResourceChunk rresLoadResourceChunk(const char *fileName, unsigned int rresId)
 {
     rresResourceChunk chunk = { 0 };
 
@@ -661,7 +661,7 @@ void rresUnloadResourceChunk(rresResourceChunk chunk)
 
 // Load resource from file by id
 // NOTE: All resources conected to base id are loaded
-rresResourceMulti rresLoadResourceMulti(const char *fileName, int rresId)
+rresResourceMulti rresLoadResourceMulti(const char *fileName, unsigned int rresId)
 {
     rresResourceMulti rres = { 0 };
 
@@ -774,7 +774,7 @@ void rresUnloadResourceMulti(rresResourceMulti multi)
 }
 
 // Load resource chunk info for provided id
-RRESAPI rresResourceChunkInfo rresLoadResourceChunkInfo(const char *fileName, int rresId)
+RRESAPI rresResourceChunkInfo rresLoadResourceChunkInfo(const char *fileName, unsigned int rresId)
 {
     rresResourceChunkInfo info = { 0 };
 
@@ -986,7 +986,7 @@ int rresGetResourceId(rresCentralDir dir, const char *fileName)
 
 // Compute CRC32 hash
 // NOTE: CRC32 is used as rres id, generated from original filename
-unsigned int rresComputeCRC32(unsigned char *data, int len)
+unsigned int rresComputeCRC32(const unsigned char *data, int len)
 {
     static unsigned int crcTable[256] = {
         0x00000000, 0x77073096, 0xee0e612c, 0x990951ba, 0x076dc419, 0x706af48f, 0xe963a535, 0x9e6495a3,
@@ -1055,7 +1055,7 @@ static rresResourceChunkData rresLoadResourceChunkData(rresResourceChunkInfo inf
     rresResourceChunkData chunkData = { 0 };
 
     // CRC32 data validation, verify packed data is not corrupted
-    unsigned int crc32 = rresComputeCRC32((unsigned char *)data, info.packedSize);
+    unsigned int crc32 = rresComputeCRC32((const unsigned char *)data, info.packedSize);
 
     if ((rresGetDataType(info.type) != RRES_DATA_NULL) && (crc32 == info.crc32))   // Make sure chunk contains data and data is not corrupted
     {
