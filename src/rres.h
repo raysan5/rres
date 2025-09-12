@@ -535,7 +535,7 @@ RRESAPI const char *rresGetCipherPassword(void);                      // Get pas
     #define RL_BOOL_TYPE
 #endif
 
-#include <stdlib.h>                 // Required for: malloc(), free()
+#include <stdlib.h>                 // Required for: malloc(), calloc(), free()
 #include <stdio.h>                  // Required for: FILE, fopen(), fseek(), fread(), fclose()
 #include <string.h>                 // Required for: memcpy(), memcmp()
 
@@ -624,7 +624,7 @@ rresResourceChunk rresLoadResourceChunk(const char *fileName, int rresId)
 
                     // Read and resource chunk from file data
                     // NOTE: Read data can be compressed/encrypted, it's up to the user library to manage decompression/decryption
-                    void *data = RRES_MALLOC(info.packedSize);    // Allocate enough memory to store resource data chunk
+                    void *data = RRES_CALLOC(info.packedSize, 1); // Allocate enough memory to store resource data chunk
                     fread(data, info.packedSize, 1, rresFile);    // Read data: propsCount + props[] + data (+additional_data)
 
                     // Get chunk.data properly organized (only if uncompressed/unencrypted)
@@ -715,7 +715,7 @@ rresResourceMulti rresLoadResourceMulti(const char *fileName, int rresId)
                     // Read and load data chunk from file data
                     // NOTE: Read data can be compressed/encrypted,
                     // it's up to the user library to manage decompression/decryption
-                    void *data = RRES_MALLOC(info.packedSize);              // Allocate enough memory to store resource data chunk
+                    void *data = RRES_CALLOC(info.packedSize, 1);           // Allocate enough memory to store resource data chunk
                     fread(data, info.packedSize, 1, rresFile);              // Read data: propsCount + props[] + data (+additional_data)
 
                     // Get chunk.data properly organized (only if uncompressed/unencrypted)
@@ -734,7 +734,7 @@ rresResourceMulti rresLoadResourceMulti(const char *fileName, int rresId)
 
                         RRES_LOG("RRES: %c%c%c%c: Id: 0x%08x | Base size: %i | Packed size: %i\n", info.type[0], info.type[1], info.type[2], info.type[3], info.id, info.baseSize, info.packedSize);
 
-                        void *data = RRES_MALLOC(info.packedSize);          // Allocate enough memory to store resource data chunk
+                        void *data = RRES_CALLOC(info.packedSize, 1);       // Allocate enough memory to store resource data chunk
                         fread(data, info.packedSize, 1, rresFile);          // Read data: propsCount + props[] + data (+additional_data)
 
                         // Get chunk.data properly organized (only if uncompressed/unencrypted)
@@ -881,7 +881,7 @@ rresCentralDir rresLoadCentralDirectory(const char *fileName)
                 {
                     RRES_LOG("RRES: CDIR: Central Directory found at offset: 0x%08x\n", header.cdOffset);
 
-                    void *data = RRES_MALLOC(info.packedSize);
+                    void *data = RRES_CALLOC(info.packedSize, 1);
                     fread(data, info.packedSize, 1, rresFile);
 
                     // Load resource chunk data (central directory), data is uncompressed/unencrypted by default
@@ -1072,7 +1072,7 @@ static rresResourceChunkData rresLoadResourceChunkData(rresResourceChunkInfo inf
             }
 
             int rawSize = info.baseSize - sizeof(int) - (chunkData.propCount*sizeof(int));
-            chunkData.raw = RRES_MALLOC(rawSize);
+            chunkData.raw = RRES_CALLOC(rawSize, 1);
             if (chunkData.raw != NULL) memcpy(chunkData.raw, ((unsigned char *)data) + sizeof(int) + (chunkData.propCount*sizeof(int)), rawSize);
         }
         else
@@ -1080,7 +1080,7 @@ static rresResourceChunkData rresLoadResourceChunkData(rresResourceChunkInfo inf
             // Data is compressed/encrypted
             // We just return the loaded resource packed data from .rres file,
             // it's up to the user to manage decompression/decryption on user library
-            chunkData.raw = RRES_MALLOC(info.packedSize);
+            chunkData.raw = RRES_CALLOC(info.packedSize, 1);
             if (chunkData.raw != NULL) memcpy(chunkData.raw, (unsigned char *)data, info.packedSize);
         }
     }
