@@ -26,7 +26,7 @@
 *     - rres.h:   Base implementation of rres specs, required to read rres files and resource chunks
 *     - lz4.h:    LZ4 compression support (optional)
 *     - aes.h:    AES-256 CTR encryption support (optional)
-*     - monocypher.h: for XChaCha20-Poly1305 encryption support (optional) 
+*     - monocypher.h: for XChaCha20-Poly1305 encryption support (optional)
 *
 *   VERSION HISTORY:
 *
@@ -99,11 +99,11 @@ RLAPI Mesh LoadMeshFromResource(rresResourceMulti multi);       // Load Mesh dat
 // Unpack resource chunk data (decompres/decrypt data)
 // NOTE: Function return 0 on success or other value on failure
 RLAPI int UnpackResourceChunk(rresResourceChunk *chunk);        // Unpack resource chunk data (decompress/decrypt)
-                                                            
+
 // Set base directory for externally linked data
 // NOTE: When resource chunk contains an external link (FourCC: LINK, Type: RRES_DATA_LINK),
 // a base directory is required to be prepended to link path
-// If not provided, the application path is prepended to link by default 
+// If not provided, the application path is prepended to link by default
 RLAPI void SetBaseDirectory(const char *baseDir);               // Set base directory for externally linked data
 
 #if defined(__cplusplus)
@@ -167,7 +167,7 @@ static void *LoadDataFromResourceChunk(rresResourceChunk chunk, unsigned int *si
 static char *LoadTextFromResourceChunk(rresResourceChunk chunk, unsigned int *codeLang); // Load chunk: RRES_DATA_TEXT
 static Image LoadImageFromResourceChunk(rresResourceChunk chunk);                        // Load chunk: RRES_DATA_IMAGE
 
-static const char *GetExtensionFromProps(unsigned int ext01, unsigned int ext02);        // Get file extension from RRES_DATA_RAW properties (unsigned int) 
+static const char *GetExtensionFromProps(unsigned int ext01, unsigned int ext02);        // Get file extension from RRES_DATA_RAW properties (unsigned int)
 
 //----------------------------------------------------------------------------------
 // Module Functions Definition
@@ -408,7 +408,7 @@ Mesh LoadMeshFromResource(rresResourceMulti multi)
             if (rresGetDataType(multi.chunks[i].info.type) == RRES_DATA_VERTEX)
             {
                 // In case vertex count do not match we skip that resource chunk
-                if ((multi.chunks[i].data.props[1] != RRES_VERTEX_ATTRIBUTE_INDEX) && (multi.chunks[i].data.props[0] != mesh.vertexCount)) continue;
+                if ((multi.chunks[i].data.props[1] != RRES_VERTEX_ATTRIBUTE_INDEX) && (multi.chunks[i].data.props[0] != (unsigned int)mesh.vertexCount)) continue;
 
                 // NOTE: We are only loading raylib supported rresVertexFormat and raylib expected components count
                 switch (multi.chunks[i].data.props[1])    // Check rresVertexAttribute value
@@ -529,7 +529,7 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
     // NOTE 1: If data is compressed/encrypted the properties are not loaded by rres.h because
     // it's up to the user to process the data; *chunk must be properly updated by this function
     // NOTE 2: rres-raylib should support the same algorithms and libraries used by rrespacker tool
-    void *unpackedData = NULL;    
+    void *unpackedData = NULL;
 
     // STEP 1. Data decryption
     //-------------------------------------------------------------------------------------
@@ -556,7 +556,7 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
             // Retrieve salt from chunk packed data
             // salt is stored at the end of packed data, before nonce and MAC: salt[16] + MD5[16]
             memcpy(salt, ((unsigned char *)chunk->data.raw) + (chunk->info.packedSize - 16 - 16), 16);
-            
+
             // Key stretching configuration
             crypto_argon2_config config = {
                 .algorithm = CRYPTO_ARGON2_I,           // Algorithm: Argon2i
@@ -631,7 +631,7 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
             // Retrieve salt from chunk packed data
             // salt is stored at the end of packed data, before nonce and MAC: salt[16] + nonce[24] + MAC[16]
             memcpy(salt, ((unsigned char *)chunk->data.raw) + (chunk->info.packedSize - 16 - 24 - 16), 16);
-            
+
             // Key stretching configuration
             crypto_argon2_config config = {
                 .algorithm = CRYPTO_ARGON2_I,           // Algorithm: Argon2i
@@ -684,7 +684,7 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
             }
         } break;
 #endif
-        default: 
+        default:
         {
             result = 1;    // Decryption algorithm not supported
             RRES_LOG("RRES: WARNING: %c%c%c%c: Chunk data encryption algorithm not supported\n", chunk->info.type[0], chunk->info.type[1], chunk->info.type[2], chunk->info.type[3]);
@@ -728,7 +728,7 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
                 }
 
                 // Security check, uncompDataSize must match the provided chunk->baseSize
-                if (uncompDataSize != chunk->info.baseSize) RRES_LOG("RRES: WARNING: Decompressed data could be corrupted, unexpected size\n");
+                if ((unsigned int)uncompDataSize != chunk->info.baseSize) RRES_LOG("RRES: WARNING: Decompressed data could be corrupted, unexpected size\n");
             } break;
 #if defined(RRES_SUPPORT_COMPRESSION_LZ4)
             case RRES_COMP_LZ4:
@@ -774,7 +774,7 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
                     RRES_LOG("RRES: WARNING: %c%c%c%c: Chunk data decompression failed\n", chunk->info.type[0], chunk->info.type[1], chunk->info.type[2], chunk->info.type[3]);
                 }
 
-                if (uncompDataSize != chunk->info.baseSize) RRES_LOG("RRES: WARNING: Decompressed data could be corrupted, unexpected size\n");
+                if ((unsigned int)uncompDataSize != chunk->info.baseSize) RRES_LOG("RRES: WARNING: Decompressed data could be corrupted, unexpected size\n");
             } break;
             default:
             {
@@ -794,7 +794,7 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
     // Update chunk->data.propCount and chunk->data.props if required
     if (updateProps && (unpackedData != NULL))
     {
-        // Data is decompressed/decrypted into chunk->data.raw but data.propCount and data.props[] are still empty, 
+        // Data is decompressed/decrypted into chunk->data.raw but data.propCount and data.props[] are still empty,
         // they must be filled with the just updated chunk->data.raw (that contains everything)
         chunk->data.propCount = ((int *)unpackedData)[0];
 
@@ -832,7 +832,7 @@ static void *LoadDataFromResourceLink(rresResourceChunk chunk, unsigned int *siz
 
     // Get base directory to append filepath if not provided by user
     if (baseDir == NULL) baseDir = GetApplicationDirectory();
-    
+
     strcpy(fullFilePath, baseDir);
     strcat(fullFilePath, linkFilePath);
 
@@ -952,14 +952,14 @@ static Image LoadImageFromResourceChunk(rresResourceChunk chunk)
     return image;
 }
 
-// Get file extension from RRES_DATA_RAW properties (unsigned int) 
+// Get file extension from RRES_DATA_RAW properties (unsigned int)
 static const char *GetExtensionFromProps(unsigned int ext01, unsigned int ext02)
 {
     static char extension[8] = { 0 };
     memset(extension, 0, 8);
 
-    // Convert file extension provided as 2 unsigned int properties, to a char[] array 
-    // NOTE: Extension is defined as 2 unsigned int big-endian values (4 bytes each), 
+    // Convert file extension provided as 2 unsigned int properties, to a char[] array
+    // NOTE: Extension is defined as 2 unsigned int big-endian values (4 bytes each),
     // starting with a dot, i.e 0x2e706e67 => ".png"
     extension[0] = (unsigned char)((ext01 & 0xff000000) >> 24);
     extension[1] = (unsigned char)((ext01 & 0x00ff0000) >> 16);
