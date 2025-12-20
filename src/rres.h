@@ -249,9 +249,13 @@ typedef struct rresCentralDir {
 // FNTG: rres font glyphs info (32 bytes)
 // NOTE: And array of this type conforms the rresResourceChunkData
 typedef struct rresFontGlyphInfo {
-    int x, y, width, height;        // Glyph rectangle in the atlas image
+    int x;                          // Glyph rectangle X in the atlas image
+    int y;                          // Glyph rectangle Y in the atlas image
+    int width;                      // Glyph rectangle width in the atlas image
+    int height;                     // Glyph rectangle height in the atlas image
     int value;                      // Glyph codepoint value
-    int offsetX, offsetY;           // Glyph drawing offset (from base line)
+    int offsetX;                    // Glyph drawing offset X (from base line)
+    int offsetY;                    // Glyph drawing offset Y (from base line)
     int advanceX;                   // Glyph advance X for next character
 } rresFontGlyphInfo;
 
