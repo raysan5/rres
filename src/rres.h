@@ -506,7 +506,7 @@ RRESAPI rresCentralDir rresLoadCentralDirectory(const char *fileName);          
 RRESAPI void rresUnloadCentralDirectory(rresCentralDir dir);                        // Unload central directory resource chunk
 
 RRESAPI unsigned int rresGetDataType(const unsigned char *fourCC);                  // Get rresResourceDataType from FourCC code
-RRESAPI int rresGetResourceId(rresCentralDir dir, const char *fileName);            // Get resource id for a provided filename
+RRESAPI unsigned int rresGetResourceId(rresCentralDir dir, const char *fileName);            // Get resource id for a provided filename
                                                                                     // NOTE: It requires CDIR available in the file (it's optinal by design)
 RRESAPI unsigned int rresComputeCRC32(const unsigned char *data, int len);          // Compute CRC32 for provided data
 
@@ -969,9 +969,9 @@ unsigned int rresGetDataType(const unsigned char *fourCC)
 
 // Get resource identifier from filename
 // WARNING: It requires the central directory previously loaded
-int rresGetResourceId(rresCentralDir dir, const char *fileName)
+unsigned int rresGetResourceId(rresCentralDir dir, const char *fileName)
 {
-    int id = 0;
+    unsigned int id = 0;
 
     for (unsigned int i = 0, len = 0; i < dir.count; i++)
     {
