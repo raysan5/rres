@@ -84,7 +84,7 @@
 *       Endianness won't affect chunk data but it will affect rresFileHeader and rresResourceChunkInfo
 *     - CRC32 hash is used to to generate the rres file identifier from filename
 *       There is a "small" probability of random collision (1 in 2^32 approx.) but considering
-*       the chance of collision is related to the number of data inputs, not the size of the inputs, we assume that risk
+*       the chance of collision is related to the number of data inputs, not the size of the inputs, assuming that risk
 *       Also note that CRC32 is not used as a security/cryptographic hash, just an identifier for the input file
 *     - CRC32 hash is also used to detect chunk data corruption. CRC32 is smaller and computationally much less complex than MD5 or SHA1.
 *       Using a hash function like MD5 is probably overkill for random error detection
@@ -140,9 +140,9 @@
 // NOTE: Microsoft specifiers to tell compiler that symbols are imported/exported from a .dll
 #if defined(_WIN32)
     #if defined(BUILD_LIBTYPE_SHARED)
-        #define RRESAPI __declspec(dllexport)     // We are building the library as a Win32 shared library (.dll)
+        #define RRESAPI __declspec(dllexport)     // Building the library as a Win32 shared library (.dll)
     #elif defined(USE_LIBTYPE_SHARED)
-        #define RRESAPI __declspec(dllimport)     // We are using the library as a Win32 shared library (.dll)
+        #define RRESAPI __declspec(dllimport)     // Using the library as a Win32 shared library (.dll)
     #endif
 #endif
 
@@ -605,8 +605,8 @@ rresResourceChunk rresLoadResourceChunk(const char *fileName, unsigned int rresI
                     RRES_LOG("RRES: INFO: Found requested resource id: 0x%08x\n", info.id);
                     RRES_LOG("RRES: %c%c%c%c: Id: 0x%08x | Base size: %i | Packed size: %i\n", info.type[0], info.type[1], info.type[2], info.type[3], info.id, info.baseSize, info.packedSize);
 
-                    // NOTE: We only load first matching id resource chunk found but
-                    // we show a message if additional chunks are detected
+                    // NOTE: Only loading first matching id resource chunk found but
+                    // showing a message if additional chunks are detected
                     if (info.nextOffset != 0) RRES_LOG("RRES: WARNING: Multiple linked resource chunks available for the provided id");
 
                     /*
@@ -804,7 +804,7 @@ RRESAPI rresResourceChunkInfo rresLoadResourceChunkInfo(const char *fileName, un
                     // TODO: Jump to next resource chunk for provided id
                     //if (info.nextOffset > 0) fseek(rresFile, info.nextOffset, SEEK_SET);
 
-                    break; // If requested rresId is found, we return the read rresResourceChunkInfo
+                    break; // If requested rresId is found, return the read rresResourceChunkInfo
                 }
                 else fseek(rresFile, info.packedSize, SEEK_CUR); // Jump to next resource
             }
@@ -1082,7 +1082,7 @@ static rresResourceChunkData rresLoadResourceChunkData(rresResourceChunkInfo inf
         else
         {
             // Data is compressed/encrypted
-            // We just return the loaded resource packed data from .rres file,
+            // Just return the loaded resource packed data from .rres file,
             // it's up to the user to manage decompression/decryption on user library
             chunkData.raw = RRES_CALLOC(info.packedSize, 1);
             if (chunkData.raw != NULL) memcpy(chunkData.raw, (unsigned char *)data, info.packedSize);
