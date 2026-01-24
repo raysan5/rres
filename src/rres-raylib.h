@@ -565,9 +565,9 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
                 .nb_lanes  = 1                          // Single-threaded
             };
             crypto_argon2_inputs inputs = {
-                .pass = (const uint8_t *)rresGetCipherPassword(), // User password
+                .pass = (const uint8_t *)rresGetCipherPassword(),     // User password
+                .pass_size = 16,                        // Password length
                 .salt = salt,                           // Salt for the password
-                .pass_size = (uint32_t)strlen(rresGetCipherPassword()), // Password length
                 .salt_size = 16
             };
             crypto_argon2_extras extras = { 0 };        // Extra parameters unused
@@ -640,9 +640,9 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
                 .nb_lanes  = 1                          // Single-threaded
             };
             crypto_argon2_inputs inputs = {
-                .pass = (const uint8_t *)rresGetCipherPassword(), // User password
-                .salt = salt,  // Salt for the password
-                .pass_size = (uint32_t)strlen(rresGetCipherPassword()), // Password length
+                .pass = (const uint8_t *)rresGetCipherPassword(),     // User password
+                .pass_size = 16,                        // Password length
+                .salt = salt,                           // Salt for the password
                 .salt_size = 16
             };
             crypto_argon2_extras extras = { 0 };        // Extra parameters unused
@@ -666,7 +666,7 @@ int UnpackResourceChunk(rresResourceChunk *chunk)
             memcpy(mac, ((unsigned char *)chunk->data.raw) + (chunk->info.packedSize - 16), 16);
 
             // Message decryption requires key, nonce and MAC
-            int decryptResult = crypto_aead_unlock(decryptedData, mac, key, nonce, NULL, 0, (unsigned char *)chunk->data.raw, (chunk->info.packedSize - 16 - 24 - 16));
+            int decryptResult = crypto_aead_unlock(decryptedData, mac, key, nonce, NULL, 0, chunk->data.raw, (chunk->info.packedSize - 16 - 24 - 16));
 
             // Wipe secrets if they are no longer needed
             crypto_wipe(nonce, 24);
