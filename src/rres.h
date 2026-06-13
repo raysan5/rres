@@ -175,7 +175,7 @@
     #define RRES_SUPPORT_LOG_INFO   1
 #endif
 
-#if RRES_SUPPORT_LOG_INFO)
+#if RRES_SUPPORT_LOG_INFO
     #define RRES_LOG(...) printf(__VA_ARGS__)
 #else
     #define RRES_LOG(...)
