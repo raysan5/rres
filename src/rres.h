@@ -1064,7 +1064,7 @@ static rresResourceChunkData rresLoadResourceChunkData(rresResourceChunkInfo inf
     // CRC32 data validation, verify packed data is not corrupted
     unsigned int crc32 = rresComputeCRC32((const unsigned char *)data, info.packedSize);
 
-    if ((rresGetDataType(info.type) != RRES_DATA_NULL) && (crc32 == info.crc32))   // Make sure chunk contains data and data is not corrupted
+    if ((rresGetDataType(info.type) != RRES_DATA_NULL) && (crc32 == info.crc32)) // Make sure chunk contains data and data is not corrupted
     {
         // Check if data chunk is compressed/encrypted to retrieve properties + data
         if ((info.compType == RRES_COMP_NONE) && (info.cipherType == RRES_CIPHER_NONE))
