@@ -501,11 +501,11 @@ extern "C" {            // Prevents name mangling of functions
 #endif
 
 // Load only one resource chunk (first resource id found)
-RRESAPI rresResourceChunk rresLoadResourceChunk(const char *fileName, unsigned int rresId);  // Load one resource chunk for provided id
+RRESAPI rresResourceChunk rresLoadResourceChunk(const char *fileName, unsigned int rresId); // Load one resource chunk for provided id
 RRESAPI void rresUnloadResourceChunk(rresResourceChunk chunk);                      // Unload resource chunk from memory
 
 // Load multi resource chunks for a specified rresId
-RRESAPI rresResourceMulti rresLoadResourceMulti(const char *fileName, unsigned int rresId);  // Load resource for provided id (multiple resource chunks)
+RRESAPI rresResourceMulti rresLoadResourceMulti(const char *fileName, unsigned int rresId); // Load resource for provided id (multiple resource chunks)
 RRESAPI void rresUnloadResourceMulti(rresResourceMulti multi);                      // Unload resource from memory (multiple resource chunks)
 
 // Load resource(s) chunk info from file
@@ -915,9 +915,11 @@ rresCentralDir rresLoadCentralDirectory(const char *fileName)
                         dir.entries[i].offset = ((int *)ptr)[1];        // Resource offset in file
                         // NOTE: There is a reserved integer value before fileNameSize
                         dir.entries[i].fileNameSize = ((int *)ptr)[3];  // Resource fileName size
+                        
+                        // Security check, note that provided size could still be larger than actual data
+                        if (dir.entries[i].fileNameSize > RRES_MAX_FILENAME_SIZE) dir.entries[i].fileNameSize = RRES_MAX_FILENAME_SIZE;
 
-                        // Resource fileName, NULL terminated and 0-padded to 4-byte,
-                        // fileNameSize considers NULL and padding
+                        // Resource fileName, NULL terminated and 0-padded to 4-byte, fileNameSize considers NULL and padding
                         memcpy(dir.entries[i].fileName, ptr + 16, dir.entries[i].fileNameSize);
 
                         ptr += (16 + dir.entries[i].fileNameSize);      // Move pointer for next entry
