@@ -1,6 +1,6 @@
 /**********************************************************************************************
 *
-*   rres v1.0 - A simple and easy-to-use file-format to package resources
+*   rres v1.1 - A simple and easy-to-use file-format to package resources
 *
 *   CONFIGURATION:
 *
@@ -105,6 +105,8 @@
 *
 *   VERSION HISTORY:
 *
+*     - 1.1 (xx-Dec-2026): Using unsigned int for rres ids
+*                          Comments review
 *     - 1.0 (12-May-2022): Implementation review for better alignment with rres specs
 *     - 0.9 (28-Apr-2022): Initial implementation of rres specs
 *
