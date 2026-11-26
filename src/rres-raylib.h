@@ -89,22 +89,22 @@ extern "C" {            // Prevents name mangling of functions
 
 // rres data loading to raylib data structures
 // NOTE: Chunk data must be provided uncompressed/unencrypted
-RLAPI void *LoadDataFromResource(rresResourceChunk chunk, unsigned int *size); // Load raw data from rres resource chunk
-RLAPI char *LoadTextFromResource(rresResourceChunk chunk);      // Load text data from rres resource chunk
-RLAPI Image LoadImageFromResource(rresResourceChunk chunk);     // Load Image data from rres resource chunk
-RLAPI Wave LoadWaveFromResource(rresResourceChunk chunk);       // Load Wave data from rres resource chunk
-RLAPI Font LoadFontFromResource(rresResourceMulti multi);       // Load Font data from rres resource multiple chunks
-RLAPI Mesh LoadMeshFromResource(rresResourceMulti multi);       // Load Mesh data from rres resource multiple chunks
+extern void *LoadDataFromResource(rresResourceChunk chunk, unsigned int *size); // Load raw data from rres resource chunk
+extern char *LoadTextFromResource(rresResourceChunk chunk);      // Load text data from rres resource chunk
+extern Image LoadImageFromResource(rresResourceChunk chunk);     // Load Image data from rres resource chunk
+extern Wave LoadWaveFromResource(rresResourceChunk chunk);       // Load Wave data from rres resource chunk
+extern Font LoadFontFromResource(rresResourceMulti multi);       // Load Font data from rres resource multiple chunks
+extern Mesh LoadMeshFromResource(rresResourceMulti multi);       // Load Mesh data from rres resource multiple chunks
 
 // Unpack resource chunk data (decompres/decrypt data)
 // NOTE: Function return 0 on success or other value on failure
-RLAPI int UnpackResourceChunk(rresResourceChunk *chunk);        // Unpack resource chunk data (decompress/decrypt)
+extern int UnpackResourceChunk(rresResourceChunk *chunk);        // Unpack resource chunk data (decompress/decrypt)
 
 // Set base directory for externally linked data
 // NOTE: When resource chunk contains an external link (FourCC: LINK, Type: RRES_DATA_LINK),
 // a base directory is required to be prepended to link path
 // If not provided, the application path is prepended to link by default
-RLAPI void SetBaseDirectory(const char *baseDir);               // Set base directory for externally linked data
+extern void SetBaseDirectory(const char *baseDir);               // Set base directory for externally linked data
 
 #if defined(__cplusplus)
 }

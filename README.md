@@ -356,15 +356,15 @@ A full `rresResourceMulti` can be loaded from the `.rres` file with the provided
 The mapping library includes `rres.h` and provides functionality to map the resource chunks data loaded from the `rres` file into `raylib` structures. The API provided is simple and intuitive, following `raylib` conventions:
 
 ```c
-RLAPI void *LoadDataFromResource(rresResourceChunk chunk, int *size);   // Load raw data from rres resource chunk
-RLAPI char *LoadTextFromResource(rresResourceChunk chunk);              // Load text data from rres resource chunk
-RLAPI Image LoadImageFromResource(rresResourceChunk chunk);             // Load Image data from rres resource chunk
-RLAPI Wave LoadWaveFromResource(rresResourceChunk chunk);               // Load Wave data from rres resource chunk
-RLAPI Font LoadFontFromResource(rresResourceMulti multi);               // Load Font data from rres resource multiple chunks
-RLAPI Mesh LoadMeshFromResource(rresResourceMulti multi);               // Load Mesh data from rres resource multiple chunks
+extern void *LoadDataFromResource(rresResourceChunk chunk, int *size);   // Load raw data from rres resource chunk
+extern char *LoadTextFromResource(rresResourceChunk chunk);              // Load text data from rres resource chunk
+extern Image LoadImageFromResource(rresResourceChunk chunk);             // Load Image data from rres resource chunk
+extern Wave LoadWaveFromResource(rresResourceChunk chunk);               // Load Wave data from rres resource chunk
+extern Font LoadFontFromResource(rresResourceMulti multi);               // Load Font data from rres resource multiple chunks
+extern Mesh LoadMeshFromResource(rresResourceMulti multi);               // Load Mesh data from rres resource multiple chunks
 
-RLAPI int UnpackResourceChunk(rresResourceChunk *chunk);                // Unpack resource chunk data (decompres/decrypt data)
-RLAPI void SetBaseDirectory(const char *baseDir);                       // Set base directory for externally linked data
+extern int UnpackResourceChunk(rresResourceChunk *chunk);                // Unpack resource chunk data (decompres/decrypt data)
+extern void SetBaseDirectory(const char *baseDir);                       // Set base directory for externally linked data
 ```
 
 Note that data decompression/decryption is implemented in this custom library, **`UnpackResourceChunk()`** is provided for the users. `rresResourceChunk` contains compressor/cipher identifier values for convenience. Compressors and ciphers support depends on user implementation and it must be aligned with the packaging tool (`rrespacker`).
