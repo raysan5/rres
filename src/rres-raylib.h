@@ -166,6 +166,7 @@ static void *LoadDataFromResourceLink(rresResourceChunk chunk, unsigned int *siz
 static void *LoadDataFromResourceChunk(rresResourceChunk chunk, unsigned int *size);     // Load chunk: RRES_DATA_RAW
 static char *LoadTextFromResourceChunk(rresResourceChunk chunk, unsigned int *codeLang); // Load chunk: RRES_DATA_TEXT
 static Image LoadImageFromResourceChunk(rresResourceChunk chunk);                        // Load chunk: RRES_DATA_IMAGE
+//static Wave LoadWaveFromResourceChunk(rresResourceChunk chunk);                        // Load chunk: RRES_DATA_WAVE, not needed, directly implemeented in LoadWaveFromResource()
 
 static const char *GetExtensionFromProps(unsigned int ext01, unsigned int ext02);        // Get file extension from RRES_DATA_RAW properties (unsigned int)
 
@@ -276,7 +277,7 @@ Wave LoadWaveFromResource(rresResourceChunk chunk)
             wave.data = RL_CALLOC(size, 1);
             memcpy(wave.data, chunk.data.raw, size);
         }
-        RRES_LOG("RRES: %c%c%c%c: WARNING: Data must be decompressed/decrypted\n", chunk.info.type[0], chunk.info.type[1], chunk.info.type[2], chunk.info.type[3]);
+        else RRES_LOG("RRES: %c%c%c%c: WARNING: Data must be decompressed/decrypted\n", chunk.info.type[0], chunk.info.type[1], chunk.info.type[2], chunk.info.type[3]);
     }
     else if (rresGetDataType(chunk.info.type) == RRES_DATA_RAW)   // Raw wave file
     {
