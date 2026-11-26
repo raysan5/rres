@@ -138,11 +138,16 @@
 
 // Function specifiers in case library is build/used as a shared library (Windows)
 // NOTE: Microsoft specifiers to tell compiler that symbols are imported/exported from a .dll
+// NOTE: visibility("default") attribute makes symbols "visible" when compiled with -fvisibility=hidden
 #if defined(_WIN32)
-    #if defined(BUILD_LIBTYPE_SHARED)
+    #if defined(RRES_BUILD_LIBTYPE_SHARED)
         #define RRESAPI __declspec(dllexport)     // Building the library as a Win32 shared library (.dll)
-    #elif defined(USE_LIBTYPE_SHARED)
+    #elif defined(RRES_USE_LIBTYPE_SHARED)
         #define RRESAPI __declspec(dllimport)     // Using the library as a Win32 shared library (.dll)
+    #endif
+#else
+    #if defined(RRES_BUILD_LIBTYPE_SHARED)
+        #define RRESAPI __attribute__((visibility("default"))) // Building as a Unix shared library (.so/.dylib)
     #endif
 #endif
 
